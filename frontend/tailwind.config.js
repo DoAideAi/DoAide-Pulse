@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['"Schibsted Grotesk"', "system-ui", "-apple-system", "sans-serif"],
+        sans: ['"Inter"', "system-ui", "-apple-system", "sans-serif"],
         mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
         display: ['"Instrument Serif"', "Georgia", "serif"],
       },
@@ -23,8 +23,8 @@ export default {
           strong: "rgb(var(--c-line-strong) / <alpha-value>)",
         },
         brand: {
-          50: "rgba(240, 180, 41, 0.1)",
-          100: "rgba(240, 180, 41, 0.15)",
+          50: "rgba(13, 148, 136, 0.1)",
+          100: "rgba(13, 148, 136, 0.15)",
           300: "rgb(var(--c-brand-300) / <alpha-value>)",
           500: "rgb(var(--c-brand-500) / <alpha-value>)",
           600: "rgb(var(--c-brand-600) / <alpha-value>)",
@@ -41,7 +41,7 @@ export default {
         card: "var(--shadow-card)",
         lift: "var(--shadow-lift)",
         pop: "var(--shadow-pop)",
-        gold: "0 0 20px rgba(240, 180, 41, 0.15)",
+        brand: "0 0 20px rgba(13, 148, 136, 0.15)",
       },
       keyframes: {
         "fade-up": {
