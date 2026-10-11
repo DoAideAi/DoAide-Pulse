@@ -4,7 +4,7 @@ import PublicNav from "../components/PublicNav";
 
 export default function Embed() {
   const [name, setName] = useState("My Newsletter");
-  const [color, setColor] = useState("#F0B429");
+  const [color, setColor] = useState("#0D9488");
   const [layout, setLayout] = useState("compact");
 
   useEffect(() => {

@@ -7,7 +7,7 @@ import DoAideFooter from "../components/DoAideFooter";
 import trackEvent from "../lib/trackEvent";
 import "./LandingPage.css";
 
-const ACCENT = "#F0B429";
+const ACCENT = "#0D9488";
 
 const TYPEWRITER_PHRASES = [
   "AI-researched content",
@@ -97,7 +97,7 @@ const FEATURES = [
     title: "AI Content Research",
     desc: "Scans hundreds of sources to surface stories your audience cares about.",
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#F0B429" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="11" cy="11" r="7" />
         <path d="M16 16l5 5" />
         <path d="M11 8v6M8 11h6" />
@@ -108,7 +108,7 @@ const FEATURES = [
     title: "Smart Subject Lines",
     desc: "AI-scored subject lines that boost open rates by 22% on average.",
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#F0B429" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 4h16v16H4z" />
         <path d="M4 10h16M10 10v10" />
       </svg>
@@ -118,7 +118,7 @@ const FEATURES = [
     title: "Send Time Optimization",
     desc: "Delivers to each subscriber when they are most likely to read.",
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#F0B429" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v5l3 3" />
       </svg>
@@ -128,7 +128,7 @@ const FEATURES = [
     title: "One-Click Publishing",
     desc: "Review the AI draft, make your edits, and publish to your list instantly.",
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#F0B429" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M22 2L2 11l8 3 3 8z" />
         <path d="M22 2L10 14" />
       </svg>
@@ -138,7 +138,7 @@ const FEATURES = [
     title: "Analytics Dashboard",
     desc: "Track opens, clicks, conversions, and subscriber growth in real time.",
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#F0B429" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 20V12M10 20V8M16 20V4M22 20V10" />
       </svg>
     ),
@@ -147,7 +147,7 @@ const FEATURES = [
     title: "Multi-Language Support",
     desc: "Generate newsletters in Hindi, Tamil, Telugu, and more Indian languages.",
     icon: (
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#F0B429" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M2 12h20M12 3a15 15 0 014 9 15 15 0 01-4 9 15 15 0 01-4-9 15 15 0 014-9z" />
       </svg>
@@ -183,19 +183,19 @@ function HeroRobot({ color }) {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 150" width="180" height="150" className="landing-hero-robot">
       <line x1="90" y1="28" x2="90" y2="10" stroke={color} strokeWidth="3" strokeLinecap="round" />
       <circle cx="90" cy="7" r="5" fill={color} className="landing-antenna-glow" />
-      <circle cx="90" cy="7" r="2.5" fill="#F7CC5F" />
+      <circle cx="90" cy="7" r="2.5" fill="#2DD4BF" />
       <rect x="35" y="28" width="110" height="80" rx="22" fill={color} />
-      <rect x="50" y="40" width="80" height="58" rx="14" fill="#D4A017" opacity="0.3" />
+      <rect x="50" y="40" width="80" height="58" rx="14" fill="#0F766E" opacity="0.3" />
       <ellipse cx="62" cy="62" rx="12" ry="14" fill="#0A0A0B" />
       <ellipse cx="118" cy="62" rx="12" ry="14" fill="#0A0A0B" />
-      <circle cx="65" cy="59" r="5" fill="#F7CC5F" />
-      <circle cx="121" cy="59" r="5" fill="#F7CC5F" />
+      <circle cx="65" cy="59" r="5" fill="#2DD4BF" />
+      <circle cx="121" cy="59" r="5" fill="#2DD4BF" />
       <circle cx="67" cy="56" r="2" fill="white" opacity="0.5" />
       <circle cx="123" cy="56" r="2" fill="white" opacity="0.5" />
       <path d="M68 88Q90 102 112 88" stroke="#0A0A0B" strokeWidth="3" fill="none" strokeLinecap="round" />
       <rect x="14" y="48" width="18" height="28" rx="7" fill={color} opacity="0.8" />
       <rect x="148" y="48" width="18" height="28" rx="7" fill={color} opacity="0.8" />
-      <rect x="75" y="108" width="30" height="10" rx="4" fill="#D4A017" />
+      <rect x="75" y="108" width="30" height="10" rx="4" fill="#0F766E" />
       <rect x="52" y="118" width="76" height="28" rx="12" fill={color} />
       <circle cx="90" cy="130" r="5" fill="#0A0A0B" />
     </svg>
@@ -477,7 +477,7 @@ function PricingSection() {
             <ul className="landing-pricing-features">
               {tier.features.map((f) => (
                 <li key={f} className="landing-pricing-feature">
-                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke={tier.highlight ? "#F0B429" : "#6B7280"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke={tier.highlight ? "#0D9488" : "#6B7280"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 8 7 12 13 4" />
                   </svg>
                   {f}
@@ -646,7 +646,7 @@ export default function LandingPage() {
         <a href="https://doaide.com" className="landing-brand">
           <RobotFace size={28} color={ACCENT} />
           <span className="landing-brand-text">
-            DoAide <em>Pulse</em>
+            DoAide <span style={{ color: "rgba(255,255,255,0.25)" }}>|</span> <em>Pulse</em>
           </span>
         </a>
         <nav className="landing-header-nav">
@@ -772,11 +772,22 @@ export default function LandingPage() {
           ))}
         </div>
         <div className="landing-footer-bottom">
-          <a href="https://doaide.com" className="landing-footer-home">
-            <RobotFace size={16} color={ACCENT} />
-            doaide.com
+          <a
+            href="https://doaide.com"
+            className="landing-footer-home"
+            style={{
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20,
+              padding: "4px 12px",
+              fontSize: 10,
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+            }}
+          >
+            <RobotFace size={14} color={ACCENT} />
+            A DoAide Product
           </a>
-          <span className="landing-footer-copy">&copy; 2026 DoAide</span>
+          <span className="landing-footer-copy">&copy; {new Date().getFullYear()} DoAide</span>
         </div>
       </footer>
     </div>

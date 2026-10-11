@@ -12,7 +12,7 @@ const TEMPLATES = [
     category: "Promotion",
     description: "Bold promotional layout with hero banner, feature highlights, and prominent CTA buttons for product launches and sales.",
     preview: {
-      headerBg: "linear-gradient(135deg, #F0B429 0%, #D4A017 100%)",
+      headerBg: "linear-gradient(135deg, #0D9488 0%, #0F766E 100%)",
       headerText: "SUMMER SALE",
       subhead: "Up to 50% off everything",
       sections: ["Feature highlights grid", "Customer testimonials", "Limited-time CTA"],

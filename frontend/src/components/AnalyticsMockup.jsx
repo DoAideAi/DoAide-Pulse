@@ -43,12 +43,12 @@ function GrowthLine() {
     <svg viewBox={`0 0 ${w} ${h + 20}`} width="100%" height="100" className="block">
       <defs>
         <linearGradient id="growth-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#F0B429" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#F0B429" stopOpacity="0" />
+          <stop offset="0%" stopColor="#0D9488" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#0D9488" stopOpacity="0" />
         </linearGradient>
       </defs>
       <polygon points={areaPoints} fill="url(#growth-fill)" />
-      <polyline points={line} fill="none" stroke="#F0B429" strokeWidth="2" strokeLinejoin="round" />
+      <polyline points={line} fill="none" stroke="#0D9488" strokeWidth="2" strokeLinejoin="round" />
       {MOCK_GROWTH.map((d, i) => (
         <text
           key={d.month}
