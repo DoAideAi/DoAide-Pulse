@@ -6,8 +6,8 @@ export default function PublicNav() {
   return (
     <header className="border-b border-line">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <Link to="/" className="flex items-center gap-2 text-lg font-bold text-ink-900">
-          DoAide <span className="text-brand-500">Pulse</span>
+        <Link to="/" className="flex items-center gap-2 text-base font-semibold text-ink-900">
+          DoAide <span className="text-ink-400">|</span> <span className="text-brand-500">Pulse</span>
         </Link>
         <nav aria-label="Public" className="flex items-center gap-5 text-sm">
           <div className="relative">
