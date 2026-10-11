@@ -504,7 +504,7 @@ function typeTone(entry) {
   const type = entry.content_type;
   if (type === "social_thread") return "bg-[rgba(52,211,153,0.15)] text-[#34D399]";
   if (type === "product_spotlight" || type === "feature_spotlight")
-    return "bg-[rgba(240,180,41,0.12)] text-[#D4AF37]";
+    return "bg-[rgba(13,148,136,0.12)] text-[#0D9488]";
   return "bg-[rgba(96,165,250,0.12)] text-[#60A5FA]";
 }
 

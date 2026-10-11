@@ -55,8 +55,8 @@ export default function CrossProductLinks({ page }) {
   if (!links) return null;
 
   return (
-    <aside className="mt-10 border-t border-chrome-200 pt-6 dark:border-chrome-700" aria-label="Explore more DoAide tools">
-      <h3 className="mb-4 text-lg font-semibold text-ink-900 dark:text-chrome-50">
+    <aside className="mt-10 border-t border-line pt-6" aria-label="Explore more DoAide tools">
+      <h3 className="mb-4 text-lg font-semibold text-ink-900">
         Explore More Tools
       </h3>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -64,17 +64,17 @@ export default function CrossProductLinks({ page }) {
           <a
             key={link.href}
             href={link.href}
-            className="group relative flex flex-col gap-1 rounded-lg border border-chrome-200 bg-paper p-4 no-underline transition-all hover:border-brand-400 hover:shadow-sm dark:border-chrome-700 dark:bg-chrome-800 dark:hover:border-brand-500"
+            className="group relative flex flex-col gap-1 rounded-lg border border-line bg-paper p-4 no-underline transition-all hover:border-brand-500 hover:shadow-sm"
             target="_blank"
             rel="noopener noreferrer"
           >
-            <strong className="text-sm text-brand-600 group-hover:text-brand-700 dark:text-brand-400 dark:group-hover:text-brand-300">
+            <strong className="text-sm text-brand-500 group-hover:text-brand-600">
               {link.label}
             </strong>
-            <span className="text-xs leading-relaxed text-ink-500 dark:text-chrome-400">
+            <span className="text-xs leading-relaxed text-ink-500">
               {link.text}
             </span>
-            <span className="absolute right-3 top-3 text-xs text-ink-300 dark:text-chrome-500" aria-hidden="true">
+            <span className="absolute right-3 top-3 text-xs text-ink-400" aria-hidden="true">
               ↗
             </span>
           </a>
