@@ -525,3 +525,45 @@ describe("what a queue row says", () => {
     expect(screen.queryByText("Nothing queued")).not.toBeInTheDocument();
   });
 });
+
+describe("explaining a failure", () => {
+  it("adds a next step under a credential error, linked to Settings", async () => {
+    api.publicationQueue.mockResolvedValue([
+      {
+        id: 2,
+        content_id: 8,
+        platform: "mastodon",
+        status: "failed",
+        attempts: 3,
+        error: "401 Unauthorized",
+      },
+    ]);
+    draw();
+
+    // The raw platform text stays; the hint sits beside it, not instead of it.
+    expect(await screen.findByText("401 Unauthorized")).toBeInTheDocument();
+    expect(screen.getByText(/refused the stored credentials/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Settings" })).toHaveAttribute(
+      "href",
+      "/settings",
+    );
+  });
+
+  it("adds nothing under an error it does not recognise", async () => {
+    api.publicationQueue.mockResolvedValue([
+      {
+        id: 2,
+        content_id: 8,
+        platform: "bluesky",
+        status: "failed",
+        attempts: 3,
+        error: "Bluesky returned no record uri: {}",
+      },
+    ]);
+    draw();
+
+    expect(await screen.findByText("Bluesky returned no record uri: {}")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Open Settings" })).not.toBeInTheDocument();
+    expect(document.querySelector("[data-kind]")).toBeNull();
+  });
+});

@@ -5,6 +5,7 @@ import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
 import { formatCount, formatDateTime, titleize } from "../lib/format";
+import { explainPublishError } from "../lib/publishErrors";
 
 /**
  * The publication queue and how each platform is performing.
@@ -232,6 +233,7 @@ function retryable(item) {
 function QueueRow({ item, onChanged }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
+  const explanation = explainPublishError(item.error);
 
   // Every other mutation in the app disables its own button while it is in
   // flight; this one did not, and it is the row that dispatches to a broker.
@@ -271,6 +273,19 @@ function QueueRow({ item, onChanged }) {
         {item.error && (
           <p className="mt-2 break-words rounded bg-bad-wash px-2 py-1 font-mono text-[11px] text-bad">
             {item.error}
+          </p>
+        )}
+        {explanation && (
+          <p className="mt-1.5 text-xs text-ink-500" data-kind={explanation.kind}>
+            {explanation.hint}
+            {explanation.action && (
+              <>
+                {" "}
+                <Link to={explanation.action.to} className="font-medium text-brand-500 hover:underline">
+                  {explanation.action.label}
+                </Link>
+              </>
+            )}
           </p>
         )}
       </div>
