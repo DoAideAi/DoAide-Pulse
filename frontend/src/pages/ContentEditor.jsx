@@ -18,6 +18,7 @@ import {
   titleize,
 } from "../lib/format";
 import { renderMarkdown } from "../lib/markdown";
+import { moveItem } from "../lib/reorder";
 import trackEvent from "../lib/trackEvent";
 import {
   OPERATIONS,
@@ -859,6 +860,9 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
   const cover = draft.cover_image_url.trim();
   const fileInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  // Index of the tile being dragged, and the one it is hovering over.
+  const [dragFrom, setDragFrom] = useState(null);
+  const [dragOver, setDragOver] = useState(null);
   const toast = useToast();
 
   const seoFieldsEmpty =
@@ -965,6 +969,13 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
     } finally {
       setSuggesting(false);
     }
+  }
+
+  function moveGalleryImage(from, to) {
+    setDraft((d) => {
+      const next = moveItem(d.marketing_images, from, to);
+      return next === d.marketing_images ? d : { ...d, marketing_images: next };
+    });
   }
 
   function removeGalleryImage(index) {
@@ -1138,12 +1149,63 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
         {(draft.marketing_images?.length > 0) ? (
           <div className="mt-2 grid grid-cols-3 gap-2">
             {draft.marketing_images.map((url, index) => (
-              <div key={index} className="group relative">
+              <div
+                key={index}
+                className={`group relative ${dragOver === index && dragFrom !== index ? "rounded-lg ring-2 ring-brand-500" : ""} ${dragFrom === index ? "opacity-50" : ""}`}
+                draggable={!locked}
+                onDragStart={(event) => {
+                  setDragFrom(index);
+                  event.dataTransfer.effectAllowed = "move";
+                  // Firefox will not start a drag without data on the transfer.
+                  event.dataTransfer.setData("text/plain", String(index));
+                }}
+                onDragOver={(event) => {
+                  if (dragFrom === null) return;
+                  event.preventDefault();
+                  setDragOver(index);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  if (dragFrom !== null) moveGalleryImage(dragFrom, index);
+                  setDragFrom(null);
+                  setDragOver(null);
+                }}
+                onDragEnd={() => {
+                  setDragFrom(null);
+                  setDragOver(null);
+                }}
+              >
                 <img
                   src={url}
                   alt={`Marketing image ${index + 1}`}
+                  draggable={false}
                   className="aspect-square w-full rounded-lg border border-line object-cover"
                 />
+                {!locked && draft.marketing_images.length > 1 && (
+                  // Buttons as well as dragging: a drag is no use on a phone or
+                  // from the keyboard, and shown always rather than on hover for
+                  // the same reason.
+                  <div className="absolute inset-x-0 bottom-0 flex justify-between p-1">
+                    <button
+                      type="button"
+                      className="rounded bg-ink-900/70 px-1.5 text-xs text-white disabled:opacity-30"
+                      aria-label={`Move image ${index + 1} earlier`}
+                      disabled={index === 0}
+                      onClick={() => moveGalleryImage(index, index - 1)}
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded bg-ink-900/70 px-1.5 text-xs text-white disabled:opacity-30"
+                      aria-label={`Move image ${index + 1} later`}
+                      disabled={index === draft.marketing_images.length - 1}
+                      onClick={() => moveGalleryImage(index, index + 1)}
+                    >
+                      →
+                    </button>
+                  </div>
+                )}
                 {!locked && (
                   <button
                     type="button"

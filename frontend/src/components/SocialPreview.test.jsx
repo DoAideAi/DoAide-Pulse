@@ -209,7 +209,7 @@ it("surfaces a failure to load the tags", async () => {
 
   await userEvent.click(screen.getByRole("button", { name: "Show" }));
 
-  expect(await screen.findByText("Network unreachable")).toBeInTheDocument();
+  expect(await screen.findByText("Could not load social tags: Network unreachable")).toBeInTheDocument();
 });
 
 it("omits the meta tags section for an unsaved piece", () => {

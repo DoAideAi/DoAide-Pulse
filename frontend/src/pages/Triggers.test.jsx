@@ -714,7 +714,7 @@ describe("deleting a trigger", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Trigger is still running"),
+      expect(toast.error).toHaveBeenCalledWith("Could not delete trigger: Trigger is still running"),
     );
     expect(screen.getByText("Changelog feed")).toBeInTheDocument();
   });
@@ -782,7 +782,7 @@ describe("rotating a webhook's secret", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Rotate secret" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Encryption key unavailable"),
+      expect(toast.error).toHaveBeenCalledWith("Could not rotate secret: Encryption key unavailable"),
     );
     expect(screen.queryByText(/shown once/i)).not.toBeInTheDocument();
   });
@@ -893,7 +893,7 @@ describe("when an action fails outright", () => {
     const pause = await screen.findByRole("button", { name: "Pause" });
     await userEvent.click(pause);
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Trigger not found"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not pause trigger: Trigger not found"));
     expect(await screen.findByRole("button", { name: "Pause" })).toBeEnabled();
   });
 
@@ -905,7 +905,7 @@ describe("when an action fails outright", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Check now" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Network unreachable"),
+      expect(toast.error).toHaveBeenCalledWith("Trigger check failed: Network unreachable"),
     );
     expect(await screen.findByRole("button", { name: "Check now" })).toBeEnabled();
   });

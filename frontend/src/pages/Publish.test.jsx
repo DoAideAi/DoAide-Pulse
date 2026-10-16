@@ -242,7 +242,7 @@ describe("retrying", () => {
     expect(api.retryPublication).toHaveBeenCalledWith(8, 2);
 
     release({});
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Retrying"));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Retrying — check back shortly for updates"));
   });
 
   it("says it is retrying while the request is in flight", async () => {
@@ -277,7 +277,7 @@ describe("retrying", () => {
 
     await user.click(await screen.findByRole("button", { name: "Retry" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Bad Gateway"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Publication retry failed: Bad Gateway"));
     expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
   });
 });

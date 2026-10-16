@@ -435,7 +435,7 @@ describe("moving with the keyboard", () => {
 
     await userEvent.keyboard("{ArrowRight}");
 
-    expect(toast.error).toHaveBeenCalledWith("Slot already taken");
+    expect(toast.error).toHaveBeenCalledWith("Could not reschedule: Slot already taken");
   });
 
   it("ignores a key that is not an arrow", async () => {

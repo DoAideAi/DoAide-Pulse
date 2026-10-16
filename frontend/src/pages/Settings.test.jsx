@@ -324,7 +324,7 @@ describe("verifying a stored key", () => {
     await user.click(await screen.findByRole("button", { name: "Verify" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Credentials were rejected"),
+      expect(toast.error).toHaveBeenCalledWith("Dev.to credentials were rejected — double-check the key and try again"),
     );
   });
 
@@ -335,7 +335,7 @@ describe("verifying a stored key", () => {
 
     await user.click(await screen.findByRole("button", { name: "Verify" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Gateway Timeout"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not verify Dev.to: Gateway Timeout"));
     expect(api.platforms).toHaveBeenCalledTimes(1);
   });
 
@@ -394,7 +394,7 @@ describe("disconnecting", () => {
 
     await user.click(await screen.findByRole("button", { name: "Disconnect" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Conflict"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not disconnect Dev.to: Conflict"));
     expect(api.platforms).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "Disconnect" })).toBeEnabled();
   });
@@ -518,7 +518,7 @@ describe("the connect dialog", () => {
     await user.click(submitButton());
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Credentials were rejected"),
+      expect(toast.error).toHaveBeenCalledWith("Could not connect Dev.to: Credentials were rejected"),
     );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByLabelText(/API key/)).toHaveValue("wrong");

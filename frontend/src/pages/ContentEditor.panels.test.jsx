@@ -146,6 +146,58 @@ beforeEach(() => {
 // --------------------------------------------------------------------------- //
 
 describe("the SEO panel", () => {
+  describe("marketing image gallery order", () => {
+    const urls = ["https://cdn.test/a.png", "https://cdn.test/b.png", "https://cdn.test/c.png"];
+    // The real 2s auto-save can fire mid-test on a loaded machine. Echoing what
+    // it was sent keeps it from handing back the original order.
+    beforeEach(() => {
+      api.updateContent.mockImplementation(async (_id, body) => content(body));
+    });
+
+    const order = () =>
+      [...document.querySelectorAll("aside img[alt^='Marketing image']")].map((i) =>
+        i.getAttribute("src"),
+      );
+
+    it("moves an image with the buttons", async () => {
+      const user = userEvent.setup();
+      await open({ marketing_images: urls });
+
+      await user.click(screen.getByRole("button", { name: "Move image 1 later" }));
+      expect(order()).toEqual([urls[1], urls[0], urls[2]]);
+
+      await user.click(screen.getByRole("button", { name: "Move image 3 earlier" }));
+      expect(order()).toEqual([urls[1], urls[2], urls[0]]);
+    });
+
+    it("cannot move the first image earlier or the last later", async () => {
+      await open({ marketing_images: urls });
+
+      expect(screen.getByRole("button", { name: "Move image 1 earlier" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Move image 3 later" })).toBeDisabled();
+    });
+
+    it("reorders by dragging one tile onto another", async () => {
+      await open({ marketing_images: urls });
+      const tiles = [...document.querySelectorAll("aside img[alt^='Marketing image']")].map(
+        (i) => i.parentElement,
+      );
+      const dataTransfer = { setData: vi.fn(), effectAllowed: "" };
+
+      fireEvent.dragStart(tiles[0], { dataTransfer });
+      fireEvent.dragOver(tiles[2], { dataTransfer });
+      fireEvent.drop(tiles[2], { dataTransfer });
+
+      expect(order()).toEqual([urls[1], urls[2], urls[0]]);
+    });
+
+    it("offers no reordering for a single image", async () => {
+      await open({ marketing_images: [urls[0]] });
+
+      expect(screen.queryByRole("button", { name: /Move image/ })).toBeNull();
+    });
+  });
+
   it("explains what a cover image is for while there is no URL to show", async () => {
     await open({ cover_image_url: null });
 

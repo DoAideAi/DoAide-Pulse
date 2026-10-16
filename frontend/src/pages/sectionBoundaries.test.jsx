@@ -37,6 +37,9 @@ vi.mock("../lib/api", () => ({
     checkLinks: vi.fn(),
     socialCards: vi.fn(),
     listPreviewLinks: vi.fn(),
+    listRevisions: vi.fn(),
+    listLanguages: vi.fn(),
+    listTranslations: vi.fn(),
   },
 }));
 
@@ -250,6 +253,9 @@ describe("the content editor", () => {
   beforeEach(() => {
     api.platforms.mockResolvedValue([]);
     api.listPreviewLinks.mockResolvedValue([]);
+    api.listRevisions.mockResolvedValue({ items: [], total: 0, retained: 50 });
+    api.listLanguages.mockResolvedValue([]);
+    api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
   });
 
   it("does not take unsaved writing down with a sidebar panel", async () => {

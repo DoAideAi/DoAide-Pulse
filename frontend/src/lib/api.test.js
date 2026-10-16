@@ -477,6 +477,10 @@ describe("every endpoint's path and verb", () => {
     ["bulkPublish", [[1, 2], ["devto"]], "/content/bulk/publish", "POST"],
     ["bulkRetry", [[1, 2]], "/content/bulk/retry", "POST"],
     ["publicationQueue", [], "/content/queue/publications", "GET"],
+    ["setContentStatus", [3, "approved"], "/content/3/status", "POST"],
+    ["archiveOld", [{ days: 30 }], "/content/bulk/archive-old", "POST"],
+    ["listIdeas", [5], "/projects/5/ideas", "GET"],
+    ["writeFromIdea", [9], "/content/ideas/9/write", "POST"],
 
     ["tagTree", [], "/tags", "GET"],
     ["suggestTags", [3], "/tags/suggest/3", "POST"],

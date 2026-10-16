@@ -355,6 +355,6 @@ describe("ErrorFallback on its own", () => {
   it("defaults to a title that says what happened without blaming the user", () => {
     render(<ErrorFallback error={new Error("x")} />);
 
-    expect(screen.getByText("Something went wrong")).toBeInTheDocument();
+    expect(screen.getByText("This section could not load")).toBeInTheDocument();
   });
 });

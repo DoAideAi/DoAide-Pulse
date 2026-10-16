@@ -168,7 +168,7 @@ describe("opening the editor", () => {
 
     await user.click(await screen.findByRole("button", { name: "Edit" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("gone"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not open template: gone"));
     expect(screen.queryByLabelText("The piece")).not.toBeInTheDocument();
     // And the card is usable again: a failure is not a stuck button.
     expect(await screen.findByRole("button", { name: "Edit" })).toBeEnabled();
@@ -467,7 +467,7 @@ describe("deleting", () => {
 
     await user.click(await screen.findByRole("button", { name: "Delete" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Conflict"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not delete template: Conflict"));
     expect(screen.getByText("Weekly changelog")).toBeInTheDocument();
     // Once on mount and not again: nothing changed, so nothing to re-read.
     expect(api.listTemplates).toHaveBeenCalledTimes(1);

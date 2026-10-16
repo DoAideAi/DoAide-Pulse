@@ -226,7 +226,7 @@ describe("scanning a repo", () => {
     await user.click(screen.getByRole("button", { name: "Scan repo" }));
 
     expect(await screen.findByRole("button", { name: "Scan repo" })).toBeEnabled();
-    expect(toast.error).toHaveBeenCalledWith("rate limited");
+    expect(toast.error).toHaveBeenCalledWith("Repo scan failed: rate limited");
   });
 });
 
@@ -277,7 +277,7 @@ describe("deleting a project", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
-    expect(toast.error).toHaveBeenCalledWith("Project has queued publications");
+    expect(toast.error).toHaveBeenCalledWith("Could not delete project: Project has queued publications");
     expect(screen.getByText("Pulse")).toBeInTheDocument();
   });
 });
