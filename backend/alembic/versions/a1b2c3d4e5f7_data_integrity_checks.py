@@ -22,24 +22,22 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    op.create_check_constraint(
-        "ck_revision_positive",
-        "content_revisions",
-        "revision > 0",
-    )
-    op.create_check_constraint(
-        "ck_revision_word_count_nonneg",
-        "content_revisions",
-        "word_count >= 0",
-    )
-    op.create_check_constraint(
-        "ck_translation_source_version_nonneg",
-        "content_translations",
-        "source_version >= 0",
-    )
+    # Batch mode: a plain ALTER on PostgreSQL, copy-and-move on SQLite, which
+    # cannot add a constraint to an existing table. Without it the migration
+    # chain could not be built on SQLite at all, and the test that diffs the
+    # migrated schema against the models never got past this revision.
+    with op.batch_alter_table("content_revisions") as batch:
+        batch.create_check_constraint("ck_revision_positive", "revision > 0")
+        batch.create_check_constraint("ck_revision_word_count_nonneg", "word_count >= 0")
+    with op.batch_alter_table("content_translations") as batch:
+        batch.create_check_constraint(
+            "ck_translation_source_version_nonneg", "source_version >= 0"
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("ck_translation_source_version_nonneg", "content_translations", type_="check")
-    op.drop_constraint("ck_revision_word_count_nonneg", "content_revisions", type_="check")
-    op.drop_constraint("ck_revision_positive", "content_revisions", type_="check")
+    with op.batch_alter_table("content_translations") as batch:
+        batch.drop_constraint("ck_translation_source_version_nonneg", type_="check")
+    with op.batch_alter_table("content_revisions") as batch:
+        batch.drop_constraint("ck_revision_word_count_nonneg", type_="check")
+        batch.drop_constraint("ck_revision_positive", type_="check")
