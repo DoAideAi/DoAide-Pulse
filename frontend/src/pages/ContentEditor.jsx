@@ -1666,6 +1666,9 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
           const live = alreadyLive.has(platform.platform);
           const connected = platform.connection?.status === "connected";
           const disabled = !platform.implemented || !connected || live;
+          // Only where a connection is the actual blocker: an unfinished adapter
+          // or an already-live post would not be fixed by credentials.
+          const needsConnection = platform.implemented && !connected && !live;
           const reason = live
             ? "Already published here"
             : !platform.implemented
@@ -1698,6 +1701,15 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
                   <span className="mt-0.5 block text-xs text-ink-400">{reason}</span>
                 )}
               </span>
+              {needsConnection && (
+                <Link
+                  to="/settings"
+                  className="ml-auto shrink-0 rounded border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink-700 hover:bg-ink-50"
+                  aria-label={`Connect ${platform.display_name}`}
+                >
+                  Connect
+                </Link>
+              )}
             </label>
           );
         })}

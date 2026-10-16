@@ -23,7 +23,8 @@ class TestUploadImage:
         )
         assert resp.status_code == 201
         data = resp.json()
-        assert data["url"].startswith("/api/v1/uploads/")
+        assert data["url"].startswith(("http://", "https://"))
+        assert "/api/v1/uploads/" in data["url"]
         assert data["url"].endswith(".png")
         assert data["size"] == len(TINY_PNG)
 

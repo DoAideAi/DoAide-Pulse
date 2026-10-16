@@ -565,6 +565,17 @@ describe("the publish dialog", () => {
     expect(screen.getByRole("checkbox", { name: /Dev\.to/ })).toBeDisabled();
   });
 
+  it("offers a Connect link to Settings only where a connection is missing", async () => {
+    await openDialog({}, [
+      platform("devto", { status: null }),
+      platform("medium", { implemented: false }),
+    ]);
+
+    const connect = screen.getByRole("link", { name: "Connect Dev.to" });
+    expect(connect).toHaveAttribute("href", "/settings");
+    expect(screen.queryByRole("link", { name: /Connect Medium/ })).toBeNull();
+  });
+
   it("refuses a platform this piece is already live on", async () => {
     await openDialog(
       { publications: [publication({ platform: "devto", status: "published" })] },

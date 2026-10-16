@@ -94,7 +94,10 @@ async def upload_image(
     dest = _upload_dir() / filename
     dest.write_bytes(data)
 
-    url = f"{settings.api_v1_prefix}/uploads/{filename}"
+    # Absolute, because the content schema refuses relative image URLs (the
+    # publishing platforms fetch them from their own servers). A relative path
+    # here made every auto-save 422 once an uploaded image was in the draft.
+    url = f"{settings.api_base_url}{settings.api_v1_prefix}/uploads/{filename}"
     return UploadOut(url=url, filename=filename, size=len(data))
 
 
