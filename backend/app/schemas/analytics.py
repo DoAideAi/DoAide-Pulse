@@ -240,6 +240,35 @@ class ReadTimeOut(BaseModel):
     by_length: list[LengthBandOut] = []
 
 
+class StatusCountOut(BaseModel):
+    status: str
+    count: int
+
+
+class PublicationOutcomesOut(BaseModel):
+    """Publication counts by outcome, and the share of settled ones that worked."""
+
+    published: int
+    failed: int
+    #: Pending, scheduled or publishing — not yet a success or a failure.
+    in_flight: int
+    cancelled: int
+    #: published / (published + failed). ``None`` when nothing has settled.
+    success_rate: float | None = None
+
+
+class PlatformOutcomesOut(PublicationOutcomesOut):
+    platform: str
+
+
+class PipelineOut(BaseModel):
+    """Where every piece and every publication currently stands."""
+
+    content_by_status: list[StatusCountOut] = []
+    publications: PublicationOutcomesOut
+    by_platform: list[PlatformOutcomesOut] = []
+
+
 class OverviewOut(BaseModel):
     """Everything the analytics page needs, in one round trip."""
 

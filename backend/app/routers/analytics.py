@@ -20,6 +20,7 @@ from app.schemas.analytics import (
     DigestSendOut,
     EngagementTrendPointOut,
     OverviewOut,
+    PipelineOut,
     PlatformStatsOut,
     PublishedPointOut,
     ReadTimeOut,
@@ -44,6 +45,19 @@ def overview(
 ) -> dict:
     """Everything the analytics page needs, in one round trip."""
     return analytics_service.overview(db, user.id)
+
+
+@router.get(
+    "/pipeline",
+    response_model=PipelineOut,
+    summary="Content by status and publish success rates",
+    responses=errors(*AUTHENTICATED),
+)
+def pipeline(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> dict:
+    """How many pieces sit in each status, and how publishing has gone per platform."""
+    return analytics_service.pipeline(db, user.id)
 
 
 @router.get(

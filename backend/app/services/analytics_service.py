@@ -1414,6 +1414,83 @@ def dashboard_summary(
     )
 
 
+#: Publication states that are still on their way out — neither a success nor
+#: a failure yet, so they sit outside the success rate's denominator.
+_IN_FLIGHT = (
+    PublicationStatus.PENDING,
+    PublicationStatus.SCHEDULED,
+    PublicationStatus.PUBLISHING,
+)
+
+
+def pipeline(db: Session, user_id: int) -> dict:
+    """Where every piece and every publication currently stands.
+
+    The counterpart to the reach numbers: those say how the published pieces
+    did, this says how many got published at all. The success rate counts only
+    settled attempts (published or failed) — a queue full of scheduled posts is
+    not a reliability problem, and counting it would make a busy week look like
+    a bad one. ``None`` when nothing has settled, for the reason every rate in
+    this module is ``None`` rather than ``0.0`` without a denominator.
+    """
+    content_rows = db.execute(
+        select(Content.status, func.count())
+        .join(Project, Project.id == Content.project_id)
+        .where(Project.user_id == user_id)
+        .group_by(Content.status)
+    ).all()
+    content_by_status = {status.value: 0 for status in ContentStatus}
+    for content_status, cnt in content_rows:
+        content_by_status[content_status.value] = int(cnt)
+
+    pub_rows = db.execute(
+        select(Publication.platform, Publication.status, func.count())
+        .join(Content, Content.id == Publication.content_id)
+        .join(Project, Project.id == Content.project_id)
+        .where(Project.user_id == user_id)
+        .group_by(Publication.platform, Publication.status)
+    ).all()
+    platforms: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"published": 0, "failed": 0, "in_flight": 0, "cancelled": 0}
+    )
+    for platform, pub_status, cnt in pub_rows:
+        bucket = platforms[platform.value]
+        if pub_status == PublicationStatus.PUBLISHED:
+            bucket["published"] += cnt
+        elif pub_status == PublicationStatus.FAILED:
+            bucket["failed"] += cnt
+        elif pub_status in _IN_FLIGHT:
+            bucket["in_flight"] += cnt
+        else:
+            bucket["cancelled"] += cnt
+
+    def _with_rate(counts: dict[str, int]) -> dict:
+        return {
+            **counts,
+            "success_rate": _rate(
+                counts["published"], counts["published"] + counts["failed"]
+            ),
+        }
+
+    overall = {"published": 0, "failed": 0, "in_flight": 0, "cancelled": 0}
+    for counts in platforms.values():
+        for key, value in counts.items():
+            overall[key] += value
+
+    by_platform_rows = [
+        {"platform": name, **_with_rate(counts)} for name, counts in platforms.items()
+    ]
+    by_platform_rows.sort(key=lambda r: (-(r["published"] + r["failed"]), r["platform"]))
+
+    return {
+        "content_by_status": [
+            {"status": name, "count": cnt} for name, cnt in content_by_status.items()
+        ],
+        "publications": _with_rate(overall),
+        "by_platform": by_platform_rows,
+    }
+
+
 __all__ = [
     "TOP_CONTENT_SORTS",
     "Totals",
@@ -1424,6 +1501,7 @@ __all__ = [
     "engagement_trend",
     "generation_cost_trend",
     "overview",
+    "pipeline",
     "published_series",
     "read_time",
     "timeline",

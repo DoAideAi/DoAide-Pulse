@@ -15,7 +15,13 @@ from app.models.mixins import utcnow
 from app.models.preview_link import PreviewLink
 from app.models.trigger import TriggerEvent, TriggerEventStatus
 from app.models.webhook import DeliveryStatus, WebhookDelivery
-from app.services import connection_verify, credential_rotation, llm_usage, password_reset
+from app.services import (
+    activity,
+    connection_verify,
+    credential_rotation,
+    llm_usage,
+    password_reset,
+)
 from app.tasks.celery_app import task
 
 logger = logging.getLogger(__name__)
@@ -211,6 +217,27 @@ def purge_old_llm_usage() -> dict:
         count = llm_usage.purge(db, days=settings.llm_usage_retention_days)
         if count:
             logger.info("purged %d llm usage row(s)", count)
+        return {"purged": count}
+    finally:
+        db.close()
+
+
+@task(
+    name="app.tasks.maintenance_tasks.purge_old_activity",
+    soft_time_limit=60,
+    time_limit=120,
+)
+def purge_old_activity() -> dict:
+    """Drop page-view and action rows past ``activity_retention_days``.
+
+    The activity tracker has no process of its own: the browser writes rows
+    through the API and this daily tick on the one beat schedule bounds them.
+    """
+    db = SessionLocal()
+    try:
+        count = activity.purge(db, days=settings.activity_retention_days)
+        if count:
+            logger.info("purged %d activity row(s)", count)
         return {"purged": count}
     finally:
         db.close()

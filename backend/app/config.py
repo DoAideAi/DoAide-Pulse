@@ -212,6 +212,9 @@ class Settings(BaseSettings):
     # Reads and the one write share it; filing an idea is not more expensive
     # than listing content, and two budgets would be two things to tune.
     rate_limit_machine_api: str = "300/hour;3000/day"
+    # The browser's activity beacon. It batches, so a busy session sends a few
+    # requests a minute; this is a ceiling on a runaway tab, not a quota.
+    rate_limit_activity: str = "60/minute;2000/day"
 
     # ---- Database ----
     database_url: str = "postgresql+psycopg://pulse:pulse@localhost:5432/pulse"
@@ -362,6 +365,9 @@ class Settings(BaseSettings):
     # busy the week was. Comfortably wider than the endpoint's own longest
     # window so the numbers it quotes are never truncated by the purge.
     llm_usage_retention_days: int = 30
+    # How long page views and actions are kept before the daily maintenance
+    # sweep prunes them. Long enough for a quarter-over-quarter comparison.
+    activity_retention_days: int = 90
 
     # ---- GitHub (project change monitoring) ----
     # A classic or fine-grained PAT with `repo` read. Optional: without it the
@@ -696,6 +702,7 @@ class Settings(BaseSettings):
         # which deletes the rows the metrics endpoint is about the moment they
         # are written.
         "llm_usage_retention_days",
+        "activity_retention_days",
         "password_reset_token_ttl_minutes",
         "preview_link_default_ttl_hours",
         "preview_link_max_ttl_hours",

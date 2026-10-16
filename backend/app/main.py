@@ -22,6 +22,7 @@ from app.config import settings
 from app.logging_config import configure_logging, request_id_var
 from app.ratelimit import limiter, rate_limit_exceeded_handler
 from app.routers import (
+    activity,
     ai_generate,
     analytics,
     api_keys,
@@ -601,6 +602,7 @@ def create_app() -> FastAPI:
     app.include_router(translations.router, prefix=prefix)
     app.include_router(calendar.router, prefix=prefix)
     app.include_router(analytics.router, prefix=prefix)
+    app.include_router(activity.router, prefix=prefix)
     app.include_router(metrics.router, prefix=prefix)
     app.include_router(settings_router.router, prefix=prefix)
     app.include_router(webhooks.router, prefix=prefix)

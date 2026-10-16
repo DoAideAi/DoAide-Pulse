@@ -1,6 +1,8 @@
 // API client for the Pulse backend.
 // Stores the JWT in localStorage and attaches it as a Bearer token.
 
+import { routePattern, trackAction } from "./activity";
+
 const BASE = "/api/v1";
 const TOKEN_KEY = "pulse_token";
 
@@ -62,6 +64,13 @@ async function request(
     // The status travels with the message so callers can tell a refusal that
     // retrying cannot fix (422, 412) from one it can (429, 5xx).
     throw Object.assign(new Error(message), { status: res.status });
+  }
+  // A write that succeeded is an action the user took. Recorded here rather
+  // than at each button so a new action is tracked without anyone remembering
+  // to. Auth calls are left out: a login has no account to file it under yet,
+  // and `trackEvent` already names them.
+  if (method !== "GET" && !path.startsWith("/auth/")) {
+    trackAction(`${method} ${routePattern(path)}`);
   }
   return data;
 }
@@ -233,6 +242,9 @@ export const api = {
   // The dashboard payload already carries a capped list of these; this is the
   // full one, for the analytics page.
   alerts: (limit) => request(`/analytics/alerts${qs({ limit })}`),
+  // Content by status and publish success rates — where everything stands.
+  pipeline: () => request("/analytics/pipeline"),
+  activitySummary: (days) => request(`/activity/summary${qs({ days })}`),
 
   // ---- triggers ----
   triggerKinds: () => request("/triggers/kinds"),

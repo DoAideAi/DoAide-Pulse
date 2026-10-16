@@ -12,6 +12,8 @@ vi.mock("../lib/api", () => ({
     engagementTrend: vi.fn(),
     velocity: vi.fn(),
     alerts: vi.fn(),
+    pipeline: vi.fn(),
+    activitySummary: vi.fn(),
   },
 }));
 
@@ -201,6 +203,19 @@ beforeEach(() => {
     day("2026-07-30", { views: 320, reads: 70, clicks: 18 }),
   ]);
   api.velocity.mockResolvedValue(velocity());
+  api.pipeline.mockResolvedValue({
+    content_by_status: [{ status: "published", count: 8 }],
+    publications: { published: 14, failed: 0, in_flight: 0, cancelled: 0, success_rate: 1 },
+    by_platform: [],
+  });
+  api.activitySummary.mockResolvedValue({
+    days: 30,
+    page_views: 0,
+    actions: 0,
+    top_pages: [],
+    top_actions: [],
+    by_day: [],
+  });
   api.alerts.mockResolvedValue({
     alerts: [
       {
@@ -291,7 +306,9 @@ describe("reach over time", () => {
     await screen.findByText("Views, reads and clicks");
     expect(api.engagementTrend).toHaveBeenCalledWith(30);
 
-    await userEvent.click(screen.getByRole("button", { name: "90d" }));
+    // Scoped: the activity panel further down has a window picker of its own.
+    const picker = screen.getByRole("group", { name: "Window" });
+    await userEvent.click(within(picker).getByRole("button", { name: "90d" }));
     expect(api.engagementTrend).toHaveBeenCalledWith(90);
   });
 

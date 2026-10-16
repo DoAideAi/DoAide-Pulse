@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { ActivityPanel, PipelineHealth } from "../components/analytics/PipelinePanels";
 import { SectionBoundary } from "../components/ErrorBoundary";
 import {
   Empty,
@@ -62,8 +63,9 @@ export default function Analytics() {
 
   const { totals, by_platform, by_content_type, top_content, timeline } = overview.data;
 
-  // Nothing has been published, so every panel below would be an empty state
-  // repeating the same sentence. One is enough.
+  // Nothing has been published, so every reach panel below would be an empty
+  // state repeating the same sentence. One is enough — but the pipeline stays,
+  // because a run of failed publishes is exactly how an account ends up here.
   if (totals.published_count === 0) {
     return (
       <div className="space-y-6">
@@ -77,6 +79,12 @@ export default function Analytics() {
             </Link>
           }
         />
+        <Section name="pipeline">
+          <PipelineHealth />
+        </Section>
+        <Section name="activity">
+          <ActivityPanel />
+        </Section>
       </div>
     );
   }
@@ -93,6 +101,10 @@ export default function Analytics() {
       </div>
 
       <Counters totals={totals} />
+
+      <Section name="pipeline">
+        <PipelineHealth />
+      </Section>
 
       <Section name="reach">
         <ReachOverTime
@@ -132,6 +144,10 @@ export default function Analytics() {
           <PublishingRhythm timeline={timeline} />
         </Section>
       </div>
+
+      <Section name="activity">
+        <ActivityPanel />
+      </Section>
     </div>
   );
 }

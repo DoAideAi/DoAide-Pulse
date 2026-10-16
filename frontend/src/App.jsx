@@ -1,8 +1,10 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorFallback, RouteErrorBoundary } from "./components/ErrorBoundary";
 import InstallPrompt from "./components/InstallPrompt";
 import Shell from "./components/Shell";
 import { useAuth } from "./hooks/useAuth";
+import { trackPageView } from "./lib/activity";
 import Analytics from "./pages/Analytics";
 import Blog from "./pages/Blog";
 import BlogPost from "./pages/BlogPost";
@@ -45,6 +47,12 @@ function Loading() {
  */
 function Protected({ children }) {
   const { user, loading } = useAuth();
+  const { pathname } = useLocation();
+  // Signed-in pages only: the tracker files events under the account, so this
+  // is the one wrapper every page it can record passes through.
+  useEffect(() => {
+    if (user) trackPageView(pathname);
+  }, [user, pathname]);
   if (loading) return <Loading />;
   if (!user) return <Navigate to="/" replace />;
   return (

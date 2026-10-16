@@ -510,6 +510,8 @@ describe("every endpoint's path and verb", () => {
     ["engagementTrend", [30], "/analytics/engagement-trend?days=30", "GET"],
     ["velocity", [], "/analytics/velocity", "GET"],
     ["alerts", [5], "/analytics/alerts?limit=5", "GET"],
+    ["pipeline", [], "/analytics/pipeline", "GET"],
+    ["activitySummary", [7], "/activity/summary?days=7", "GET"],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],
