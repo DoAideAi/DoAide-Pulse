@@ -449,3 +449,75 @@ describe("review mode", () => {
     });
   });
 });
+
+describe("searching by title", () => {
+  function drawAt(url) {
+    return render(
+      <MemoryRouter initialEntries={[url]} future={ROUTER_FUTURE}>
+        <ContentList />
+        <Search />
+      </MemoryRouter>,
+    );
+  }
+
+  it("sends the typed words to the server once typing settles", async () => {
+    api.listContent.mockResolvedValue([item()]);
+    const user = userEvent.setup();
+    draw();
+    await screen.findByText(item().title);
+
+    await user.type(screen.getByLabelText("Search by title"), "retry");
+
+    await waitFor(() =>
+      expect(api.listContent).toHaveBeenLastCalledWith(
+        expect.objectContaining({ q: "retry" }),
+      ),
+    );
+    expect(screen.getByTestId("search")).toHaveTextContent("q=retry");
+    // Debounced: not one request per letter.
+    const withQuery = api.listContent.mock.calls.filter(([p]) => p.q);
+    expect(withQuery.length).toBe(1);
+  });
+
+  it("reads the search from the URL it was linked with", async () => {
+    api.listContent.mockResolvedValue([]);
+    drawAt("/?q=outage");
+
+    expect(await screen.findByLabelText("Search by title")).toHaveValue("outage");
+    await waitFor(() =>
+      expect(api.listContent).toHaveBeenCalledWith(expect.objectContaining({ q: "outage" })),
+    );
+    expect(await screen.findByText(/No titles contain "outage"/)).toBeInTheDocument();
+  });
+
+  it("clears every filter, the search included, in one click", async () => {
+    api.listContent.mockResolvedValue([item()]);
+    const user = userEvent.setup();
+    drawAt("/?q=retry&status=draft");
+
+    await user.click(await screen.findByRole("button", { name: "Clear filters" }));
+
+    expect(screen.getByTestId("search")).toHaveTextContent(/^$/);
+    expect(screen.getByLabelText("Search by title")).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a trailing space typed before a pause", async () => {
+    api.listContent.mockResolvedValue([item()]);
+    const user = userEvent.setup();
+    draw();
+    await screen.findByText(item().title);
+
+    await user.type(screen.getByLabelText("Search by title"), "retry ");
+    await waitFor(() => expect(screen.getByTestId("search")).toHaveTextContent("q=retry"));
+
+    expect(screen.getByLabelText("Search by title")).toHaveValue("retry ");
+  });
+
+  it("offers no clear button when nothing is filtered", async () => {
+    api.listContent.mockResolvedValue([item()]);
+    draw();
+    await screen.findByText(item().title);
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+});

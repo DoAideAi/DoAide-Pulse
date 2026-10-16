@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Confidence,
@@ -35,6 +35,11 @@ export default function ContentList() {
   const projectId = params.get("project") || "";
   const status = params.get("status") || "";
   const type = params.get("type") || "";
+  const query = params.get("q") || "";
+  // What is in the box, ahead of the URL by one debounce. Searching per
+  // keystroke would put a request and a history entry behind every letter.
+  const [typed, setTyped] = useState(query);
+  const filtered = Boolean(status || type || projectId || query);
 
   const { data: projects } = useApi(() => api.listProjects(), []);
   const { data, error, loading, reload } = useApi(
@@ -43,15 +48,38 @@ export default function ContentList() {
         project_id: projectId || undefined,
         status: status || undefined,
         content_type: type || undefined,
+        q: query || undefined,
       }),
-    [projectId, status, type],
+    [projectId, status, type, query],
   );
 
-  const setFilter = (key, value) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next);
+  const setFilter = useCallback(
+    (key, value) => {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      });
+    },
+    [setParams],
+  );
+
+  // Back/forward changes the URL under the box; follow it. Only when it says
+  // something different — the debounce trims, and echoing that back would eat
+  // the space someone paused after in the middle of a phrase.
+  useEffect(() => setTyped((prev) => (prev.trim() === query ? prev : query)), [query]);
+
+  useEffect(() => {
+    const trimmed = typed.trim();
+    if (trimmed === query) return undefined;
+    const timer = setTimeout(() => setFilter("q", trimmed), 300);
+    return () => clearTimeout(timer);
+  }, [typed, query, setFilter]);
+
+  const clearFilters = () => {
+    setTyped("");
+    setParams(new URLSearchParams());
   };
 
   const isReviewView = status === "review";
@@ -171,6 +199,18 @@ export default function ContentList() {
       </div>
 
       <div className="flex flex-wrap gap-2">
+        <input
+          type="search"
+          className="input w-full sm:w-64"
+          placeholder="Search titles…"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") setFilter("q", typed.trim());
+          }}
+          maxLength={200}
+          aria-label="Search by title"
+        />
         <select
           className="input w-auto"
           value={projectId}
@@ -210,6 +250,11 @@ export default function ContentList() {
             </option>
           ))}
         </select>
+        {filtered && (
+          <button className="btn-quiet" onClick={clearFilters}>
+            Clear filters
+          </button>
+        )}
       </div>
 
       <ErrorBanner message={error} onRetry={reload} />
@@ -218,10 +263,12 @@ export default function ContentList() {
         <Skeleton rows={5} />
       ) : data?.length === 0 ? (
         <Empty
-          title={status || type || projectId ? "Nothing matches" : "Nothing written yet"}
+          title={filtered ? "Nothing matches" : "Nothing written yet"}
           hint={
-            status || type || projectId
-              ? "Try clearing a filter."
+            filtered
+              ? query
+                ? `No titles contain "${query}". Try another word or clear the filters.`
+                : "Try clearing a filter."
               : "Generate a draft from one of your registered projects."
           }
           action={

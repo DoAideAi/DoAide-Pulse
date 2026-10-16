@@ -531,6 +531,9 @@ def list_content(
     project_id: QueryRowId | None = None,
     status_filter: ContentStatus | None = Query(default=None, alias="status"),
     content_type: ContentType | None = None,
+    # Matched case-insensitively against the title. Bounded so a pasted essay
+    # does not become a pattern the database has to compile.
+    q: str | None = Query(default=None, max_length=200),
     # ``ge=1`` as well as ``le``: every other paginated endpoint here bounds
     # both ends, and this one bounded only the top. A negative ``limit`` reaches
     # SQLAlchemy's ``.limit()`` verbatim, and the two databases disagree about
@@ -560,6 +563,13 @@ def list_content(
         base = base.where(Content.status == status_filter)
     if content_type is not None:
         base = base.where(Content.content_type == content_type)
+    if q is not None and q.strip():
+        # ``%`` and ``_`` are the user's characters, not wildcards: searching
+        # for "100%" should not match every title containing "100".
+        needle = (
+            q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        )
+        base = base.where(Content.title.ilike(f"%{needle}%", escape="\\"))
 
     # Total count for the UI to render pagination controls.
     total = db.scalar(
