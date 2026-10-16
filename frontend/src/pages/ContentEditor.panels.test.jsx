@@ -403,7 +403,7 @@ describe("the link check", () => {
 
     await user.click(checkButton());
 
-    expect(await screen.findByText("Checker unavailable")).toBeInTheDocument();
+    expect(await screen.findByText("Link check failed: Checker unavailable")).toBeInTheDocument();
     // The explanation gives way to the error rather than sitting above it.
     expect(
       screen.queryByText(/invent plausible documentation URLs/i),
@@ -501,7 +501,7 @@ describe("the publications panel", () => {
     await waitFor(() => expect(api.retryPublication).toHaveBeenCalledWith(3, 12));
     // Re-read, or the row keeps saying "failed" over a publication now queued.
     await waitFor(() => expect(api.getContent).toHaveBeenCalled());
-    expect(toast.success).toHaveBeenCalledWith("Retrying");
+    expect(toast.success).toHaveBeenCalledWith("Retrying — check the publish queue for updates");
   });
 
   it("reports a retry the server refused instead of claiming it worked", async () => {
@@ -515,7 +515,7 @@ describe("the publications panel", () => {
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Still rate limited"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Publication retry failed: Still rate limited"));
     expect(toast.success).not.toHaveBeenCalled();
   });
 });

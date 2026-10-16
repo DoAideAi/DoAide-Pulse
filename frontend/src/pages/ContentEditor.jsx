@@ -993,7 +993,7 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
         ) : (
           <p className="mt-1 text-xs text-ink-400">
             Shown in the Dev.to, Medium and Hashnode feeds, and used for the
-            LinkedIn and Twitter link preview.
+            LinkedIn and Twitter link preview. Must be an absolute URL.
           </p>
         )}
       </div>

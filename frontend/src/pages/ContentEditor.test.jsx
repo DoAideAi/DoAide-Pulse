@@ -748,7 +748,7 @@ describe("editing one passage", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Shorten" }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Service unavailable"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Passage edit failed: Service unavailable"));
     expect(api.editPassage).not.toHaveBeenCalled();
   });
 
@@ -784,7 +784,7 @@ describe("editing one passage", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "No AI provider could be reached for this edit.",
+        "Passage edit failed: No AI provider could be reached for this edit.",
       ),
     );
     expect(screen.getByLabelText(/^Body/i)).toHaveValue(BODY);
@@ -923,7 +923,7 @@ describe("approving", () => {
     await userEvent.click(screen.getByRole("button", { name: "Approve" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("No platform is connected"),
+      expect(toast.error).toHaveBeenCalledWith("Could not approve: No platform is connected"),
     );
     expect(toast.success).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
@@ -973,7 +973,7 @@ describe("deleting a piece", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /Delete this piece/ }));
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Already published"));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Could not delete: Already published"));
     expect(screen.getByDisplayValue("Saved title")).toBeInTheDocument();
   });
 });
@@ -1230,7 +1230,7 @@ describe("sharing a preview link", () => {
     await userEvent.click(screen.getByRole("button", { name: "New link" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Preview links are disabled"),
+      expect(toast.error).toHaveBeenCalledWith("Could not create preview link: Preview links are disabled"),
     );
     expect(screen.getByRole("button", { name: "New link" })).toBeEnabled();
   });
@@ -1285,7 +1285,7 @@ describe("sharing a preview link", () => {
     await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
 
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Link already expired"),
+      expect(toast.error).toHaveBeenCalledWith("Could not revoke preview link: Link already expired"),
     );
     expect(screen.getByRole("button", { name: "Revoke" })).toBeEnabled();
   });
@@ -1412,7 +1412,7 @@ describe("revision history", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
 
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Published pieces cannot be restored");
+      expect(toast.error).toHaveBeenCalledWith("Could not restore version: Published pieces cannot be restored");
     });
   });
 });
