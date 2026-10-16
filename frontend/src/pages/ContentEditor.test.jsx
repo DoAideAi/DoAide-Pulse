@@ -481,8 +481,11 @@ describe("auto-save", () => {
     expect(draftStore.load(3)?.draft.title).toBe("Saved title!");
   });
 
-  it("does not retry a failed save until there is something new to send", async () => {
-    api.updateContent.mockRejectedValue(new Error("Service unavailable"));
+  it("does not retry a refusal until there is something new to send", async () => {
+    // A 422 answers the same way every time; asking again is only noise.
+    api.updateContent.mockRejectedValue(
+      Object.assign(new Error("Cover must be an absolute URL"), { status: 422 }),
+    );
     draw();
     const title = await screen.findByLabelText(/^Title/i);
     useClock();
@@ -494,6 +497,45 @@ describe("auto-save", () => {
     // Ten more seconds of nothing happening is not a reason to ask again.
     await settle(10000);
     expect(api.updateContent).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Retry now" })).toBeInTheDocument();
+  });
+
+  it("retries a transient failure on its own and recovers", async () => {
+    api.updateContent
+      .mockRejectedValueOnce(Object.assign(new Error("Bad gateway"), { status: 502 }))
+      .mockResolvedValue(content({ title: "Saved title!" }));
+    draw();
+    const title = await screen.findByLabelText(/^Title/i);
+    useClock();
+
+    typeInto(title, "Saved title!");
+    await settle();
+    expect(api.updateContent).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Auto-save failed")).toBeInTheDocument();
+    expect(screen.getByText("retrying…")).toBeInTheDocument();
+
+    await settle(5000);
+    expect(api.updateContent).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Auto-save failed")).not.toBeInTheDocument();
+  });
+
+  it("gives up after repeated transient failures and offers a manual retry", async () => {
+    api.updateContent.mockRejectedValue(new Error("Failed to fetch"));
+    draw();
+    const title = await screen.findByLabelText(/^Title/i);
+    useClock();
+
+    typeInto(title, "Saved title!");
+    await settle();
+    // Waits of 5, 10, 20, 40s separate the five attempts. One `settle` each,
+    // because the next timer is only scheduled once React has committed the
+    // failure from the last one.
+    for (const wait of [5000, 10000, 20000, 40000]) await settle(wait);
+    expect(api.updateContent).toHaveBeenCalledTimes(5);
+
+    await settle(120000);
+    expect(api.updateContent).toHaveBeenCalledTimes(5);
+    expect(screen.getByRole("button", { name: "Retry now" })).toBeInTheDocument();
   });
 
   it("keeps what was typed while the save was in flight", async () => {

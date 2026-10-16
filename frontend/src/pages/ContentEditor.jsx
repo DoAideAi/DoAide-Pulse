@@ -35,6 +35,20 @@ import {
  * saved rather than sitting in a tab.
  */
 const AUTOSAVE_DELAY_MS = 2000;
+/** Failed auto-saves are retried with a doubling wait, up to this many times in
+ *  a row for the same text. After that the status line offers a manual retry. */
+const AUTOSAVE_RETRY_BASE_MS = 5000;
+const AUTOSAVE_RETRY_MAX_MS = 60000;
+const AUTOSAVE_MAX_ATTEMPTS = 5;
+
+/** Whether sending the same text again could succeed. No status means the
+ *  request never got an answer (offline, DNS, reset); 408/429/5xx are the
+ *  server saying "not now". Anything else — a 412 stale version, a 422 the
+ *  text fails validation on, a 401 — will answer the same way every time. */
+export function isRetryableSaveError(err) {
+  const status = err?.status;
+  return status === undefined || status === 408 || status === 429 || status >= 500;
+}
 
 /** The server's copy, in the shape the editor's fields hold.
  *
@@ -208,12 +222,26 @@ export default function ContentEditor() {
   const autoSaveRef = useRef(null);
   useEffect(() => {
     if (!autoSaveRef.current) return undefined;
-    const timer = setTimeout(() => autoSaveRef.current?.(), AUTOSAVE_DELAY_MS);
+    let delay = AUTOSAVE_DELAY_MS;
+    if (autoSave.status === "error" && autoSave.failedFor === draft) {
+      // The same text just failed. Retrying a refusal is a request per wait
+      // that answers identically, so only transient failures go again, with a
+      // growing pause and a ceiling. Editing the text makes `draft` a new
+      // object and falls back to the ordinary delay above.
+      if (!autoSave.retryable || autoSave.attempts >= AUTOSAVE_MAX_ATTEMPTS) {
+        return undefined;
+      }
+      delay = Math.min(
+        AUTOSAVE_RETRY_MAX_MS,
+        AUTOSAVE_RETRY_BASE_MS * 2 ** (autoSave.attempts - 1),
+      );
+    }
+    const timer = setTimeout(() => autoSaveRef.current?.(), delay);
     return () => clearTimeout(timer);
     // `draft` is a fresh object per keystroke, which is what restarts the
     // countdown; the rest are the conditions that decide whether there is
     // anything to save at all.
-  }, [draft, dirty, locked, recovered, saving]);
+  }, [draft, dirty, locked, recovered, saving, autoSave]);
 
   // ⌘S / Ctrl-S. Registered up here with the other effects, so it reads the
   // current `save` through a ref rather than needing to be declared after it.
@@ -364,13 +392,22 @@ export default function ContentEditor() {
    * prompt, so nothing is lost while it says so quietly.
    */
   async function autosave() {
+    const sent = draft;
     setSaving(true);
     setAutoSave((current) => ({ ...current, status: "saving", error: null }));
     try {
       await persist();
       setAutoSave({ status: "saved", at: Date.now(), error: null });
     } catch (err) {
-      setAutoSave((current) => ({ ...current, status: "error", error: err.message }));
+      setAutoSave((current) => ({
+        ...current,
+        status: "error",
+        error: err.message,
+        // Counted per piece of text: typing something new starts again.
+        failedFor: sent,
+        attempts: current.failedFor === sent ? (current.attempts || 0) + 1 : 1,
+        retryable: isRetryableSaveError(err),
+      }));
     } finally {
       setSaving(false);
     }
@@ -545,7 +582,12 @@ export default function ContentEditor() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={data.status} />
-          {!locked && <AutoSaveStatus state={autoSave} dirty={dirty} />}
+          {!locked && <AutoSaveStatus
+              state={autoSave}
+              dirty={dirty}
+              draft={draft}
+              onRetry={autoSaveRef.current}
+            />}
           {!locked && (
             <button className="btn-ghost" onClick={save} disabled={!dirty || saving}>
               {saving ? "Saving…" : dirty ? "Save" : "Saved"}
@@ -1792,18 +1834,36 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
  * last reached the server, and that saving has quietly stopped working — the two
  * things worth knowing after ten minutes of typing without touching anything.
  */
-function AutoSaveStatus({ state, dirty }) {
+function AutoSaveStatus({ state, dirty, draft, onRetry }) {
   if (state.status === "error") {
+    const sameText = state.failedFor === draft;
+    const gaveUp =
+      sameText && (!state.retryable || state.attempts >= AUTOSAVE_MAX_ATTEMPTS);
+    const retrying = sameText && !gaveUp;
     return (
-      <span
-        role="status"
-        className="font-mono text-[11px] text-bad"
-        // The server's own words, on hover. Too long for the header, and too
-        // specific to throw away — "disk full" and "session expired" want very
-        // different responses.
-        title={state.error}
-      >
-        Auto-save failed
+      <span className="inline-flex items-center gap-2">
+        <span
+          role="status"
+          className="font-mono text-[11px] text-bad"
+          // The server's own words, on hover. Too long for the header, and too
+          // specific to throw away — "disk full" and "session expired" want very
+          // different responses.
+          title={state.error}
+        >
+          Auto-save failed
+        </span>
+        {retrying && (
+          <span className="font-mono text-[11px] text-ink-400">retrying…</span>
+        )}
+        {gaveUp && onRetry && (
+          <button
+            type="button"
+            className="font-mono text-[11px] text-ink-700 underline"
+            onClick={onRetry}
+          >
+            Retry now
+          </button>
+        )}
       </span>
     );
   }

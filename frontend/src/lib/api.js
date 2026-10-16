@@ -59,7 +59,9 @@ async function request(
       : typeof detail === "string"
         ? detail
         : JSON.stringify(detail);
-    throw new Error(message);
+    // The status travels with the message so callers can tell a refusal that
+    // retrying cannot fix (422, 412) from one it can (429, 5xx).
+    throw Object.assign(new Error(message), { status: res.status });
   }
   return data;
 }
