@@ -761,7 +761,12 @@ def _epoch_seconds_sqlite(
 def _epoch_seconds_postgresql(
     element: _EpochSeconds, compiler: SQLCompiler, **kw: Any
 ) -> str:
-    return f"EXTRACT(EPOCH FROM {compiler.process(element.clauses, **kw)})"
+    # EXTRACT returns `numeric` (PostgreSQL 14+), and a RANGE frame needs its
+    # offset in the ORDER BY's own type: a float offset over `numeric` is
+    # "RANGE with offset PRECEDING/FOLLOWING is not supported". Casting to
+    # double precision matches the offset and the `Float` this element declares.
+    inner = compiler.process(element.clauses, **kw)
+    return f"CAST(EXTRACT(EPOCH FROM {inner}) AS DOUBLE PRECISION)"
 
 
 #: Slack on the ``RANGE`` offset in :func:`peak_gains`, in seconds.

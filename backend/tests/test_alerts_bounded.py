@@ -553,6 +553,9 @@ def test_the_frame_compiles_for_both_dialects_the_app_runs_on(db, user, project)
 
     assert "julianday" in rendered_sqlite
     assert "EXTRACT(EPOCH FROM" in rendered_pg
+    # EXTRACT alone is `numeric`, and PostgreSQL refuses a float RANGE offset
+    # over a numeric ORDER BY — which is what production did.
+    assert "AS DOUBLE PRECISION)" in rendered_pg
     # The frame itself is dialect-free: the offset is a number in both, which is
     # the entire reason ordering by seconds was worth doing.
     for rendered in (rendered_sqlite, rendered_pg):
