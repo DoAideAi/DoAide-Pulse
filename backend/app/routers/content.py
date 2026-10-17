@@ -111,6 +111,15 @@ RETRYABLE = (
     PublicationStatus.CANCELLED,
 )
 
+#: What ``GET /content/queue/publications`` lists: rows still waiting to go out,
+#: going out now, or stopped and waiting on a retry.
+_QUEUE_STATUSES = (
+    PublicationStatus.PENDING,
+    PublicationStatus.SCHEDULED,
+    PublicationStatus.PUBLISHING,
+    PublicationStatus.FAILED,
+)
+
 #: What an age-based sweep archives when the caller does not say. The two
 #: statuses that accumulate without anybody deciding anything: a draft nobody
 #: finished and a review-queue piece nobody judged. ``approved`` is left out on
@@ -650,14 +659,20 @@ def publication_queue(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[PublicationOut]:
-    """Everything in flight or waiting: pending, scheduled, publishing, failed."""
+    """Everything in flight or waiting: pending, scheduled, publishing, failed.
+
+    Named rather than "not published": ``cancelled`` is as terminal as
+    ``published`` — a withdrawn row nothing will ever pick up — and excluding
+    only the one let every retracted piece sit in the "Pending and scheduled"
+    panel for good, captioned "as soon as a worker picks it up".
+    """
     base = (
         select(Publication)
         .join(Content, Content.id == Publication.content_id)
         .join(Project, Project.id == Content.project_id)
         .where(
             Project.user_id == user.id,
-            Publication.status != PublicationStatus.PUBLISHED,
+            Publication.status.in_(_QUEUE_STATUSES),
         )
     )
     total = db.scalar(

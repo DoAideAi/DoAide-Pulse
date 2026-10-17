@@ -65,6 +65,38 @@ def test_the_queue_holds_everything_except_what_already_went_out(
     assert resp.headers["X-Total-Count"] == "2"
 
 
+def test_cancelled_rows_are_not_in_the_queue(client, auth, project, db):
+    """A withdrawn row is terminal; nothing will ever pick it up.
+
+    The query used to exclude ``published`` alone, so every retracted piece
+    stayed in the "Pending and scheduled" panel for good, captioned "as soon as
+    a worker picks it up".
+    """
+    content = _content(db, project)
+    scheduled = _publication(
+        db,
+        content,
+        status=PublicationStatus.SCHEDULED,
+        when=datetime.now(UTC) + timedelta(days=1),
+    )
+    publishing = _publication(
+        db, content, status=PublicationStatus.PUBLISHING, platform=Platform.MEDIUM
+    )
+    _publication(
+        db, content, status=PublicationStatus.CANCELLED, platform=Platform.HASHNODE
+    )
+    _publication(
+        db, content, status=PublicationStatus.CANCELLED, platform=Platform.BLUESKY,
+        when=datetime.now(UTC) - timedelta(days=60),
+    )
+
+    resp = client.get(QUEUE, headers=auth)
+
+    assert resp.status_code == 200, resp.text
+    assert {p["id"] for p in resp.json()} == {scheduled.id, publishing.id}
+    assert resp.headers["X-Total-Count"] == "2"
+
+
 def test_work_with_no_date_on_it_sorts_ahead_of_work_that_is_scheduled(
     client, auth, project, db
 ):
