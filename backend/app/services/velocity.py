@@ -780,6 +780,24 @@ def _epoch_seconds_postgresql(
 _RANGE_SLACK_SECONDS = 0.001
 
 
+def _range_preceding(seconds: float) -> Any:
+    """``RANGE BETWEEN <seconds> PRECEDING AND CURRENT ROW``, for ``over(range_=)``.
+
+    The offset is a float (see :data:`_RANGE_SLACK_SECONDS`). SQLAlchemy 2.0
+    takes that as a ``(-seconds, 0)`` tuple; 2.1 accepts only integers in the
+    tuple form and raises ``ArgumentError`` otherwise — which production, on
+    2.1, did on every dashboard load. 2.1's :class:`FrameClause` is the
+    spelling it asks for instead, and does not exist in 2.0.
+    """
+    try:
+        from sqlalchemy import FrameClause, FrameClauseType
+    except ImportError:  # SQLAlchemy 2.0
+        return (-seconds, 0)
+    return FrameClause(
+        seconds, None, FrameClauseType.PRECEDING, FrameClauseType.CURRENT
+    )
+
+
 def peak_gains(
     db: Session, known: list[Curve], *, window_hours: float
 ) -> dict[int, int]:
@@ -888,7 +906,7 @@ def _peak_gain_statement(
             - func.min(clamped.c.views).over(
                 partition_by=clamped.c.publication_id,
                 order_by=clamped.c.at,
-                range_=(-(window_hours * 3600 + _RANGE_SLACK_SECONDS), 0),
+                range_=_range_preceding(window_hours * 3600 + _RANGE_SLACK_SECONDS),
             )
         ).label("gain"),
     ).cte("velocity_spans")
