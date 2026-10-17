@@ -175,3 +175,27 @@ def test_bulk_approve_mixed_seo_pass_and_fail(
     assert good.id in body["succeeded"]
     failed_ids = [f["content_id"] for f in body["failed"]]
     assert seo_poor_content.id in failed_ids
+
+
+# ================================================================== #
+# The single-item approve: gated by default, overridable with force  #
+# ================================================================== #
+
+
+def test_approve_blocked_by_seo_gate_without_force(client, auth, seo_poor_review, db):
+    resp = client.post(f"{API}/{seo_poor_review.id}/approve", headers=auth)
+    assert resp.status_code == 409, resp.text
+    assert "SEO preflight" in resp.json()["detail"]
+    db.refresh(seo_poor_review)
+    assert seo_poor_review.status == ContentStatus.REVIEW
+
+
+def test_approve_with_force_overrides_seo_gate(client, auth, seo_poor_review, db):
+    """The dashboard's "Approve anyway": a human has read it and says yes."""
+    resp = client.post(
+        f"{API}/{seo_poor_review.id}/approve", params={"force": "true"}, headers=auth
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "approved"
+    db.refresh(seo_poor_review)
+    assert seo_poor_review.status == ContentStatus.APPROVED

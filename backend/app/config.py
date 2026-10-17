@@ -390,6 +390,15 @@ class Settings(BaseSettings):
     # Generated content at or above this confidence may publish without review
     # when the project is set to auto-publish. Below it, everything queues.
     autopilot_auto_publish_confidence: float = 0.8
+    # Generated content at or above this confidence is approved without review
+    # on a project set to auto or full, and the SEO *score* no longer holds it
+    # back. The score is a sum of style deductions (title a few characters
+    # long, meta description a few short), and it routed pieces at 82-85%
+    # confidence with no real problem into a queue nobody was reading. The
+    # gates that find something broken — dead links, missing meta, garbled
+    # text, invented names, duplicates, the quality floor — still hold a piece.
+    # Set to 1.0 to turn auto-approval off.
+    autopilot_auto_approve_confidence: float = 0.75
     # Ceiling on autopilot drafts per project per day, so a busy repo can't
     # turn into a content firehose.
     autopilot_daily_content_limit: int = 2
@@ -951,6 +960,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "autopilot_auto_publish_confidence",
+        "autopilot_auto_approve_confidence",
         "headline_winner_margin",
         "underperformance_threshold",
         "velocity_stall_ratio",

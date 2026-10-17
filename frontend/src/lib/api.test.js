@@ -469,6 +469,7 @@ describe("every endpoint's path and verb", () => {
     ["updateContent", [3, { title: "t" }], "/content/3", "PATCH"],
     ["deleteContent", [3], "/content/3", "DELETE"],
     ["approveContent", [3], "/content/3/approve", "POST"],
+    ["approveContent", [3, { force: true }], "/content/3/approve?force=true", "POST"],
     ["publishContent", [3, { platforms: [] }], "/content/3/publish", "POST"],
     ["retryPublication", [3, 8], "/content/3/retry/8", "POST"],
     ["reviewQueue", [], "/content/queue/review", "GET"],

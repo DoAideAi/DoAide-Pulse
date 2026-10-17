@@ -9,6 +9,7 @@ import {
   Skeleton,
   StatusBadge,
 } from "../components/ui/Bits";
+import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
 import {
@@ -244,16 +245,35 @@ function ReviewQueuePreview({ items, totalCount, onApproved }) {
   );
 }
 
-function ReviewCard({ item, onApproved }) {
-  const [busy, setBusy] = useState(false);
+/** The SEO preflight's 409, which a human may override; any other refusal they may not. */
+export function seoPreflightIssues(err) {
+  if (err?.status !== 409 || !err.message?.startsWith("SEO preflight")) return null;
+  return err.message
+    .split("\n")
+    .slice(1)
+    .map((line) => line.replace(/^•\s*/, "").trim())
+    .filter(Boolean);
+}
 
-  async function approve() {
+function ReviewCard({ item, onApproved }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  // Set when the SEO preflight refused: the card then lists what it found and
+  // offers "Approve anyway". Before this the refusal was caught and dropped, so
+  // the button read as broken — it went "…" and back with nothing said.
+  const [issues, setIssues] = useState(null);
+
+  async function approve(force = false) {
     setBusy(true);
     try {
-      await api.approveContent(item.id);
+      await (force ? api.approveContent(item.id, { force: true }) : api.approveContent(item.id));
+      toast.success("Approved");
       onApproved?.();
-    } catch {
+    } catch (err) {
       setBusy(false);
+      const found = force ? null : seoPreflightIssues(err);
+      if (found) setIssues(found);
+      else toast.error(`Could not approve: ${err.message}`);
     }
   }
 
@@ -298,13 +318,24 @@ function ReviewCard({ item, onApproved }) {
         </div>
       )}
 
+      {issues && (
+        <div role="alert" className="rounded-lg bg-warn/10 px-3 py-2 text-xs text-ink-600">
+          <p className="font-medium text-warn">SEO preflight flagged:</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            {issues.map((issue) => (
+              <li key={issue}>{issue}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-auto flex items-center gap-2 pt-1">
         <button
           className="min-h-[44px] flex-1 rounded-lg bg-good px-3 py-2 text-sm font-medium text-canvas transition-colors hover:bg-good/90 active:scale-[0.98] disabled:opacity-40"
-          onClick={approve}
+          onClick={() => approve(Boolean(issues))}
           disabled={busy}
         >
-          {busy ? "…" : "Approve"}
+          {busy ? "…" : issues ? "Approve anyway" : "Approve"}
         </button>
         <Link
           to={`/content/${item.id}`}

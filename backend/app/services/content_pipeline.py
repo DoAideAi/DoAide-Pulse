@@ -248,10 +248,17 @@ def generate_and_route(
         else AutopilotMode(project.autopilot_mode)
     )
     confident = generated.confidence >= settings.autopilot_auto_publish_confidence
+    # Clears the bar for approval without a human: the review queue is for
+    # pieces something is wrong with, not for every piece. A fallback stub is
+    # never approved this way, whatever confidence it carries.
+    auto_approvable = (
+        not generated.is_fallback
+        and generated.confidence >= settings.autopilot_auto_approve_confidence
+    )
     destinations = publishable_destinations(project)
     auto = bool(
         mode in (AutopilotMode.AUTO, AutopilotMode.FULL)
-        and (confident or mode == AutopilotMode.FULL)
+        and (confident or auto_approvable or mode == AutopilotMode.FULL)
         and destinations.usable
     )
 
@@ -281,7 +288,10 @@ def generate_and_route(
         "cover_image_url": None,  # an automated piece rarely has one
     }
     score = seo.seo_score(**seo_fields)
-    if auto and score < seo.SEO_SCORE_THRESHOLD:
+    # Advisory for an auto-approvable piece: see
+    # ``settings.autopilot_auto_approve_confidence``. ``seo.blocking_issues``
+    # below is what holds back a piece whose SEO is actually broken.
+    if auto and score < seo.SEO_SCORE_THRESHOLD and not auto_approvable:
         auto = False
         logger.info(
             "held %r back from auto-publish: SEO score %d < %d",

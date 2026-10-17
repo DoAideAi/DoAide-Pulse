@@ -268,7 +268,11 @@ def test_a_confident_piece_with_a_weak_seo_score_goes_to_review(
     body that is genuinely thin: no headings, no cover image, under 300
     words — the same kind of piece a confident model can produce about a
     one-line release.
+
+    Auto-approval is switched off here: above its threshold the score is
+    advisory, which the tests after this one pin.
     """
+    monkeypatch.setattr(settings, "autopilot_auto_approve_confidence", 1.0)
     project.autopilot_mode = AutopilotMode.AUTO
     project.autopilot_platforms = ["devto"]
     project.last_seen_commit_sha = "old"
@@ -284,6 +288,78 @@ def test_a_confident_piece_with_a_weak_seo_score_goes_to_review(
     content = db.query(Content).one()
     assert content.status == ContentStatus.REVIEW
     assert content.source["seo_score"] == result["seo_score"]
+
+
+def test_an_auto_approvable_piece_with_a_weak_seo_score_publishes(
+    db, project, stub_github, monkeypatch
+):
+    """Above the auto-approve threshold the SEO score is advice, not a hold.
+
+    Production held every autopilot piece at 82-85% confidence in review for
+    a score of 48-68 made of style deductions, with nothing actually wrong.
+    """
+    monkeypatch.setattr(settings, "autopilot_auto_approve_confidence", 0.75)
+    project.autopilot_mode = AutopilotMode.FULL
+    project.autopilot_platforms = ["devto"]
+    project.last_seen_commit_sha = "old"
+    db.commit()
+    stub_github["set"](make_activity(commits=1, release=True))
+    _confident_generation(monkeypatch, "A short update about the release.")
+    monkeypatch.setattr(content_pipeline.link_check, "check_body", lambda body, **kw: [])
+    monkeypatch.setattr(content_pipeline, "publish_now", lambda publication_id: None)
+
+    result = autopilot_tasks.scan_project(project.id)
+
+    assert result["status"] == "auto_published"
+    content = db.query(Content).one()
+    assert content.status == ContentStatus.APPROVED
+    assert content.source["seo_score"] < content_pipeline.seo.SEO_SCORE_THRESHOLD
+
+
+def test_auto_approval_still_holds_a_piece_with_a_dead_link(
+    db, project, stub_github, monkeypatch
+):
+    """Auto-approval relaxes the score, not the gates that find something broken."""
+    from app.services import link_check
+
+    monkeypatch.setattr(settings, "autopilot_auto_approve_confidence", 0.75)
+    project.autopilot_mode = AutopilotMode.FULL
+    project.autopilot_platforms = ["devto"]
+    project.last_seen_commit_sha = "old"
+    db.commit()
+    stub_github["set"](make_activity(commits=1, release=True))
+    _confident_generation(monkeypatch, "See the [docs](https://example.com/invented).")
+    monkeypatch.setattr(
+        content_pipeline.link_check,
+        "check_body",
+        lambda body, **kw: [
+            link_check.LinkStatus("https://example.com/invented", link_check.BROKEN, 404)
+        ],
+    )
+
+    result = autopilot_tasks.scan_project(project.id)
+
+    assert result["status"] == "queued_for_review"
+    assert db.query(Content).one().status == ContentStatus.REVIEW
+
+
+def test_a_piece_below_the_auto_approve_threshold_is_reviewed(
+    db, project, stub_github, monkeypatch
+):
+    """Under the threshold a weak SEO score still sends a piece to review."""
+    monkeypatch.setattr(settings, "autopilot_auto_approve_confidence", 0.99)
+    project.autopilot_mode = AutopilotMode.FULL
+    project.autopilot_platforms = ["devto"]
+    project.last_seen_commit_sha = "old"
+    db.commit()
+    stub_github["set"](make_activity(commits=1, release=True))
+    _confident_generation(monkeypatch, "A short update about the release.")
+    monkeypatch.setattr(content_pipeline.link_check, "check_body", lambda body, **kw: [])
+
+    result = autopilot_tasks.scan_project(project.id)
+
+    assert result["status"] == "queued_for_review"
+    assert db.query(Content).one().status == ContentStatus.REVIEW
 
 
 def test_auto_mode_still_reviews_a_low_confidence_draft(

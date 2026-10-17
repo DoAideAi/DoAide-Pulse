@@ -155,6 +155,65 @@ describe("review queue preview", () => {
     await userEvent.click(approveBtn);
 
     expect(api.approveContent).toHaveBeenCalledWith(42);
+    expect(toast.success).toHaveBeenCalledWith("Approved");
+  });
+
+  function oneInReview() {
+    api.dashboard.mockResolvedValue(payload({ needs_review: 1 }));
+    api.reviewQueue.mockResolvedValue([
+      {
+        id: 42,
+        title: "Approve me",
+        project_name: "Pulse",
+        content_type: "tutorial",
+        confidence: 0.85,
+        status: "review",
+      },
+    ]);
+  }
+
+  it("shows the SEO preflight issues and approves anyway with force", async () => {
+    oneInReview();
+    api.approveContent
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error(
+            "SEO preflight failed — fix these before approving:\n" +
+              "• Title is 64 chars — aim for 50–60 for search results.\n" +
+              "• Only 0 link(s) in the body — include at least 2 internal links.",
+          ),
+          { status: 409 },
+        ),
+      )
+      .mockResolvedValueOnce({});
+    draw();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText(/Title is 64 chars/)).toBeInTheDocument();
+    expect(within(alert).getByText(/Only 0 link/)).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Approve anyway" }));
+
+    expect(api.approveContent).toHaveBeenLastCalledWith(42, { force: true });
+    expect(toast.success).toHaveBeenCalledWith("Approved");
+  });
+
+  it("reports any other refusal instead of swallowing it", async () => {
+    oneInReview();
+    api.approveContent.mockRejectedValue(
+      Object.assign(new Error("This piece is already published"), { status: 409 }),
+    );
+    draw();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Approve" }));
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Could not approve: This piece is already published",
+    );
+    expect(screen.getByRole("button", { name: "Approve" })).toBeEnabled();
   });
 });
 

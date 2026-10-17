@@ -2201,6 +2201,11 @@ def delete_content(
 )
 def approve_content(
     content_id: RowId,
+    force: bool = Query(
+        default=False,
+        description="Approve despite SEO preflight issues. The issues are "
+        "advice about a piece a human has read; this is them saying yes anyway.",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ContentOut:
@@ -2213,6 +2218,11 @@ def approve_content(
     conditions — nothing is queued for a project on ``off`` or ``draft``, or for
     a piece that already has publications, and approving stays a status change
     there.
+
+    The SEO preflight refuses with 409 by default, and ``force`` overrides it.
+    The checks are ranges (a 61-character title, a 145-character meta
+    description), and a gate with no way past it made the dashboard's Approve
+    button refuse every piece the autopilot routed to review.
     """
     content = _owned_content(content_id, db, user)
     if content.status == ContentStatus.PUBLISHED:
@@ -2234,7 +2244,8 @@ def approve_content(
         )
     previous_status = content.status
     content.status = ContentStatus.APPROVED
-    _assert_seo_ready(db, content, previous_status)
+    if not force:
+        _assert_seo_ready(db, content, previous_status)
     _settle_status(db, content, previous_status)
     db.commit()
     content_pipeline.release_approved(db, content)

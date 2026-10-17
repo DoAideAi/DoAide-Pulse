@@ -146,7 +146,12 @@ export const api = {
       headers: version == null ? undefined : { "If-Match": `"${version}"` },
     }),
   deleteContent: (id) => request(`/content/${id}`, { method: "DELETE" }),
-  approveContent: (id) => request(`/content/${id}/approve`, { method: "POST" }),
+  // `force` approves past the SEO preflight's 409 — the human override for
+  // checks that are advice about a piece somebody has already read.
+  approveContent: (id, { force = false } = {}) =>
+    request(`/content/${id}/approve${qs({ force: force ? "true" : null })}`, {
+      method: "POST",
+    }),
   publishContent: (id, payload) =>
     request(`/content/${id}/publish`, { method: "POST", body: payload }),
   retryPublication: (contentId, publicationId) =>
