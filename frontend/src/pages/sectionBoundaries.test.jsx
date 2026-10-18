@@ -30,6 +30,7 @@ vi.mock("../lib/api", () => ({
     dashboard: vi.fn(),
     readTime: vi.fn(),
     reviewQueue: vi.fn(),
+    listContent: vi.fn(),
     bulkApprove: vi.fn(),
     approveContent: vi.fn(),
     getContent: vi.fn(),
@@ -74,6 +75,7 @@ async function draw(ui) {
 beforeEach(() => {
   vi.clearAllMocks();
   api.reviewQueue.mockResolvedValue([]);
+  api.listContent.mockResolvedValue([]);
 });
 
 describe("the analytics page", () => {

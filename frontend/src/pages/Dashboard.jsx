@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SectionBoundary } from "../components/ErrorBoundary";
+import PublishedLinks from "../components/PublishedLinks";
 import QuickActions from "../components/QuickActions";
 import {
   Empty,
@@ -141,6 +142,13 @@ export default function Dashboard() {
             </Link>
           ))}
         </section>
+      )}
+
+      {/* The exact URLs, not just the count in the stat above. */}
+      {totals.published_count > 0 && (
+        <SectionBoundary name="dashboard:published-links">
+          <PublishedLinks limit={50} perProject={5} compact />
+        </SectionBoundary>
       )}
 
       {/* Recent activity feed */}

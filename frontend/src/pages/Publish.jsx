@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import PublishedLinks from "../components/PublishedLinks";
 import { Empty, ErrorBanner, SectionHeader, Skeleton, StatusBadge } from "../components/ui/Bits";
 import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
@@ -78,6 +79,8 @@ export default function Publish() {
           </ul>
         )}
       </section>
+
+      <PublishedLinks />
 
       <section>
         <SectionHeader

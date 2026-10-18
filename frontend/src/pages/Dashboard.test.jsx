@@ -14,6 +14,7 @@ vi.mock("../lib/api", () => ({
     reviewQueue: vi.fn(),
     approveContent: vi.fn(),
     bulkApprove: vi.fn(),
+    listContent: vi.fn(),
   },
 }));
 
@@ -51,6 +52,7 @@ function payload(overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.listContent.mockResolvedValue([]);
   api.readTime.mockResolvedValue({ published_pieces: 0 });
   api.engagementTrend.mockResolvedValue({ points: [] });
   api.reviewQueue.mockResolvedValue([]);
@@ -298,5 +300,26 @@ describe("scheduled items", () => {
     draw();
 
     expect(await screen.findByText("Shipping the new editor")).toBeInTheDocument();
+  });
+});
+
+describe("Dashboard published links", () => {
+  it("lists the exact published URLs, not just the count", async () => {
+    api.dashboard.mockResolvedValue(payload());
+    api.listContent.mockResolvedValue([
+      {
+        id: 7,
+        title: "Shipping faster",
+        project_name: "Pulse",
+        status: "published",
+        published_at: "2026-10-01T10:00:00Z",
+        publications: [
+          { id: 1, platform: "devto", status: "published", external_url: "https://dev.to/pulse/shipping-faster" },
+        ],
+      },
+    ]);
+    draw();
+    const link = await screen.findByRole("link", { name: "https://dev.to/pulse/shipping-faster" });
+    expect(link).toHaveAttribute("href", "https://dev.to/pulse/shipping-faster");
   });
 });

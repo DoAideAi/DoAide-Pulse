@@ -24,6 +24,7 @@ vi.mock("../lib/api", () => ({
     platforms: vi.fn(),
     analytics: vi.fn(),
     retryPublication: vi.fn(),
+    listContent: vi.fn(),
   },
 }));
 
@@ -47,6 +48,7 @@ const DEVTO = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.listContent.mockResolvedValue([]);
   api.publicationQueue.mockResolvedValue([]);
   api.platforms.mockResolvedValue([DEVTO]);
   api.analytics.mockResolvedValue({
