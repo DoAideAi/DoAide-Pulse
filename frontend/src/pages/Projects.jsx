@@ -49,9 +49,12 @@ export default function Projects() {
             What the robot writes about.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button className="btn-ghost" onClick={() => setEditing("new")}>
             Advanced
+          </button>
+          <button className="btn-ghost" onClick={() => setEditing("docs")}>
+            From documents
           </button>
           <button className="btn-primary" onClick={() => setEditing("quick")}>
             Quick add
@@ -66,11 +69,16 @@ export default function Projects() {
       ) : projects?.length === 0 ? (
         <Empty
           title="No projects yet"
-          hint="Register what you ship — the robot watches and writes."
+          hint="Register what you ship — the robot watches and writes. Have a brief, README or pitch deck? Upload it and Pulse fills in the details."
           action={
-            <button className="btn-primary mt-1" onClick={() => setEditing("quick")}>
-              Add your first project
-            </button>
+            <div className="mt-1 flex flex-wrap justify-center gap-2">
+              <button className="btn-primary" onClick={() => setEditing("quick")}>
+                Add your first project
+              </button>
+              <button className="btn-ghost" onClick={() => setEditing("docs")}>
+                Create from documents
+              </button>
+            </div>
           }
         />
       ) : (
@@ -99,9 +107,18 @@ export default function Projects() {
         />
       )}
 
-      {editing && editing !== "quick" && (
+      {editing === "docs" && (
+        <DocumentsProjectDialog
+          onClose={() => setEditing(null)}
+          onDrafted={(draft) => setEditing({ draft })}
+          onError={(message) => toast.error(message)}
+        />
+      )}
+
+      {editing && editing !== "quick" && editing !== "docs" && (
         <ProjectDialog
-          project={editing === "new" ? null : editing}
+          project={editing === "new" || editing.draft ? null : editing}
+          draft={editing.draft ?? null}
           onClose={() => setEditing(null)}
           onSaved={() => {
             setEditing(null);
@@ -222,9 +239,11 @@ function ProjectCard({ project, onEdit, onChanged }) {
 
 /** Create/edit form. Lists are entered as comma-separated text — the fastest
  *  input for a handful of tags, and it round-trips cleanly. */
-function ProjectDialog({ project, onClose, onSaved, onError }) {
+function ProjectDialog({ project, draft = null, onClose, onSaved, onError }) {
   const [form, setForm] = useState(() =>
-    project
+    draft
+      ? formFromDraft(draft)
+      : project
       ? {
           name: project.name,
           description: project.description,
@@ -297,6 +316,8 @@ function ProjectDialog({ project, onClose, onSaved, onError }) {
       <h2 className="font-display text-2xl text-ink-900">
         {project ? `Edit ${project.name}` : "Add a project"}
       </h2>
+
+      {draft && <DraftNotice draft={draft} />}
 
       <div>
         <label className="label" htmlFor="p-name">
@@ -681,4 +702,184 @@ function IdeasPanel({ projectId }) {
       ))}
     </div>
   );
+}
+
+/** The project form's starting values from a document draft. */
+export function formFromDraft(draft) {
+  return {
+    ...EMPTY_FORM,
+    name: draft.name ?? "",
+    description: draft.description ?? "",
+    repo_url: draft.repo_url ?? "",
+    live_url: draft.live_url ?? "",
+    tech_stack: (draft.tech_stack ?? []).join(", "),
+    target_audience: draft.target_audience ?? "",
+    keywords: (draft.keywords ?? []).join(", "),
+    tone: TONES.includes(draft.tone) ? draft.tone : EMPTY_FORM.tone,
+  };
+}
+
+function DraftNotice({ draft }) {
+  const files = draft.documents ?? [];
+  return (
+    <div className="rounded-lg bg-brand-50 px-3 py-2 text-xs leading-relaxed text-ink-700">
+      <p>
+        Filled in from{" "}
+        {files.length === 1 ? (
+          <span className="font-mono">{files[0].filename}</span>
+        ) : (
+          `${files.length} documents`
+        )}
+        {draft.source === "ai" ? " by AI" : ""}. Check the details, then press Save
+        project.
+      </p>
+      {(draft.warnings ?? []).map((warning) => (
+        <p key={warning} className="mt-1 text-warn">
+          {warning}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export const DOCUMENT_ACCEPT = ".pdf,.docx,.md,.markdown,.txt,.html,.htm";
+export const MAX_DOCUMENTS = 5;
+const MAX_TOTAL_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Pick up to five documents — a brief, README, pitch deck, spec — and have
+ * Pulse draft the project from them. Nothing is created here: the draft opens
+ * in the normal project form for checking first.
+ */
+function DocumentsProjectDialog({ onClose, onDrafted, onError }) {
+  const [files, setFiles] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const total = files.reduce((sum, file) => sum + file.size, 0);
+  const tooBig = total > MAX_TOTAL_BYTES;
+
+  function add(list) {
+    const incoming = [...(list ?? [])];
+    setFiles((current) => {
+      const names = new Set(current.map((f) => f.name));
+      const merged = [...current, ...incoming.filter((f) => !names.has(f.name))];
+      return merged.slice(0, MAX_DOCUMENTS);
+    });
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const draft = await api.draftProjectFromDocuments(files);
+      onDrafted(draft);
+    } catch (err) {
+      onError(`Could not read the documents: ${err.message}`);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog
+      label="Create project from documents"
+      onClose={onClose}
+      closable={!busy}
+      width="md"
+      onSubmit={submit}
+    >
+      <h2 className="font-display text-2xl text-ink-900">Create from documents</h2>
+      <p className="text-sm text-ink-500">
+        Upload a brief, README, pitch deck or spec. Pulse reads them and fills in
+        the project for you to check — nothing is saved until you do.
+      </p>
+
+      <label
+        htmlFor="doc-files"
+        className={`flex cursor-pointer flex-col items-center gap-1 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${
+          dragging ? "border-brand-500 bg-brand-50" : "border-line hover:border-line-strong"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          add(e.dataTransfer?.files);
+        }}
+      >
+        <span className="text-sm font-medium text-ink-900">
+          Drop files here or click to choose
+        </span>
+        <span className="text-xs text-ink-400">
+          PDF, Word (.docx), Markdown, text or HTML · up to {MAX_DOCUMENTS} files, 10 MB total
+        </span>
+        <input
+          id="doc-files"
+          type="file"
+          multiple
+          accept={DOCUMENT_ACCEPT}
+          className="sr-only"
+          aria-label="Choose documents"
+          onChange={(e) => {
+            add(e.target.files);
+            e.target.value = "";
+          }}
+        />
+      </label>
+
+      {files.length > 0 && (
+        <ul className="space-y-1.5" aria-label="Selected documents">
+          {files.map((file) => (
+            <li
+              key={file.name}
+              className="flex items-center justify-between gap-3 rounded-lg border border-line px-3 py-2"
+            >
+              <span className="min-w-0 truncate font-mono text-xs text-ink-900">{file.name}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="font-mono text-[11px] text-ink-400">
+                  {formatBytes(file.size)}
+                </span>
+                <button
+                  type="button"
+                  className="btn-quiet text-xs"
+                  onClick={() => setFiles((current) => current.filter((f) => f !== file))}
+                  aria-label={`Remove ${file.name}`}
+                  disabled={busy}
+                >
+                  Remove
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {tooBig && (
+        <p className="text-xs text-bad">
+          These files add up to {formatBytes(total)} — keep it under 10 MB.
+        </p>
+      )}
+
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={busy || files.length === 0 || tooBig}
+        >
+          {busy ? "Reading documents…" : "Read and fill in"}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+export function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

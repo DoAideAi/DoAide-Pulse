@@ -25,6 +25,7 @@ from app.models.template import ContentTemplate, TemplateMode
 from app.models.translation import ContentTranslation, TranslationStatus
 from app.models.trigger import Trigger, TriggerEvent, TriggerEventStatus, TriggerKind
 from app.models.user import User
+from app.models.user_llm_key import UserLLMKey
 from app.models.webhook import (
     SUBSCRIBABLE_EVENTS,
     DeliveryStatus,
@@ -69,6 +70,7 @@ __all__ = [
     "TriggerEventStatus",
     "TriggerKind",
     "User",
+    "UserLLMKey",
     "Webhook",
     "WebhookDelivery",
     "WebhookEvent",

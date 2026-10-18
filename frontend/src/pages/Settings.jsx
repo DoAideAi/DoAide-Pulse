@@ -106,6 +106,8 @@ export default function Settings() {
         )}
       </section>
 
+      <LlmKeySection />
+
       <div className="border-t border-line pt-6">
         <h2 className="text-base font-semibold text-ink-900">Advanced</h2>
         <p className="mt-0.5 text-sm text-ink-500">
@@ -262,6 +264,213 @@ function AddPlatformCard({ platform, onConnect }) {
         Connect
       </button>
     </li>
+  );
+}
+
+/* ---- Personal LLM key ---- */
+
+/**
+ * The user's own AI key. Optional: Pulse writes with the server's shared
+ * providers by default, and a personal key is simply tried first — so the
+ * copy sells it as "faster, no shared limits", never as required.
+ */
+function LlmKeySection() {
+  const toast = useToast();
+  const { data, loading, error, reload } = useApi(() => api.llmKey(), []);
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const stored = data?.key ?? null;
+  const providers = data?.providers ?? [];
+  const label = (name) => providers.find((p) => p.provider === name)?.label ?? name;
+
+  async function remove() {
+    if (!window.confirm("Remove your AI key? Pulse will go back to its shared AI.")) return;
+    setBusy(true);
+    try {
+      await api.deleteLlmKey();
+      toast.success("AI key removed");
+      reload();
+    } catch (err) {
+      toast.error(`Could not remove the AI key: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="llm-heading">
+      <div className="mb-4">
+        <h2 id="llm-heading" className="text-base font-semibold text-ink-900">
+          Your AI key
+        </h2>
+        <p className="mt-0.5 text-sm text-ink-500">
+          Optional. Pulse writes with its shared AI by default; add your own key
+          and it is used first — no shared limits, your choice of model.
+        </p>
+      </div>
+
+      <ErrorBanner message={error} onRetry={reload} />
+
+      {loading && !data ? (
+        <Skeleton rows={1} />
+      ) : stored && !editing ? (
+        <div className="panel flex flex-wrap items-start justify-between gap-4 p-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <h3 className="text-sm font-semibold text-ink-900">{label(stored.provider)}</h3>
+              <span className="badge bg-good-wash text-good">in use</span>
+            </div>
+            <p className="mt-1 font-mono text-[11px] text-ink-500">
+              {stored.key_hint ? `key …${stored.key_hint}` : "key saved"}
+              {" · "}
+              {stored.model ||
+                `${providers.find((p) => p.provider === stored.provider)?.default_model ?? "default"} (default)`}
+              {stored.last_verified_at && ` · verified ${formatWhen(stored.last_verified_at)}`}
+            </p>
+            {stored.last_error && (
+              <p className="mt-2 break-words rounded bg-bad-wash px-2 py-1 font-mono text-[11px] text-bad">
+                {stored.last_error}
+              </p>
+            )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button className="btn-quiet text-bad" onClick={remove} disabled={busy}>
+              Remove
+            </button>
+            <button className="btn-ghost" onClick={() => setEditing(true)} disabled={busy}>
+              Change key
+            </button>
+          </div>
+        </div>
+      ) : (
+        <LlmKeyForm
+          providers={providers}
+          initialProvider={stored?.provider}
+          onCancel={stored ? () => setEditing(false) : null}
+          onSaved={() => {
+            setEditing(false);
+            reload();
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+function LlmKeyForm({ providers, initialProvider, onCancel, onSaved }) {
+  const toast = useToast();
+  const [provider, setProvider] = useState(
+    initialProvider || providers[0]?.provider || "gemini",
+  );
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("");
+  const [busy, setBusy] = useState(false);
+  const preset = providers.find((p) => p.provider === provider);
+
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      await api.saveLlmKey({ provider, api_key: apiKey.trim(), model: model.trim() });
+      toast.success(`${preset?.label ?? "AI"} key saved — Pulse will use it from now on`);
+      setApiKey("");
+      onSaved();
+    } catch (err) {
+      toast.error(`Could not save the AI key: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form className="panel space-y-4 p-5" onSubmit={submit} aria-label="AI key">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,12rem)_1fr]">
+        <div>
+          <label className="label" htmlFor="llm-provider">
+            Provider
+          </label>
+          <select
+            id="llm-provider"
+            className="input"
+            value={provider}
+            onChange={(e) => setProvider(e.target.value)}
+          >
+            {providers.map((p) => (
+              <option key={p.provider} value={p.provider}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <CredentialInput
+          field={{
+            key: "llm-api-key",
+            label: "Your key",
+            secret: true,
+            required: true,
+            help_text: "",
+          }}
+          value={apiKey}
+          onChange={setApiKey}
+          placeholder={preset?.key_prefix ? `${preset.key_prefix}…` : ""}
+        />
+      </div>
+
+      {preset?.key_url && (
+        <p className="text-xs text-ink-500">
+          Don&apos;t have one?{" "}
+          <a
+            className="font-medium text-brand-600 hover:underline"
+            href={preset.key_url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Get a {preset.label} key ↗
+          </a>{" "}
+          — copy it and paste it above.
+        </p>
+      )}
+
+      <details className="rounded-lg border border-line px-4 py-2">
+        <summary className="cursor-pointer text-xs font-medium text-ink-700">
+          Model (optional) — defaults to {preset?.default_model || "the provider's default"}
+        </summary>
+        <div className="mt-3 pb-2">
+          <label className="label" htmlFor="llm-model">
+            Model name
+          </label>
+          <input
+            id="llm-model"
+            className="input font-mono text-xs"
+            placeholder={preset?.default_model ?? ""}
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </div>
+      </details>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-ink-400">
+          Checked with a tiny request before saving, then encrypted.
+        </p>
+        <div className="flex shrink-0 gap-2">
+          {onCancel && (
+            <button type="button" className="btn-ghost" onClick={onCancel} disabled={busy}>
+              Cancel
+            </button>
+          )}
+          <button
+            type="submit"
+            className="btn-primary"
+            disabled={busy || apiKey.trim().length < 8}
+          >
+            {busy ? "Checking…" : "Save key"}
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }
 
@@ -1088,7 +1297,7 @@ function ConnectDialog({ platform, onClose, onDone }) {
 }
 
 /** One credential field, with a reveal toggle on secrets so a paste can be checked. */
-function CredentialInput({ field, value, onChange, autoFocus }) {
+function CredentialInput({ field, value, onChange, autoFocus, placeholder }) {
   const [revealed, setRevealed] = useState(false);
   const id = `cred-${field.key}`;
   return (
@@ -1108,6 +1317,7 @@ function CredentialInput({ field, value, onChange, autoFocus }) {
           autoComplete="off"
           spellCheck={false}
           data-autofocus={autoFocus || undefined}
+          placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
         />

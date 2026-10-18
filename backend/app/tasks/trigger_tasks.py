@@ -19,6 +19,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.database import SessionLocal
 from app.models.trigger import Trigger
+from app.services import llm_router
 from app.services import triggers as trigger_service
 from app.services.errors import sanitize_unexpected_error
 from app.tasks.celery_app import task
@@ -43,7 +44,8 @@ def check_trigger(trigger_id: int) -> dict:
         trigger = db.get(Trigger, trigger_id)
         if trigger is None or not trigger.is_active:
             return {"trigger_id": trigger_id, "status": "skipped"}
-        return trigger_service.check(db, trigger)
+        with llm_router.acting_for(trigger.project.user_id if trigger.project else None):
+            return trigger_service.check(db, trigger)
     except SoftTimeLimitExceeded:
         logger.warning("trigger %s timed out", trigger_id)
         return {"trigger_id": trigger_id, "status": "timeout"}

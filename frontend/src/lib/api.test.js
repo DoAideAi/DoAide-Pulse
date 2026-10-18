@@ -459,6 +459,7 @@ describe("every endpoint's path and verb", () => {
     ["updateProject", [5, { name: "H" }], "/projects/5", "PATCH"],
     ["deleteProject", [5], "/projects/5", "DELETE"],
     ["scanProject", [5], "/projects/5/scan", "POST"],
+    ["draftProjectFromDocuments", [[]], "/projects/draft-from-documents", "POST"],
 
     ["listContent", [], "/content", "GET"],
     ["getContent", [3], "/content/3", "GET"],
@@ -561,7 +562,22 @@ describe("every endpoint's path and verb", () => {
     ["saveConnection", ["devto", {}], "/settings/connections", "PUT"],
     ["verifyConnection", ["devto"], "/settings/connections/devto/verify", "POST"],
     ["deleteConnection", ["devto"], "/settings/connections/devto", "DELETE"],
+    ["llmKey", [], "/settings/llm-key", "GET"],
+    ["saveLlmKey", [{ provider: "gemini", api_key: "k" }], "/settings/llm-key", "PUT"],
+    ["deleteLlmKey", [], "/settings/llm-key", "DELETE"],
   ];
+
+  it("sends every document as a multipart `files` part", async () => {
+    const fetchMock = stubOk();
+    const a = new File(["a"], "a.md");
+    const b = new File(["b"], "b.pdf");
+
+    await api.draftProjectFromDocuments([a, b]);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(init.body.getAll("files").map((f) => f.name)).toEqual(["a.md", "b.pdf"]);
+  });
 
   it.each(ENDPOINTS)("%s hits %s as %s", async (name, args, path, verb) => {
     const fetchMock = stubOk();

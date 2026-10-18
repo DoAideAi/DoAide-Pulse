@@ -35,6 +35,9 @@ vi.mock("../lib/api", () => ({
     createApiKey: vi.fn(),
     revokeApiKey: vi.fn(),
     listProjects: vi.fn(),
+    llmKey: vi.fn(),
+    saveLlmKey: vi.fn(),
+    deleteLlmKey: vi.fn(),
   },
 }));
 
@@ -46,6 +49,23 @@ vi.mock("../components/ui/Toast", () => ({ useToast: () => toast }));
 // is rebuilt on every render can never be asserted against.
 const auth = { user: { email: "you@example.com" }, refresh: vi.fn() };
 vi.mock("../hooks/useAuth", () => ({ useAuth: () => auth }));
+
+const LLM_PROVIDERS = [
+  {
+    provider: "gemini",
+    label: "Google Gemini",
+    default_model: "gemini-flash-latest",
+    key_url: "https://aistudio.google.com/app/apikey",
+    key_prefix: "AIza",
+  },
+  {
+    provider: "openai",
+    label: "OpenAI",
+    default_model: "gpt-4o-mini",
+    key_url: "https://platform.openai.com/api-keys",
+    key_prefix: "sk-",
+  },
+];
 
 function draw() {
   return render(
@@ -73,6 +93,7 @@ beforeEach(() => {
   api.listApiKeys.mockResolvedValue([]);
   api.apiKeyScopes.mockResolvedValue([]);
   api.listProjects.mockResolvedValue([]);
+  api.llmKey.mockResolvedValue({ providers: LLM_PROVIDERS, key: null });
 });
 
 describe("service health", () => {
@@ -951,5 +972,144 @@ describe("API keys", () => {
     // The one-time token dialog should appear
     expect(await screen.findByText("API token")).toBeInTheDocument();
     expect(screen.getByDisplayValue("psk_abc.secret_token_value")).toBeInTheDocument();
+  });
+});
+
+/* ---- Personal AI key ---- */
+
+describe("your AI key", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function form() {
+    return screen.getByRole("form", { name: "AI key" });
+  }
+
+  it("offers the form with Gemini picked and a link to get a key", async () => {
+    draw();
+
+    expect(await screen.findByRole("heading", { name: "Your AI key" })).toBeInTheDocument();
+    const select = await within(await screen.findByRole("form", { name: "AI key" })).findByLabelText("Provider");
+    expect(select).toHaveValue("gemini");
+    expect(screen.getByRole("link", { name: /Get a Google Gemini key/ })).toHaveAttribute(
+      "href",
+      "https://aistudio.google.com/app/apikey",
+    );
+  });
+
+  it("switches the key link with the provider", async () => {
+    const user = userEvent.setup();
+    draw();
+    await screen.findByRole("form", { name: "AI key" });
+
+    await user.selectOptions(within(form()).getByLabelText("Provider"), "openai");
+
+    expect(screen.getByRole("link", { name: /Get a OpenAI key/ })).toHaveAttribute(
+      "href",
+      "https://platform.openai.com/api-keys",
+    );
+  });
+
+  it("keeps Save disabled until something key-shaped is typed", async () => {
+    const user = userEvent.setup();
+    draw();
+    await screen.findByRole("form", { name: "AI key" });
+    const save = within(form()).getByRole("button", { name: "Save key" });
+
+    expect(save).toBeDisabled();
+    await user.type(within(form()).getByLabelText(/Your key/), "AIzaSy-123456");
+    expect(save).toBeEnabled();
+  });
+
+  it("saves the provider, trimmed key and blank model, then reloads", async () => {
+    api.saveLlmKey.mockResolvedValue({ providers: LLM_PROVIDERS, key: null });
+    const user = userEvent.setup();
+    draw();
+    await screen.findByRole("form", { name: "AI key" });
+
+    await user.type(within(form()).getByLabelText(/Your key/), "  AIzaSy-123456  ");
+    await user.click(within(form()).getByRole("button", { name: "Save key" }));
+
+    await waitFor(() =>
+      expect(api.saveLlmKey).toHaveBeenCalledWith({
+        provider: "gemini",
+        api_key: "AIzaSy-123456",
+        model: "",
+      }),
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Google Gemini key saved — Pulse will use it from now on",
+    );
+    await waitFor(() => expect(api.llmKey).toHaveBeenCalledTimes(2));
+  });
+
+  it("says why when the provider refuses the key", async () => {
+    api.saveLlmKey.mockRejectedValue(new Error("The key did not work: API key not valid"));
+    const user = userEvent.setup();
+    draw();
+    await screen.findByRole("form", { name: "AI key" });
+
+    await user.type(within(form()).getByLabelText(/Your key/), "AIzaSy-wrong-key");
+    await user.click(within(form()).getByRole("button", { name: "Save key" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not save the AI key: The key did not work: API key not valid",
+      ),
+    );
+    expect(within(form()).getByLabelText(/Your key/)).toHaveValue("AIzaSy-wrong-key");
+  });
+
+  it("shows a stored key by its hint only, with the default model named", async () => {
+    api.llmKey.mockResolvedValue({
+      providers: LLM_PROVIDERS,
+      key: {
+        provider: "gemini",
+        model: "",
+        key_hint: "abcd",
+        last_verified_at: null,
+        last_error: null,
+      },
+    });
+    draw();
+
+    expect(await screen.findByText("Google Gemini")).toBeInTheDocument();
+    expect(screen.getByText("in use")).toBeInTheDocument();
+    expect(screen.getByText(/key …abcd · gemini-flash-latest \(default\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("form", { name: "AI key" })).not.toBeInTheDocument();
+  });
+
+  it("can change a stored key, and cancel back out", async () => {
+    api.llmKey.mockResolvedValue({
+      providers: LLM_PROVIDERS,
+      key: { provider: "openai", model: "gpt-4o", key_hint: "wxyz" },
+    });
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Change key" }));
+    expect(within(form()).getByLabelText("Provider")).toHaveValue("openai");
+
+    await user.click(within(form()).getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("form", { name: "AI key" })).not.toBeInTheDocument();
+  });
+
+  it("removes a stored key after asking", async () => {
+    api.llmKey.mockResolvedValue({
+      providers: LLM_PROVIDERS,
+      key: { provider: "gemini", model: "", key_hint: "abcd" },
+    });
+    api.deleteLlmKey.mockResolvedValue(null);
+    const confirm = vi.fn().mockReturnValue(true);
+    vi.stubGlobal("confirm", confirm);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Remove" }));
+
+    expect(confirm).toHaveBeenCalled();
+    await waitFor(() => expect(api.deleteLlmKey).toHaveBeenCalled());
+    expect(toast.success).toHaveBeenCalledWith("AI key removed");
   });
 });

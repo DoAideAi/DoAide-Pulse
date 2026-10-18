@@ -48,7 +48,7 @@ from app.models.mixins import elapsed_ms, utcnow
 from app.models.project import AutopilotMode, Project, repo_full_name, scan_due
 from app.models.trigger import Trigger, TriggerKind
 from app.models.user import User
-from app.services import content_generator, content_pipeline, dedup, github_client
+from app.services import content_generator, content_pipeline, dedup, github_client, llm_router
 from app.services.errors import sanitize_unexpected_error
 from app.tasks.celery_app import task
 
@@ -158,7 +158,9 @@ def scan_project(project_id: int) -> dict:
         # of history.
         first_scan = project.last_seen_commit_sha is None
         try:
-            result = _act_on(db, project, activity, first_scan=first_scan)
+            # The owner's own LLM key, if they saved one, goes first.
+            with llm_router.acting_for(project.user_id):
+                result = _act_on(db, project, activity, first_scan=first_scan)
         except content_pipeline.GenerationUnavailable as exc:
             # Nothing was written and the watermark stays put, so the next sweep
             # sees these same commits and writes about them properly. Rolled

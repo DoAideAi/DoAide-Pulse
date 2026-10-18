@@ -19,10 +19,19 @@ from app.models.mixins import utcnow
 from app.models.platform_connection import ConnectionStatus, PlatformConnection
 from app.models.publication import Platform
 from app.models.user import User
+from app.models.user_llm_key import UserLLMKey
 from app.ratelimit import account_key, limiter
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
-from app.schemas.settings import ConnectionCreate, ConnectionOut, PlatformCapability
-from app.services import publishers
+from app.schemas.settings import (
+    ConnectionCreate,
+    ConnectionOut,
+    LLMKeyIn,
+    LLMKeyOut,
+    LLMKeySettings,
+    LLMProviderOption,
+    PlatformCapability,
+)
+from app.services import llm_router, publishers, user_llm
 from app.services.crypto import CredentialEncryptionError, encrypt_credentials
 from app.services.errors import clip_error, redact
 from app.services.publishers.base import (
@@ -337,3 +346,118 @@ def delete_connection(
     )
     db.delete(connection)
     db.commit()
+
+
+# --------------------------------------------------------------------------- #
+# Personal LLM key                                                             #
+# --------------------------------------------------------------------------- #
+
+
+def _llm_settings(db: Session, user: User) -> LLMKeySettings:
+    row = user_llm.get_row(db, user.id)
+    return LLMKeySettings(
+        providers=[
+            LLMProviderOption(
+                provider=name,
+                label=preset.label,
+                default_model=preset.default_model,
+                key_url=preset.key_url,
+                key_prefix=preset.key_prefix,
+            )
+            for name, preset in user_llm.presets().items()
+        ],
+        key=LLMKeyOut.model_validate(row) if row and row.encrypted_key else None,
+    )
+
+
+@router.get(
+    "/llm-key",
+    response_model=LLMKeySettings,
+    summary="Your own LLM key: which providers are supported and what is stored",
+    responses=errors(*AUTHENTICATED),
+)
+def get_llm_key(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> LLMKeySettings:
+    """The providers a personal key can be for, and the stored one if any.
+
+    The key itself never comes back — only its last four characters.
+    """
+    return _llm_settings(db, user)
+
+
+@router.put(
+    "/llm-key",
+    response_model=LLMKeySettings,
+    summary="Save your own LLM key, verifying it first",
+    responses=errors(
+        status.HTTP_400_BAD_REQUEST,
+        *AUTHENTICATED,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+    ),
+)
+@limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
+def save_llm_key(
+    payload: LLMKeyIn,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> LLMKeySettings:
+    """Check the key with one tiny completion, then store it encrypted.
+
+    From then on everything Pulse writes for this account tries this key
+    first, with the server's own providers behind it as the fallback.
+
+    Rate-limited like platform connections, for the same reason: verifying is
+    an outbound request made on the caller's say-so with a key they just typed.
+    """
+    try:
+        user_llm.verify(payload.provider, payload.api_key, payload.model)
+    except llm_router.LLMError as exc:
+        safe = redact(str(exc), [payload.api_key])
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"The key did not work: {clip_error(safe)}",
+        ) from exc
+
+    try:
+        encrypted = encrypt_credentials({"api_key": payload.api_key})
+    except CredentialEncryptionError as exc:
+        logger.error("LLM key encryption failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not encrypt the key for storage. "
+            "Check the server's encryption configuration.",
+        ) from exc
+
+    row = user_llm.get_row(db, user.id)
+    if row is None:
+        row = UserLLMKey(user_id=user.id, provider=payload.provider)
+        db.add(row)
+    row.provider = payload.provider
+    row.model = payload.model
+    row.encrypted_key = encrypted
+    row.key_hint = user_llm.hint(payload.api_key)
+    row.last_verified_at = utcnow()
+    row.last_error = None
+    db.commit()
+    return _llm_settings(db, user)
+
+
+@router.delete(
+    "/llm-key",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove your own LLM key",
+    responses=errors(*AUTHENTICATED),
+)
+def delete_llm_key(
+    db: Session = Depends(get_db), user: User = Depends(get_current_user)
+) -> Response:
+    """Forget the key. Generation goes back to the server's providers."""
+    row = user_llm.get_row(db, user.id)
+    if row is not None:
+        db.delete(row)
+        db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

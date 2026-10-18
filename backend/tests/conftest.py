@@ -122,6 +122,13 @@ engine = create_engine(
 )
 TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
+# The LLM chain looks up the acting user's own key on a session it opens itself
+# (see app.services.user_llm.load_for). Point that at the test database, or
+# every authenticated request that generates would query an empty one.
+from app.services import user_llm  # noqa: E402
+
+user_llm.session_factory = TestSession
+
 
 @pytest.fixture(autouse=True)
 def _fresh_rate_limits():

@@ -63,7 +63,9 @@ import json
 import logging
 import random
 import time
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -224,6 +226,59 @@ class Provider:
         }
 
 
+# --------------------------------------------------------------------------- #
+# Whose request this is                                                        #
+# --------------------------------------------------------------------------- #
+
+#: The user Pulse is generating for, when it knows. Set per request by
+#: :class:`app.main.ActingUserMiddleware` and per task by :func:`acting_for`.
+#: A ContextVar rather than a parameter because the chain is reached through a
+#: dozen call sites that have no reason to carry a user id, and a key that only
+#: worked where somebody remembered to thread it through would be worse than
+#: none.
+_acting_user: ContextVar[int | None] = ContextVar("llm_acting_user", default=None)
+
+
+def set_acting_user(user_id: int | None) -> Token:
+    """Bind *user_id* for the current context. Pair with :func:`reset_acting_user`."""
+    return _acting_user.set(user_id)
+
+
+def reset_acting_user(token: Token) -> None:
+    _acting_user.reset(token)
+
+
+@contextmanager
+def acting_for(user_id: int | None) -> Iterator[None]:
+    """Run the enclosed generation on *user_id*'s own key, when they have one."""
+    token = set_acting_user(user_id)
+    try:
+        yield
+    finally:
+        reset_acting_user(token)
+
+
+def _own_provider() -> Provider | None:
+    """The acting user's personal key as a provider, or ``None``.
+
+    Read from the database on every call rather than cached: a key saved or
+    removed in Settings takes effect on the very next generation, and one query
+    is nothing next to the completion it precedes. Any failure to read it falls
+    back to the server chain — a personal key is an addition, never a new way
+    for generation to break.
+    """
+    user_id = _acting_user.get()
+    if user_id is None:
+        return None
+    try:
+        from app.services import user_llm
+
+        return user_llm.load_for(user_id)
+    except Exception:  # noqa: BLE001 - see docstring
+        logger.warning("could not load personal LLM key for user %s", user_id, exc_info=True)
+        return None
+
+
 def _configured_models(raw: str) -> tuple[str, ...]:
     """Parse a comma-separated ``*_FALLBACK_MODELS`` setting."""
     return tuple(part.strip() for part in (raw or "").split(",") if part.strip())
@@ -269,7 +324,22 @@ def _providers() -> list[Provider]:
             fallback_models=_configured_models(settings.cerebras_fallback_models),
         ),
     ]
-    return [p for p in candidates if p.api_key]
+    configured = [p for p in candidates if p.api_key]
+    own = _own_provider()
+    return [own, *configured] if own else configured
+
+
+def _prefer(providers: list[Provider], name: str | None) -> list[Provider]:
+    """Move the server provider called *name* to the front of the server chain.
+
+    A user's own key, when there is one, stays first: they chose it.
+    """
+    if not name:
+        return providers
+    own = [p for p in providers if p.name.startswith("own:")]
+    rest = [p for p in providers if not p.name.startswith("own:")]
+    rest.sort(key=lambda p: p.name != name)  # stable: the rest keep their order
+    return [*own, *rest]
 
 
 def configured_providers() -> list[str]:
@@ -899,6 +969,7 @@ def complete(
     max_tokens: int = 1200,
     timeout: float = 90.0,
     purpose: str = "",
+    prefer: str | None = None,
 ) -> Completion:
     """Try each configured provider in order; return the first success.
 
@@ -925,7 +996,7 @@ def complete(
     Raises :class:`AllProvidersFailed` when none of them produce usable text —
     the signal for the caller to use its own static template.
     """
-    providers = _providers()
+    providers = _prefer(_providers(), prefer)
     if not providers:
         raise AllProvidersFailed(
             "No LLM provider is configured — set OPENROUTER_API_KEY, "
@@ -982,7 +1053,10 @@ __all__ = [
     "LLMModelUnavailable",
     "LLMRateLimited",
     "Provider",
+    "acting_for",
     "breaker",
     "complete",
     "configured_providers",
+    "reset_acting_user",
+    "set_acting_user",
 ]

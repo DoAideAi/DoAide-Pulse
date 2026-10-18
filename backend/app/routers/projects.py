@@ -5,7 +5,17 @@ import logging
 import secrets
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only, selectinload
@@ -22,13 +32,15 @@ from app.ratelimit import account_key, limiter
 from app.routers._patch import reject_nulls
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
 from app.schemas.project import (
+    DocumentSummary,
     IdeaOut,
     ProjectCreate,
+    ProjectDraftOut,
     ProjectOut,
     ProjectUpdate,
     RepoActivityOut,
 )
-from app.services import content_generator, github_client, rss
+from app.services import content_generator, github_client, project_import, rss
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +241,81 @@ def create_project(
         db.commit()
     db.refresh(project)
     return _to_out(project, db=db)
+
+
+@router.post(
+    "/draft-from-documents",
+    response_model=ProjectDraftOut,
+    summary="Read uploaded documents and draft a project from them",
+    responses=errors(
+        status.HTTP_400_BAD_REQUEST,
+        *AUTHENTICATED,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+    ),
+)
+@limiter.limit(settings.rate_limit_ai_generate, key_func=account_key)
+async def draft_from_documents(
+    request: Request,
+    response: Response,
+    files: list[UploadFile] = File(...),
+    user: User = Depends(get_current_user),
+) -> ProjectDraftOut:
+    """Upload a brief, README, pitch deck or spec; get the project form filled in.
+
+    Accepts up to five PDF, Word (.docx), Markdown, text or HTML files. Nothing
+    is saved: the answer is a draft for the user to check and then send to
+    ``POST /projects`` as usual. The fields are written by the LLM chain
+    (Gemini first, or the user's own key) and fall back to plain text
+    heuristics when no model is available.
+    """
+    if not files:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Upload at least one document.")
+    if len(files) > project_import.MAX_FILES:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=f"Upload at most {project_import.MAX_FILES} documents at a time.",
+        )
+
+    documents: list[project_import.ExtractedDocument] = []
+    for upload in files:
+        filename = (upload.filename or "document").rsplit("/", 1)[-1][:200]
+        # One byte past the cap is enough to know it is over; reading the
+        # whole thing first would buffer whatever size the client chose.
+        data = await upload.read(project_import.MAX_FILE_BYTES + 1)
+        try:
+            text = project_import.extract_text(filename, data)
+        except project_import.DocumentError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        documents.append(project_import.ExtractedDocument(filename=filename, text=text))
+
+    # The model call is blocking; keep it off the event loop. The context is
+    # copied explicitly so the acting user (and their own LLM key) goes with it.
+    import contextvars
+
+    from starlette.concurrency import run_in_threadpool
+
+    context = contextvars.copy_context()
+    draft = await run_in_threadpool(context.run, project_import.draft_project, documents)
+    warnings = list(draft.warnings)
+    if sum(len(d.text) for d in documents) > project_import.MAX_PROMPT_CHARS:
+        warnings.append(
+            "The documents are long, so only the first part of them was read."
+        )
+    return ProjectDraftOut(
+        name=draft.name,
+        description=draft.description,
+        repo_url=draft.repo_url,
+        live_url=draft.live_url,
+        tech_stack=draft.tech_stack,
+        target_audience=draft.target_audience,
+        keywords=draft.keywords,
+        tone=draft.tone,
+        source=draft.source,
+        documents=[
+            DocumentSummary(filename=d.filename, characters=len(d.text)) for d in documents
+        ],
+        warnings=warnings,
+    )
 
 
 @router.get(

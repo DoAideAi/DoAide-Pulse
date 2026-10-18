@@ -205,3 +205,26 @@ class IdeaOut(BaseModel):
     rationale: str = ""
 
     model_config = {"from_attributes": True}
+
+
+class DocumentSummary(BaseModel):
+    filename: str
+    characters: int
+
+
+class ProjectDraftOut(BaseModel):
+    """A project filled in from uploaded documents. Not saved — the user
+    reviews it in the project form and creates it from there."""
+
+    name: str
+    description: str
+    repo_url: str | None = None
+    live_url: str | None = None
+    tech_stack: list[str] = []
+    target_audience: str = ""
+    keywords: list[str] = []
+    tone: Tone = Tone.TECHNICAL
+    #: ``"ai"`` or ``"heuristic"``.
+    source: str
+    documents: list[DocumentSummary] = []
+    warnings: list[str] = []

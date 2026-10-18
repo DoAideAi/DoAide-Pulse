@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from app.models.platform_connection import PlatformConnection
 from app.models.trigger import Trigger
+from app.models.user_llm_key import UserLLMKey
 from app.models.webhook import Webhook
 from app.services import crypto
 
@@ -68,6 +69,7 @@ _ENCRYPTED_COLUMNS: tuple[tuple[str, type, str], ...] = (
     ("platform_connections", PlatformConnection, "encrypted_credentials"),
     ("webhooks", Webhook, "encrypted_secret"),
     ("triggers", Trigger, "encrypted_secret"),
+    ("user_llm_keys", UserLLMKey, "encrypted_key"),
 )
 
 

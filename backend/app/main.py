@@ -54,7 +54,11 @@ logger = logging.getLogger(__name__)
 MAX_BODY_BYTES = 1 * 1024 * 1024
 
 #: Paths that accept file uploads and need a higher body size limit.
-_UPLOAD_PATHS = frozenset({f"{settings.api_v1_prefix}/uploads"})
+_UPLOAD_PATHS = frozenset({
+    f"{settings.api_v1_prefix}/uploads",
+    # Documents a project is drafted from (PDF, .docx, Markdown…).
+    f"{settings.api_v1_prefix}/projects/draft-from-documents",
+})
 MAX_UPLOAD_BODY_BYTES = 10 * 1024 * 1024
 
 #: How deeply a request body may nest arrays and objects.
@@ -201,6 +205,55 @@ def _is_json(scope: Scope) -> bool:
     declared = Headers(scope=scope).get("content-type", "")
     mime = declared.split(";")[0].strip().lower()
     return mime == "application/json" or mime.endswith("+json")
+
+
+class ActingUserMiddleware:
+    """Bind the signed-in user for the LLM chain, so their own key is tried first.
+
+    Reads only the bearer token's signed ``sub`` — no database, no revocation
+    check. It does not authenticate anything: every route still resolves its
+    user through :func:`app.deps.get_current_user`, which refuses a revoked
+    token before any generation can start. All this decides is whose personal
+    key :mod:`app.services.llm_router` looks up *if* the route goes on to
+    generate, and a token that fails here simply means the server chain.
+
+    Raw ASGI, like :class:`BodySizeLimitMiddleware`: a context variable set
+    here is inherited by the route, including a sync route run in the thread
+    pool, because the pool copies the context it is called from.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        user_id = _bearer_subject(Headers(scope=scope).get("authorization", ""))
+        if user_id is None:
+            await self.app(scope, receive, send)
+            return
+        from app.services import llm_router
+
+        token = llm_router.set_acting_user(user_id)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            llm_router.reset_acting_user(token)
+
+
+def _bearer_subject(header: str) -> int | None:
+    """The user id in a valid ``Authorization: Bearer`` token, else ``None``."""
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    from app.security import decode_access_token_claims
+
+    claims = decode_access_token_claims(token.strip())
+    try:
+        return int(claims["sub"]) if claims else None
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 class _JSONDepthScanner:
@@ -477,6 +530,7 @@ def create_app() -> FastAPI:
     # the body check now carries X-Request-ID for log correlation, and the
     # request-id context var is set before the body middleware logs anything.
     app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(ActingUserMiddleware)
 
     app.add_middleware(RequestIDMiddleware)
 

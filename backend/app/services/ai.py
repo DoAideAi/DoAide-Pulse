@@ -468,6 +468,7 @@ def chat_completion_detailed(
     max_tokens: int = 1200,
     timeout: float = 90.0,
     purpose: str = "",
+    prefer: str | None = None,
 ) -> llm_router.Completion:
     """Run the provider chain and return the text *plus* who served it.
 
@@ -489,6 +490,7 @@ def chat_completion_detailed(
             max_tokens=max_tokens,
             timeout=timeout,
             purpose=purpose,
+            prefer=prefer,
         )
     except llm_router.AllProvidersFailed as exc:
         raise AIError(str(exc)) from exc
@@ -529,6 +531,7 @@ def json_completion(
     max_tokens: int = 1200,
     timeout: float = 90.0,
     purpose: str = "",
+    prefer: str | None = None,
 ) -> tuple[dict[str, Any], llm_router.Completion]:
     """Ask for a JSON object and return it alongside the raw completion.
 
@@ -551,6 +554,7 @@ def json_completion(
         max_tokens=max_tokens,
         timeout=timeout,
         purpose=purpose,
+        prefer=prefer,
     )
     parsed = extract_json_object(completion.text)
     if parsed is None:

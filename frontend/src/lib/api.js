@@ -115,6 +115,11 @@ export const api = {
     request(`/projects/${id}`, { method: "PATCH", body: payload }),
   deleteProject: (id) => request(`/projects/${id}`, { method: "DELETE" }),
   scanProject: (id) => request(`/projects/${id}/scan`, { method: "POST" }),
+  draftProjectFromDocuments: (files) => {
+    const form = new FormData();
+    for (const file of files) form.append("files", file);
+    return request("/projects/draft-from-documents", { method: "POST", form });
+  },
 
   // ---- content ----
   listContent: (params = {}) => request(`/content${qs(params)}`),
@@ -339,6 +344,9 @@ export const api = {
 
   // ---- settings ----
   platforms: () => request("/settings/platforms"),
+  llmKey: () => request("/settings/llm-key"),
+  saveLlmKey: (payload) => request("/settings/llm-key", { method: "PUT", body: payload }),
+  deleteLlmKey: () => request("/settings/llm-key", { method: "DELETE" }),
   saveConnection: (platform, credentials) =>
     request("/settings/connections", {
       method: "PUT",

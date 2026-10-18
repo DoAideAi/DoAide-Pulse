@@ -60,3 +60,6 @@ beautifulsoup4>=4.12
 # straight through, so this is what stands between a <script> in a body and the
 # author's readers. See app.services.publishers.formatting.sanitize_html.
 nh3>=0.2.18
+# Text out of uploaded PDFs, for creating a project from documents
+# (app.services.project_import). Pure Python, no system libraries.
+pypdf>=5.0

@@ -148,3 +148,58 @@ class HealthDetailOut(HealthOut):
     github_configured: bool = False
     credential_encryption: bool = False
     implemented_platforms: list[str] = []
+
+
+# ---- Personal LLM key ------------------------------------------------------ #
+
+
+class LLMProviderOption(BaseModel):
+    provider: str
+    label: str
+    default_model: str
+    key_url: str
+    key_prefix: str = ""
+
+
+class LLMKeyOut(BaseModel):
+    """The stored key, described. The key itself is never in here."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    provider: str
+    model: str
+    key_hint: str
+    last_verified_at: datetime | None = None
+    last_error: str | None = None
+
+
+class LLMKeySettings(BaseModel):
+    providers: list[LLMProviderOption]
+    key: LLMKeyOut | None = None
+
+
+class LLMKeyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(min_length=1, max_length=30)
+    api_key: str = Field(min_length=8, max_length=500)
+    #: Blank = the provider's default model.
+    model: str = Field(default="", max_length=120)
+
+    @field_validator("provider")
+    @classmethod
+    def _known(cls, value: str) -> str:
+        from app.services import user_llm
+
+        name = value.strip().lower()
+        if name not in user_llm.PROVIDERS:
+            raise ValueError(
+                f"Unknown provider {value!r}. Choose one of: "
+                f"{', '.join(user_llm.PROVIDERS)}."
+            )
+        return name
+
+    @field_validator("api_key", "model")
+    @classmethod
+    def _strip(cls, value: str) -> str:
+        return value.strip()

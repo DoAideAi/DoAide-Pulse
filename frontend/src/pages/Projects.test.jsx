@@ -3,11 +3,11 @@
  * one, and the two per-card actions — scan and delete — that talk to the API
  * directly rather than through the dialog.
  */
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Projects from "./Projects";
+import Projects, { formFromDraft, formatBytes } from "./Projects";
 import { api } from "../lib/api";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
 
@@ -21,6 +21,7 @@ vi.mock("../lib/api", () => ({
     platforms: vi.fn(),
     listIdeas: vi.fn(),
     writeFromIdea: vi.fn(),
+    draftProjectFromDocuments: vi.fn(),
   },
 }));
 
@@ -537,5 +538,201 @@ describe("the add/edit dialog", () => {
     await user.click(screen.getByRole("button", { name: "More options" }));
 
     expect(screen.getByRole("heading", { name: "Add a project" })).toBeInTheDocument();
+  });
+});
+
+/* ---- Creating a project from documents ---- */
+
+function file(name, size = 1200, type = "text/markdown") {
+  const f = new File(["x".repeat(Math.min(size, 50))], name, { type });
+  Object.defineProperty(f, "size", { value: size });
+  return f;
+}
+
+function draft(overrides = {}) {
+  return {
+    name: "Tidewatch",
+    description: "Tide alerts for sailors.",
+    repo_url: "https://github.com/acme/tidewatch",
+    live_url: null,
+    tech_stack: ["Python", "FastAPI"],
+    target_audience: "Sailors",
+    keywords: ["tides"],
+    tone: "casual",
+    source: "ai",
+    documents: [{ filename: "brief.md", characters: 400 }],
+    warnings: [],
+    ...overrides,
+  };
+}
+
+describe("creating a project from documents", () => {
+  async function openUpload(user) {
+    await user.click(await screen.findByRole("button", { name: "From documents" }));
+    return screen.getByRole("dialog", { name: "Create project from documents" });
+  }
+
+  it("is offered in the header and on the empty state", async () => {
+    draw();
+
+    expect(await screen.findByRole("button", { name: "From documents" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create from documents" })).toBeInTheDocument();
+  });
+
+  it("accepts the supported document types and lists what was picked", async () => {
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+    const input = within(dialog).getByLabelText("Choose documents");
+
+    expect(input).toHaveAttribute("accept", expect.stringContaining(".pdf"));
+    expect(input).toHaveAttribute("accept", expect.stringContaining(".docx"));
+    expect(within(dialog).getByRole("button", { name: "Read and fill in" })).toBeDisabled();
+
+    await user.upload(input, [file("brief.md"), file("deck.pdf", 2_500_000, "application/pdf")]);
+
+    const list = within(dialog).getByRole("list", { name: "Selected documents" });
+    expect(within(list).getByText("brief.md")).toBeInTheDocument();
+    expect(within(list).getByText("2.4 MB")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Read and fill in" })).toBeEnabled();
+  });
+
+  it("takes files dropped onto it", async () => {
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+    const zone = within(dialog).getByText("Drop files here or click to choose").closest("label");
+
+    fireEvent.drop(zone, { dataTransfer: { files: [file("readme.md")] } });
+
+    expect(within(dialog).getByText("readme.md")).toBeInTheDocument();
+  });
+
+  it("removes a picked file, and never keeps the same name twice", async () => {
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+    const input = within(dialog).getByLabelText("Choose documents");
+
+    await user.upload(input, [file("brief.md")]);
+    await user.upload(input, [file("brief.md")]);
+    expect(within(dialog).getAllByText("brief.md")).toHaveLength(1);
+
+    await user.click(within(dialog).getByRole("button", { name: "Remove brief.md" }));
+    expect(within(dialog).queryByText("brief.md")).not.toBeInTheDocument();
+  });
+
+  it("stops at five files", async () => {
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+
+    await user.upload(
+      within(dialog).getByLabelText("Choose documents"),
+      ["a", "b", "c", "d", "e", "f"].map((n) => file(`${n}.md`)),
+    );
+
+    expect(within(dialog).getAllByRole("button", { name: /^Remove / })).toHaveLength(5);
+  });
+
+  it("refuses more than 10 MB in total before uploading anything", async () => {
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+
+    await user.upload(within(dialog).getByLabelText("Choose documents"), [
+      file("a.pdf", 6 * 1024 * 1024, "application/pdf"),
+      file("b.pdf", 6 * 1024 * 1024, "application/pdf"),
+    ]);
+
+    expect(within(dialog).getByText(/keep it under 10 MB/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Read and fill in" })).toBeDisabled();
+  });
+
+  it("opens the filled-in project form for checking, and creates only on Save", async () => {
+    api.draftProjectFromDocuments.mockResolvedValue(draft());
+    api.createProject.mockResolvedValue({ id: 9 });
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+    const picked = file("brief.md");
+
+    await user.upload(within(dialog).getByLabelText("Choose documents"), [picked]);
+    await user.click(within(dialog).getByRole("button", { name: "Read and fill in" }));
+
+    expect(api.draftProjectFromDocuments).toHaveBeenCalledWith([picked]);
+    const form = await screen.findByRole("dialog", { name: "Add project" });
+    expect(within(form).getByText(/Filled in from/)).toHaveTextContent("brief.md by AI");
+    expect(within(form).getByLabelText("Name")).toHaveValue("Tidewatch");
+    expect(within(form).getByLabelText(/Tech stack/)).toHaveValue("Python, FastAPI");
+    expect(within(form).getByLabelText("Tone")).toHaveValue("casual");
+    expect(api.createProject).not.toHaveBeenCalled();
+
+    await user.click(within(form).getByRole("button", { name: "Save project" }));
+
+    await waitFor(() => expect(api.createProject).toHaveBeenCalled());
+    const payload = api.createProject.mock.calls[0][0];
+    expect(payload).toMatchObject({
+      name: "Tidewatch",
+      tech_stack: ["Python", "FastAPI"],
+      keywords: ["tides"],
+      repo_url: "https://github.com/acme/tidewatch",
+      live_url: null,
+    });
+  });
+
+  it("passes the server's warnings on to the form", async () => {
+    api.draftProjectFromDocuments.mockResolvedValue(
+      draft({ source: "heuristic", warnings: ["AI was unavailable."] }),
+    );
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+
+    await user.upload(within(dialog).getByLabelText("Choose documents"), [file("brief.md")]);
+    await user.click(within(dialog).getByRole("button", { name: "Read and fill in" }));
+
+    const form = await screen.findByRole("dialog", { name: "Add project" });
+    expect(within(form).getByText("AI was unavailable.")).toBeInTheDocument();
+    expect(within(form).getByText(/Filled in from/)).not.toHaveTextContent("by AI");
+  });
+
+  it("stays open with the files when reading fails", async () => {
+    api.draftProjectFromDocuments.mockRejectedValue(new Error("deck.pdf: no text found."));
+    const user = userEvent.setup();
+    draw();
+    const dialog = await openUpload(user);
+
+    await user.upload(within(dialog).getByLabelText("Choose documents"), [file("deck.pdf")]);
+    await user.click(within(dialog).getByRole("button", { name: "Read and fill in" }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not read the documents: deck.pdf: no text found.",
+      ),
+    );
+    expect(within(dialog).getByText("deck.pdf")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Read and fill in" })).toBeEnabled();
+  });
+});
+
+describe("formFromDraft", () => {
+  it("joins lists for the comma-separated inputs and blanks nulls", () => {
+    const form = formFromDraft(draft());
+    expect(form.tech_stack).toBe("Python, FastAPI");
+    expect(form.live_url).toBe("");
+    expect(form.autopilot_mode).toBe("draft");
+  });
+
+  it("falls back to the default tone for one it does not know", () => {
+    expect(formFromDraft(draft({ tone: "pirate" })).tone).toBe("technical");
+  });
+});
+
+describe("formatBytes", () => {
+  it("reads like a file size", () => {
+    expect(formatBytes(512)).toBe("512 B");
+    expect(formatBytes(2048)).toBe("2 KB");
+    expect(formatBytes(3 * 1024 * 1024)).toBe("3.0 MB");
   });
 });
