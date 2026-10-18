@@ -51,6 +51,7 @@ from app.services import (
     publishing_service,
     quality,
     seo,
+    seo_autofix,
     webhook_payloads,
     webhooks,
 )
@@ -501,6 +502,14 @@ def generate_and_route(
     )
     db.add(content)
     db.flush()
+    # The mechanical SEO repairs — title length, meta length, keyword density,
+    # internal links — made now, so a piece reaches the review queue (or goes
+    # out) already passing the checks the Approve button would otherwise
+    # refuse it on. After the flush: the link search excludes this piece by id.
+    fixes = seo_autofix.apply(db, content)
+    if fixes.changed:
+        content.source = {**(content.source or {}), "seo_autofix": fixes.changes}
+        db.flush()
 
     if not auto:
         db.commit()

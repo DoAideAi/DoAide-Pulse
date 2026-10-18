@@ -173,9 +173,12 @@ def test_the_piece_is_held_back_not_discarded(db, auto_project, writes):
     routed = _route(db, auto_project)
 
     assert routed.content.id is not None
-    # Stripped, not equal: the generator trims the stored body. What matters
-    # here is that the words survived the gate, not that whitespace did.
-    assert routed.content.body_markdown.strip() == DENSE_BODY.strip()
+    # Contained, not equal: the generator trims the stored body, and the SEO
+    # autofix may append keyword sentences and a "Related reading" list. What
+    # matters here is that the words survived the gate, not that nothing was
+    # added to them.
+    for block in DENSE_BODY.strip().split("\n\n"):
+        assert block.strip() in routed.content.body_markdown
 
 
 def test_a_readable_piece_still_publishes_itself(db, auto_project, writes):

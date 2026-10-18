@@ -93,6 +93,7 @@ from app.services import (
     revisions,
     scheduling,
     seo,
+    seo_autofix,
     social_cards,
 )
 
@@ -413,6 +414,10 @@ def _assert_seo_ready(
     if previous_status not in (ContentStatus.DRAFT, ContentStatus.REVIEW):
         return
 
+    # Repair what a program can before judging: a 64-character title or a 0.7%
+    # keyword density is a mechanical edit, not a reason to send a human back.
+    # Only what is left after the repair can refuse the approval.
+    seo_autofix.apply(db, content)
     issues = _seo_preflight(content)
     if not issues:
         return
@@ -762,6 +767,10 @@ def bulk_approve_content(
             settings.content_quality_gate_enabled
             and content.status in (ContentStatus.DRAFT, ContentStatus.REVIEW)
         ):
+            # Same repair the single-item approve makes, so the batch and the
+            # button agree. A dry run repairs nothing that survives — the
+            # rollback below discards it — but judges the repaired piece.
+            seo_autofix.apply(db, content)
             issues = _seo_preflight(content)
             if issues:
                 failed.append(
@@ -2244,7 +2253,12 @@ def approve_content(
         )
     previous_status = content.status
     content.status = ContentStatus.APPROVED
-    if not force:
+    if force:
+        # Still repaired: "approve anyway" overrides what could not be fixed,
+        # not what could.
+        if previous_status in (ContentStatus.DRAFT, ContentStatus.REVIEW):
+            seo_autofix.apply(db, content)
+    else:
         _assert_seo_ready(db, content, previous_status)
     _settle_status(db, content, previous_status)
     db.commit()
