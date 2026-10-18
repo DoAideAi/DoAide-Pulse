@@ -74,6 +74,18 @@ describe("focus", () => {
     expect(screen.getByRole("button", { name: "Only button" })).toHaveFocus();
   });
 
+  it("prefers the element marked data-autofocus over the first focusable", () => {
+    draw(
+      {},
+      <>
+        <a href="https://example.com">Where to find your key</a>
+        <input aria-label="Key" data-autofocus />
+      </>,
+    );
+
+    expect(screen.getByLabelText("Key")).toHaveFocus();
+  });
+
   it("returns to whatever opened it", async () => {
     function Page() {
       const [open, setOpen] = useState(false);

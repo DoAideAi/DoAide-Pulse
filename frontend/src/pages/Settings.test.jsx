@@ -164,30 +164,32 @@ function connection(overrides = {}) {
 }
 
 describe("platform rows", () => {
-  it("offers no Connect button for an adapter that is not built", async () => {
+  it("lists an adapter that is not built as coming soon, with nothing to click", async () => {
     api.platforms.mockResolvedValue([
       platform({ platform: "medium", display_name: "Medium", implemented: false }),
     ]);
     draw();
 
-    const button = await screen.findByRole("button", { name: "Connect" });
-    expect(button).toBeDisabled();
-    expect(button).toHaveAttribute("title", "This adapter is not finished yet");
-    expect(screen.getByText("not built")).toBeInTheDocument();
+    expect(await screen.findByText("Coming soon")).toBeInTheDocument();
+    expect(screen.getByText("Medium")).toHaveAttribute(
+      "title",
+      "This adapter is not finished yet",
+    );
+    expect(screen.queryByRole("button", { name: /Connect/ })).not.toBeInTheDocument();
   });
 
   it("leaves Connect live on one that is", async () => {
     api.platforms.mockResolvedValue([platform()]);
     draw();
 
-    expect(await screen.findByRole("button", { name: "Connect" })).toBeEnabled();
-    expect(screen.queryByText("not built")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Connect Dev.to" })).toBeEnabled();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
   it("shows Verify and Disconnect only once a key is stored", async () => {
     api.platforms.mockResolvedValue([platform()]);
     draw();
-    await screen.findByRole("button", { name: "Connect" });
+    await screen.findByRole("button", { name: "Connect Dev.to" });
 
     expect(screen.queryByRole("button", { name: "Verify" })).not.toBeInTheDocument();
     expect(
@@ -257,13 +259,16 @@ describe("platform rows", () => {
     ]);
     draw();
 
-    await screen.findByText("not built");
+    await screen.findByText("Coming soon");
     expect(screen.queryByText(/No stats API/)).not.toBeInTheDocument();
   });
 
   it("surfaces the adapter's caveat", async () => {
     api.platforms.mockResolvedValue([
-      platform({ caveat: "Medium's API is write-only and deprecated." }),
+      platform({
+        caveat: "Medium's API is write-only and deprecated.",
+        connection: connection(),
+      }),
     ]);
     draw();
 
@@ -422,7 +427,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
 
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByLabelText(/API key/)).toBeInTheDocument();
@@ -437,7 +442,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
 
     expect(screen.getByLabelText(/API key/)).toHaveAttribute("type", "password");
     expect(screen.getByLabelText(/Organisation/)).toHaveAttribute("type", "text");
@@ -448,7 +453,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
 
     expect(screen.getByLabelText(/Organisation \(optional\)/)).not.toBeRequired();
     expect(screen.getByLabelText(/API key/)).toBeRequired();
@@ -460,7 +465,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
     await user.type(screen.getByLabelText(/API key/), "secret-key");
     await user.click(submitButton());
 
@@ -477,7 +482,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
     await user.type(screen.getByLabelText(/API key/), "secret-key");
     await user.type(screen.getByLabelText(/Organisation/), "   ");
     await user.click(submitButton());
@@ -495,7 +500,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
     await user.type(screen.getByLabelText(/API key/), "k");
     await user.click(submitButton());
 
@@ -513,7 +518,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
     await user.type(screen.getByLabelText(/API key/), "wrong");
     await user.click(submitButton());
 
@@ -532,7 +537,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
     await user.type(screen.getByLabelText(/API key/), "wrong");
     await user.click(submitButton());
 
@@ -545,7 +550,7 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -559,12 +564,157 @@ describe("the connect dialog", () => {
     const user = userEvent.setup();
     draw();
 
-    await user.click(await screen.findByRole("button", { name: "Connect" }));
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
 
     const dialog = screen.getByRole("dialog");
     expect(
       within(dialog).getByText("Posts land as drafts; you publish them by hand."),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * The setup flow: how far along you are, what you can add next, and a dialog
+ * that tells you where the key lives instead of assuming you already know.
+ */
+describe("account setup", () => {
+  const bluesky = () =>
+    platform({ platform: "bluesky", display_name: "Bluesky" });
+
+  it("counts healthy connections against what can be connected", async () => {
+    api.platforms.mockResolvedValue([
+      platform({ connection: connection() }),
+      bluesky(),
+      platform({ platform: "twitter", display_name: "Twitter / X", implemented: false }),
+    ]);
+    draw();
+
+    const progress = await screen.findByTestId("setup-progress");
+    // Twitter is not buildable yet, so it is not part of the denominator.
+    expect(progress).toHaveTextContent("1 of 2 accounts connected");
+    expect(within(progress).getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+  });
+
+  it("does not count a rejected key as connected, and says it needs a new one", async () => {
+    api.platforms.mockResolvedValue([
+      platform({ connection: connection({ status: "invalid" }) }),
+      bluesky(),
+    ]);
+    draw();
+
+    const progress = await screen.findByTestId("setup-progress");
+    expect(progress).toHaveTextContent("0 of 2 accounts connected");
+    expect(progress).toHaveTextContent("1 account needs a new key");
+  });
+
+  it("points a brand-new account at where to start", async () => {
+    api.platforms.mockResolvedValue([platform(), bluesky()]);
+    draw();
+
+    expect(await screen.findByTestId("setup-progress")).toHaveTextContent(/No accounts yet/);
+  });
+
+  it("separates connected accounts from ones still to add", async () => {
+    api.platforms.mockResolvedValue([platform({ connection: connection() }), bluesky()]);
+    draw();
+
+    expect(await screen.findByText("Your accounts")).toBeInTheDocument();
+    expect(screen.getByText("Add an account")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Bluesky" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Connect Dev.to" })).not.toBeInTheDocument();
+  });
+
+  it("describes what each site is on its card", async () => {
+    api.platforms.mockResolvedValue([platform()]);
+    draw();
+
+    expect(await screen.findByText("Developer community blog")).toBeInTheDocument();
+  });
+
+  it("files webhooks, API keys and health under Advanced", async () => {
+    draw();
+
+    expect(await screen.findByRole("heading", { name: "Advanced" })).toBeInTheDocument();
+    expect(screen.getByText(/You don't need any of this to publish/)).toBeInTheDocument();
+  });
+
+  it("shows the steps and a direct link to where the key is made", async () => {
+    api.platforms.mockResolvedValue([platform()]);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("How to get your key")).toBeInTheDocument();
+    const link = within(dialog).getByRole("link", { name: /Open Dev.to settings/ });
+    expect(link).toHaveAttribute("href", "https://dev.to/settings/extensions");
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    expect(within(dialog).getAllByRole("listitem").length).toBeGreaterThan(1);
+  });
+
+  it("focuses the first field so the key can be pasted straight in", async () => {
+    api.platforms.mockResolvedValue([platform()]);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
+
+    expect(screen.getByLabelText(/API key/)).toHaveFocus();
+  });
+
+  it("can reveal a pasted secret to check it, and hide it again", async () => {
+    api.platforms.mockResolvedValue([platform()]);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
+    const input = screen.getByLabelText(/API key/);
+    const toggle = within(screen.getByRole("dialog")).getByRole("button", { name: "Show" });
+
+    await user.click(toggle);
+    expect(input).toHaveAttribute("type", "text");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Hide" }));
+    expect(input).toHaveAttribute("type", "password");
+  });
+
+  it("tucks optional non-secret settings behind a disclosure", async () => {
+    api.platforms.mockResolvedValue([
+      platform({
+        credential_fields: [
+          { key: "api_key", label: "API key", help_text: "", secret: true, required: true },
+          { key: "branch", label: "Branch", help_text: "", secret: false, required: false },
+          { key: "token", label: "Token", help_text: "", secret: true, required: false },
+        ],
+      }),
+    ]);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Connect Dev.to" }));
+
+    const dialog = screen.getByRole("dialog");
+    const details = dialog.querySelector("details");
+    expect(details).not.toBeNull();
+    expect(details).toHaveTextContent("Optional settings (1)");
+    expect(details).toContainElement(screen.getByLabelText(/Branch/));
+    // An optional secret changes which credential is used — it stays in view.
+    expect(details).not.toContainElement(screen.getByLabelText(/Token/));
+  });
+
+  it("calls it an update when replacing a stored key", async () => {
+    api.platforms.mockResolvedValue([platform({ connection: connection() })]);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Replace key" }));
+
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("heading", { name: "Update Dev.to" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Save new key" })).toBeInTheDocument();
   });
 });
 

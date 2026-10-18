@@ -80,7 +80,12 @@ export default function Dialog({
   // reading it in a separate effect would race the focus move below.
   useEffect(() => {
     const opener = document.activeElement;
-    focusables(panel.current)[0]?.focus();
+    // A dialog that leads with help text and links can name the field it is
+    // really for with `data-autofocus`; otherwise, the first focusable.
+    (
+      panel.current?.querySelector("[data-autofocus]") ??
+      focusables(panel.current)[0]
+    )?.focus();
     return () => {
       // Only if it is still in the document: a dialog that deleted the row its
       // own trigger lived in has nothing to give focus back to, and calling

@@ -6,6 +6,7 @@ import { useApi } from "../hooks/useApi";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
 import { formatWhen, titleize } from "../lib/format";
+import { groupPlatforms, guideFor } from "../lib/platformGuides";
 
 /**
  * Platform connections and service health.
@@ -19,6 +20,12 @@ export default function Settings() {
   const { data, error, loading, reload } = useApi(() => api.platforms(), []);
   const health = useApi(() => api.healthDetail(), []);
   const [connecting, setConnecting] = useState(null);
+  const groups = groupPlatforms(data);
+
+  function changed() {
+    reload();
+    refresh();
+  }
 
   return (
     <div className="stagger space-y-8">
@@ -31,29 +38,81 @@ export default function Settings() {
 
       <ErrorBanner message={error} onRetry={reload} />
 
-      <section>
-        <SectionHeader
-          title="Publishing platforms"
-          subtitle="Credentials are encrypted at rest and never sent back."
-        />
+      <section aria-labelledby="accounts-heading">
+        <div className="mb-4">
+          <h2 id="accounts-heading" className="text-base font-semibold text-ink-900">
+            Publishing accounts
+          </h2>
+          <p className="mt-0.5 text-sm text-ink-500">
+            Connect the sites Pulse publishes to. Each one takes about a minute —
+            keys are checked before saving, encrypted at rest and never sent back.
+          </p>
+        </div>
+
         {loading && !data ? (
           <Skeleton rows={4} />
         ) : (
-          <div className="space-y-3">
-            {(data ?? []).map((platform) => (
-              <PlatformRow
-                key={platform.platform}
-                platform={platform}
-                onConnect={() => setConnecting(platform)}
-                onChanged={() => {
-                  reload();
-                  refresh();
-                }}
-              />
-            ))}
+          <div className="space-y-6">
+            <SetupProgress groups={groups} />
+
+            {groups.connected.length > 0 && (
+              <div>
+                <h3 className="label mb-2">Your accounts</h3>
+                <div className="space-y-3">
+                  {groups.connected.map((platform) => (
+                    <PlatformRow
+                      key={platform.platform}
+                      platform={platform}
+                      onConnect={() => setConnecting(platform)}
+                      onChanged={changed}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {groups.available.length > 0 && (
+              <div>
+                <h3 className="label mb-2">Add an account</h3>
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {groups.available.map((platform) => (
+                    <AddPlatformCard
+                      key={platform.platform}
+                      platform={platform}
+                      onConnect={() => setConnecting(platform)}
+                    />
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {groups.comingSoon.length > 0 && (
+              <div>
+                <h3 className="label mb-2">Coming soon</h3>
+                <ul className="flex flex-wrap gap-1.5">
+                  {groups.comingSoon.map((platform) => (
+                    <li
+                      key={platform.platform}
+                      className="chip"
+                      title={platform.caveat || "This adapter is not finished yet"}
+                    >
+                      {platform.display_name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </section>
+
+      <div className="border-t border-line pt-6">
+        <h2 className="text-base font-semibold text-ink-900">Advanced</h2>
+        <p className="mt-0.5 text-sm text-ink-500">
+          Webhooks, API keys and server status — for developers and operators.
+          You don't need any of this to publish.
+        </p>
+      </div>
 
       <WebhooksSection />
       <ApiKeysSection />
@@ -119,12 +178,90 @@ export default function Settings() {
           onClose={() => setConnecting(null)}
           onDone={() => {
             setConnecting(null);
-            reload();
-            refresh();
+            changed();
           }}
         />
       )}
     </div>
+  );
+}
+
+/**
+ * How far through setup this account is, in one line and one bar.
+ *
+ * The count leaves out connections the platform has stopped accepting — a
+ * broken key is not a connected account — and says how many there are.
+ */
+function SetupProgress({ groups }) {
+  const { total, healthy, attention, connected } = groups;
+  if (total === 0) return null;
+  const percent = Math.round((healthy / total) * 100);
+
+  let message;
+  if (connected.length === 0) {
+    message = "No accounts yet. Pick a site below — Dev.to and Bluesky are the quickest to set up.";
+  } else if (attention.length > 0) {
+    message = `${attention.length} ${attention.length === 1 ? "account needs" : "accounts need"} a new key — see below.`;
+  } else if (healthy === total) {
+    message = "Every available site is connected.";
+  } else {
+    message = "Add more sites to reach more readers with each piece.";
+  }
+
+  return (
+    <div className="panel p-5" data-testid="setup-progress">
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="text-sm font-semibold text-ink-900">
+          {healthy} of {total} accounts connected
+        </p>
+        <span className="font-mono text-xs text-ink-400">{percent}%</span>
+      </div>
+      <div
+        className="mt-3 h-1.5 overflow-hidden rounded-full bg-canvas"
+        role="progressbar"
+        aria-label="Accounts connected"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={healthy}
+      >
+        <div
+          className="h-full rounded-full bg-brand-500 transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      <p
+        className={`mt-2 text-xs ${attention.length > 0 ? "text-warn" : "text-ink-500"}`}
+      >
+        {message}
+      </p>
+    </div>
+  );
+}
+
+/** One not-yet-connected site: what it is, and the one button that sets it up. */
+function AddPlatformCard({ platform, onConnect }) {
+  const guide = guideFor(platform);
+  return (
+    <li className="panel flex items-center justify-between gap-4 p-4">
+      <div className="min-w-0">
+        <h4 className="text-sm font-semibold text-ink-900">{platform.display_name}</h4>
+        {guide.tagline && (
+          <p className="mt-0.5 truncate text-xs text-ink-500">{guide.tagline}</p>
+        )}
+        {!platform.supports_metrics && (
+          <p className="mt-0.5 text-[11px] text-ink-400">
+            No stats API — views for this platform will stay empty.
+          </p>
+        )}
+      </div>
+      <button
+        className="btn-primary shrink-0"
+        onClick={onConnect}
+        aria-label={`Connect ${platform.display_name}`}
+      >
+        Connect
+      </button>
+    </li>
   );
 }
 
@@ -837,10 +974,19 @@ function CreateApiKeyDialog({ onClose, onDone }) {
 
 function ConnectDialog({ platform, onClose, onDone }) {
   const toast = useToast();
+  const guide = guideFor(platform);
   const [values, setValues] = useState(() =>
     Object.fromEntries(platform.credential_fields.map((field) => [field.key, ""])),
   );
   const [busy, setBusy] = useState(false);
+  const replacing = Boolean(platform.connection);
+
+  // Optional settings with sensible defaults (branch, PDS URL, visibility…)
+  // are what make a two-field form look like a six-field one. They go behind
+  // a disclosure. An optional *secret* stays in view: leaving a token blank
+  // changes which credential is used, which is not a default to hide.
+  const primary = platform.credential_fields.filter((f) => f.required || f.secret);
+  const extra = platform.credential_fields.filter((f) => !f.required && !f.secret);
 
   async function submit(event) {
     event.preventDefault();
@@ -860,6 +1006,18 @@ function ConnectDialog({ platform, onClose, onDone }) {
     }
   }
 
+  function field(f, index) {
+    return (
+      <CredentialInput
+        key={f.key}
+        field={f}
+        autoFocus={index === 0}
+        value={values[f.key]}
+        onChange={(value) => setValues((current) => ({ ...current, [f.key]: value }))}
+      />
+    );
+  }
+
   return (
     <Dialog
       label={`Connect ${platform.display_name}`}
@@ -869,7 +1027,7 @@ function ConnectDialog({ platform, onClose, onDone }) {
       onSubmit={submit}
     >
       <h2 className="font-display text-2xl text-ink-900">
-        Connect {platform.display_name}
+        {replacing ? "Update" : "Connect"} {platform.display_name}
       </h2>
       {platform.caveat && (
         <p className="rounded-lg bg-warn-wash px-3 py-2 text-xs leading-relaxed text-warn">
@@ -877,30 +1035,41 @@ function ConnectDialog({ platform, onClose, onDone }) {
         </p>
       )}
 
-      {platform.credential_fields.map((field) => (
-        <div key={field.key}>
-          <label className="label" htmlFor={`cred-${field.key}`}>
-            {field.label}
-            {!field.required && (
-              <span className="normal-case tracking-normal"> (optional)</span>
+      {guide.steps.length > 0 && (
+        <div className="rounded-lg border border-line bg-canvas px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="label !mb-0">How to get your key</p>
+            {guide.setupUrl && (
+              <a
+                className="text-xs font-medium text-brand-600 hover:underline"
+                href={guide.setupUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open {platform.display_name} settings ↗
+              </a>
             )}
-          </label>
-          <input
-            id={`cred-${field.key}`}
-            className="input font-mono text-xs"
-            type={field.secret ? "password" : "text"}
-            required={field.required}
-            autoComplete="off"
-            value={values[field.key]}
-            onChange={(e) =>
-              setValues((current) => ({ ...current, [field.key]: e.target.value }))
-            }
-          />
-          {field.help_text && (
-            <p className="mt-1 text-xs text-ink-400">{field.help_text}</p>
-          )}
+          </div>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs leading-relaxed text-ink-700">
+            {guide.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
         </div>
-      ))}
+      )}
+
+      {primary.map(field)}
+
+      {extra.length > 0 && (
+        <details className="group rounded-lg border border-line px-4 py-2">
+          <summary className="cursor-pointer text-xs font-medium text-ink-700">
+            Optional settings ({extra.length}) — the defaults work for most people
+          </summary>
+          <div className="mt-3 space-y-4 pb-2">
+            {extra.map((f, i) => field(f, primary.length + i))}
+          </div>
+        </details>
+      )}
 
       <p className="text-xs text-ink-400">
         Verified against {platform.display_name} before saving.
@@ -911,9 +1080,52 @@ function ConnectDialog({ platform, onClose, onDone }) {
           Cancel
         </button>
         <button type="submit" className="btn-primary" disabled={busy}>
-          {busy ? "Verifying…" : "Connect"}
+          {busy ? "Verifying…" : replacing ? "Save new key" : "Connect"}
         </button>
       </div>
     </Dialog>
+  );
+}
+
+/** One credential field, with a reveal toggle on secrets so a paste can be checked. */
+function CredentialInput({ field, value, onChange, autoFocus }) {
+  const [revealed, setRevealed] = useState(false);
+  const id = `cred-${field.key}`;
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {field.label}
+        {!field.required && (
+          <span className="normal-case tracking-normal"> (optional)</span>
+        )}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          className={`input font-mono text-xs ${field.secret ? "pr-16" : ""}`}
+          type={field.secret && !revealed ? "password" : "text"}
+          required={field.required}
+          autoComplete="off"
+          spellCheck={false}
+          data-autofocus={autoFocus || undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {field.secret && (
+          <button
+            type="button"
+            className="absolute inset-y-0 right-2 my-auto h-6 rounded px-2 text-[11px] text-ink-500 hover:text-ink-900"
+            onClick={() => setRevealed((r) => !r)}
+            aria-controls={id}
+            aria-pressed={revealed}
+          >
+            {revealed ? "Hide" : "Show"}
+          </button>
+        )}
+      </div>
+      {field.help_text && (
+        <p className="mt-1 text-xs text-ink-400">{field.help_text}</p>
+      )}
+    </div>
   );
 }
