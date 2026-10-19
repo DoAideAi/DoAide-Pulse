@@ -108,14 +108,16 @@ export default function Settings() {
 
       <LlmKeySection />
 
-      <div className="border-t border-line pt-6">
-        <h2 className="text-base font-semibold text-ink-900">Advanced</h2>
-        <p className="mt-0.5 text-sm text-ink-500">
-          Webhooks, API keys and server status — for developers and operators.
-          You don't need any of this to publish.
-        </p>
-      </div>
-
+      <details className="group border-t border-line pt-6">
+        <summary className="cursor-pointer list-none">
+          <h2 className="inline text-base font-semibold text-ink-900">Advanced</h2>
+          <span className="ml-2 text-sm text-ink-500 group-open:hidden">Show</span>
+          <p className="mt-0.5 text-sm text-ink-500">
+            Webhooks, API keys and server status — for developers and operators.
+            You don't need any of this to publish.
+          </p>
+        </summary>
+        <div className="mt-6 space-y-8">
       <WebhooksSection />
       <ApiKeysSection />
 
@@ -173,6 +175,8 @@ export default function Settings() {
           </dl>
         )}
       </section>
+        </div>
+      </details>
 
       {connecting && (
         <ConnectDialog
