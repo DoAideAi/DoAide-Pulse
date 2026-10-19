@@ -231,8 +231,77 @@ def fix_keyword_density(body_markdown: str, keyword: str) -> str:
 # ------------------------------------------------------------------ links
 
 
-def link_count(body_markdown: str) -> int:
-    return len(_LINK.findall(body_markdown or ""))
+# A Markdown link that is not an image (``![alt](src)``), capturing the URL.
+_BODY_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(\s*<?([^)\s>]+)")
+
+
+@dataclass
+class LinkScope:
+    """What counts as one of the project's own pages.
+
+    "Internal" for a Pulse piece means the project's own properties, which live
+    on absolute URLs elsewhere: its site, its repository, and its other posts
+    wherever they were published (dev.to, Hashnode, …). A relative URL is
+    always internal.
+    """
+
+    hosts: set[str] = field(default_factory=set)
+    urls: set[str] = field(default_factory=set)
+
+    def owns(self, url: str) -> bool:
+        url = (url or "").strip()
+        if not url or url.startswith(("mailto:", "tel:")):
+            return False
+        if "://" not in url and not url.startswith("//"):
+            return True  # relative: a page on the same site
+        norm = _norm_url(url)
+        if norm in self.urls or any(norm.startswith(u + "/") for u in self.urls):
+            return True
+        return _host(url) in self.hosts
+
+
+def _host(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    host = (urlsplit(url if "://" in url else "https:" + url).hostname or "").lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _norm_url(url: str) -> str:
+    url = url.strip().split("#", 1)[0].rstrip("/")
+    return url.split("://", 1)[-1].lower().removeprefix("www.")
+
+
+def _body_links(body_markdown: str) -> list[str]:
+    """URLs of the body's non-image links, ignoring fenced code."""
+    return _BODY_LINK.findall(seo._CODE_FENCE.sub(" ", body_markdown or ""))
+
+
+def scope_from_targets(
+    targets: list[tuple[str, str]], project: Project | None = None
+) -> LinkScope:
+    scope = LinkScope(urls={_norm_url(u) for _, u in targets if u})
+    if project is not None and project.live_url:
+        scope.hosts.add(_host(project.live_url))
+    return scope
+
+
+def link_count(body_markdown: str, scope: LinkScope | None = None) -> int:
+    """Links in the body: every non-image link, or only internal ones given *scope*."""
+    links = _body_links(body_markdown)
+    if scope is None:
+        return len(links)
+    return sum(1 for url in links if scope.owns(url))
+
+
+def internal_link_count(db: Session | None, content: Content) -> int:
+    """How many of *content*'s body links point at the project's own pages."""
+    project = content.project
+    targets = _link_targets(db, content, project) if db is not None else []
+    if not targets and project is not None:
+        own = (("site", project.live_url), ("repo", project.repo_url))
+        targets = [(n, u) for n, u in own if u]
+    return link_count(content.body_markdown or "", scope_from_targets(targets, project))
 
 
 def _link_targets(db: Session, content: Content, project: Project | None) -> list[tuple[str, str]]:
@@ -310,10 +379,10 @@ def _link_targets(db: Session, content: Content, project: Project | None) -> lis
 def fix_links(body_markdown: str, targets: list[tuple[str, str]]) -> str:
     """Append a "Related reading" section bringing the body to two links."""
     body = body_markdown or ""
-    missing = LINKS_MIN - link_count(body)
+    missing = LINKS_MIN - link_count(body, scope_from_targets(targets))
     if missing <= 0:
         return body
-    present = {url.strip() for _, url in _LINK.findall(body)}
+    present = {url.strip() for url in _body_links(body)}
     chosen: list[tuple[str, str]] = []
     for label, url in targets:
         url = (url or "").strip()
@@ -364,10 +433,12 @@ def apply(db: Session, content: Content) -> AutofixResult:
             body = new_body
             result.changes.append(f'Keyword "{fk}" density {before:.1f}% → {after:.1f}%')
 
-    if link_count(body) < LINKS_MIN:
-        new_body = fix_links(body, _link_targets(db, content, project))
+    targets = _link_targets(db, content, project)
+    scope = scope_from_targets(targets, project)
+    if link_count(body, scope) < LINKS_MIN:
+        new_body = fix_links(body, targets)
         if new_body != body:
-            added = link_count(new_body) - link_count(body)
+            added = link_count(new_body, scope) - link_count(body, scope)
             body = new_body
             result.changes.append(f"Added {added} internal link(s)")
 

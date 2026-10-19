@@ -139,7 +139,7 @@ export default function Shell({ children }) {
             <a href="https://desk.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">Desk</a>
             <span className="text-brand-500">Pulse</span>
             <a href="https://409a.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">409A</a>
-            <a href="https://job.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">AutoApply</a>
+            <a href="https://prospect.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">Prospect</a>
             <a href="https://realty.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">Realty</a>
             <a href="https://med.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">Med</a>
             <a href="https://reach.doaide.com" target="_blank" rel="noopener noreferrer" className="text-ink-400/60 hover:text-brand-500">Reach</a>

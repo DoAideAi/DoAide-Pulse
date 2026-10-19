@@ -383,11 +383,16 @@ def _seo_preflight(content: Content) -> list[str]:
                 f'Focus keyword "{fk}" density is {density:.1f}% — aim for 1–3%.'
             )
 
-    import re
-    link_count = len(re.findall(r"\[([^\]]+)\]\(([^)]+)\)", body))
-    if link_count < 2:
+    # Internal links only: images, code samples and links to other sites
+    # used to count, so "include at least 2 internal links" passed on a
+    # screenshot and a link to Stack Overflow.
+    from sqlalchemy.orm import object_session
+
+    link_count = seo_autofix.internal_link_count(object_session(content), content)
+    if link_count < seo_autofix.LINKS_MIN:
         issues.append(
-            f"Only {link_count} link(s) in the body — include at least 2 internal links."
+            f"Only {link_count} internal link(s) in the body — "
+            "include at least 2."
         )
 
     headings = seo._find_headings(body)

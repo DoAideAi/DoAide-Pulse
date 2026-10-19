@@ -231,3 +231,36 @@ def test_unfixable_piece_is_approved_with_its_issues_reported(client, auth, db, 
     detail = client.get(f"{API}/{row.id}", headers=auth).json()
     assert detail["status"] == "approved"
     assert detail["seo_issues"]
+
+
+class TestInternalLinkCount:
+    """Only links to the project's own pages count toward "2 internal links"."""
+
+    SCOPE = seo_autofix.LinkScope(
+        hosts={"acme.dev"}, urls={"dev.to/acme/launch-notes", "github.com/acme/widget"}
+    )
+
+    def test_images_are_not_links(self):
+        body = "![diagram](https://acme.dev/d.png) and ![x](/img.png)"
+        assert seo_autofix.link_count(body) == 0
+        assert seo_autofix.link_count(body, self.SCOPE) == 0
+
+    def test_external_links_do_not_count_as_internal(self):
+        body = "[SO](https://stackoverflow.com/q/1) [MDN](https://developer.mozilla.org/)"
+        assert seo_autofix.link_count(body) == 2
+        assert seo_autofix.link_count(body, self.SCOPE) == 0
+
+    def test_own_site_relative_posts_and_repo_count(self):
+        body = (
+            "[home](https://www.acme.dev/pricing) [rel](/docs/start) "
+            "[post](https://dev.to/acme/launch-notes/) "
+            "[code](https://github.com/acme/widget/tree/main/src)"
+        )
+        assert seo_autofix.link_count(body, self.SCOPE) == 4
+
+    def test_links_inside_code_fences_are_ignored(self):
+        body = "```md\n[a](/x) [b](/y)\n```\n\nText."
+        assert seo_autofix.link_count(body, self.SCOPE) == 0
+
+    def test_mailto_is_not_internal(self):
+        assert seo_autofix.link_count("[mail](mailto:hi@acme.dev)", self.SCOPE) == 0
