@@ -50,7 +50,7 @@ rsync -az --delete \
   --exclude '.git' --exclude '.env' --exclude '.env.*' --exclude 'keys/' \
   --exclude '.venv/' --exclude 'node_modules/' --exclude '__pycache__/' \
   --exclude '*.pyc' --exclude '.pytest_cache/' --exclude '.ruff_cache/' \
-  --exclude '*.egg-info/' --exclude 'celerybeat-schedule*' \
+  --exclude '*.egg-info/' --exclude 'celerybeat-schedule*' --exclude '.claude/' \
   -e "ssh -i $SSH_KEY" \
   ./ "root@$HOST:$REMOTE/"
 

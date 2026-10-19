@@ -82,7 +82,6 @@ import pytest  # noqa: E402
 # ``app.ratelimit`` before conftest ran (transitive import from app.main during
 # pytest collection), the limiter was created with the production .env values
 # (e.g. Redis storage URI). Replacing it here guarantees in-memory storage.
-import slowapi  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine, event  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
@@ -90,7 +89,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app import ratelimit  # noqa: E402
 
-ratelimit.limiter = slowapi.Limiter(
+ratelimit.limiter = ratelimit.PulseLimiter(
     key_func=ratelimit.client_key,
     storage_uri=_cfg.settings.rate_limit_storage_uri or "memory://",
     enabled=_cfg.settings.rate_limit_enabled,

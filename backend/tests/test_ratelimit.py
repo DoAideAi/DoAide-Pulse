@@ -97,7 +97,7 @@ def test_register_refused_when_disabled(client, monkeypatch):
     monkeypatch.setattr(settings, "registration_enabled", False)
     resp = client.post(REGISTER, json=_payload())
     assert resp.status_code == 403
-    assert resp.json()["detail"] == "Registration is closed."
+    assert resp.json()["detail"] .startswith("Registration is currently closed.")
 
 
 @pytest.mark.parametrize("token", [None, "", "wrong-token"])
@@ -130,3 +130,26 @@ def test_register_open_in_production_without_an_invite_token(client, monkeypatch
     monkeypatch.setattr(settings, "registration_invite_token", "")
     resp = client.post(REGISTER, json=_payload())
     assert resp.status_code == 201
+
+
+# --------------------------------------------------------------------------- #
+# Storage outage                                                              #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_dead_limiter_store_lets_requests_through(client, monkeypatch):
+    """Redis down (or refusing writes on a full disk) must not 500 every route.
+
+    ``swallow_errors`` lets the request through when ``hit`` raises; the headers
+    step used to then read an unset ``request.state.view_rate_limit`` and crash.
+    """
+    from app.ratelimit import limiter
+
+    def boom(*_a, **_kw):
+        raise ConnectionError("MISCONF Redis is unable to persist to disk")
+
+    monkeypatch.setattr(limiter.limiter, "hit", boom)
+    # A route that returns normally: the crash was in writing the headers onto
+    # a successful response (an error response never reaches that step).
+    resp = client.get("/api/v1/health")
+    assert resp.status_code == 200, resp.text

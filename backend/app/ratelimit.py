@@ -149,7 +149,24 @@ def api_key_key(request: Request) -> str:
     return client_key(request)
 
 
-limiter = Limiter(
+class PulseLimiter(Limiter):
+    """slowapi's Limiter, safe to run with ``headers_enabled`` and ``swallow_errors``.
+
+    ``_check_request_limit`` only sets ``request.state.view_rate_limit`` after
+    every ``hit`` has succeeded. When the storage raises (Redis down, or Redis
+    refusing writes with MISCONF on a full disk) slowapi swallows the error and
+    lets the request through — then reads ``view_rate_limit`` to write the
+    X-RateLimit headers and crashes with AttributeError/KeyError, turning every
+    rate-limited route into a 500. Seeding it with ``None`` first means a
+    swallowed storage error leaves no headers instead of no response.
+    """
+
+    def _check_request_limit(self, request, endpoint_func, in_middleware=True):
+        request.state.view_rate_limit = None
+        return super()._check_request_limit(request, endpoint_func, in_middleware)
+
+
+limiter = PulseLimiter(
     key_func=client_key,
     storage_uri=settings.rate_limit_storage_uri or "memory://",
     enabled=settings.rate_limit_enabled,
@@ -174,7 +191,7 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Res
     )
     # Adds Retry-After / X-RateLimit-* so a client can back off sensibly.
     return request.app.state.limiter._inject_headers(
-        response, request.state.view_rate_limit
+        response, getattr(request.state, "view_rate_limit", None)
     )
 
 
@@ -187,6 +204,7 @@ __all__ = [
     "account_key",
     "api_key_key",
     "client_key",
+    "PulseLimiter",
     "limiter",
     "rate_limit_exceeded_handler",
     "reset",
