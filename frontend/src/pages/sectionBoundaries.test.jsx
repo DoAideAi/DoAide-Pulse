@@ -27,6 +27,10 @@ vi.mock("../lib/api", () => ({
     engagementTrend: vi.fn(),
     velocity: vi.fn(),
     alerts: vi.fn(),
+    // The Analytics page grew pipeline and activity panels; an unmocked call
+    // threw "api.pipeline is not a function" and took the whole page down.
+    pipeline: vi.fn(),
+    activitySummary: vi.fn(),
     dashboard: vi.fn(),
     readTime: vi.fn(),
     reviewQueue: vi.fn(),
@@ -124,6 +128,14 @@ describe("the analytics page", () => {
     api.analytics.mockResolvedValue(overview());
     api.engagementTrend.mockResolvedValue([]);
     api.alerts.mockResolvedValue({ alerts: [] });
+    api.pipeline.mockResolvedValue({
+      content_by_status: [],
+      publications: { published: 0, failed: 0, in_flight: 0, cancelled: 0, success_rate: 1 },
+      by_platform: [],
+    });
+    api.activitySummary.mockResolvedValue({
+      days: 30, page_views: 0, actions: 0, top_pages: [], top_actions: [], by_day: [],
+    });
   });
 
   it("loses only the section whose payload lost a field", async () => {

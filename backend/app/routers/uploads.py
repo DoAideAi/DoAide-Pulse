@@ -45,6 +45,23 @@ def _upload_dir() -> FilePath:
     return base
 
 
+_CHUNK = 256 * 1024
+_SNIFF_BYTES = 12
+
+
+def sniff_image_type(head: bytes) -> str | None:
+    """The image MIME type a file's leading bytes declare, or ``None``."""
+    if head.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if head.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if head[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    return None
+
+
 def _ext_from_content_type(ct: str) -> str:
     return {
         "image/jpeg": ".jpg",
@@ -72,33 +89,56 @@ async def upload_image(
     file: UploadFile,
     user: User = Depends(get_current_user),
 ) -> UploadOut:
-    """Accept an image file and persist it to the upload directory."""
+    """Accept an image file and persist it to the upload directory.
+
+    The type is decided by the file's own leading bytes, not by the
+    ``Content-Type`` the client sent — that header is whatever the browser (or a
+    script) says it is, so a renamed HTML or SVG file used to be stored and
+    served back under an image extension. The body is streamed to disk in
+    chunks and refused as soon as it passes the size limit, instead of being
+    read whole into memory first.
+    """
     if file.content_type not in ALLOWED_CONTENT_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported file type: {file.content_type}. "
             f"Allowed: jpg, png, webp, gif.",
         )
-
-    data = await file.read()
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-            detail=f"File too large (max {settings.max_upload_bytes // (1024 * 1024)} MB).",
-        )
-
-    ext = _ext_from_content_type(file.content_type)
-    file_hash = hashlib.sha256(data).hexdigest()[:12]
-    filename = f"{uuid.uuid4().hex[:8]}_{file_hash}{ext}"
-
-    dest = _upload_dir() / filename
-    dest.write_bytes(data)
-
+    limit = settings.max_upload_bytes
+    base = _upload_dir()
+    tmp = base / f".upload-{uuid.uuid4().hex}.part"
+    digest = hashlib.sha256()
+    size = 0
+    head = b""
+    try:
+        with tmp.open("wb") as out:
+            while chunk := await file.read(_CHUNK):
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        detail=f"File too large (max {limit // (1024 * 1024)} MB).",
+                    )
+                if len(head) < _SNIFF_BYTES:
+                    head += chunk[: _SNIFF_BYTES - len(head)]
+                digest.update(chunk)
+                out.write(chunk)
+        detected = sniff_image_type(head)
+        if detected is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="That file is not a JPG, PNG, WebP or GIF image.",
+            )
+        ext = _ext_from_content_type(detected)
+        filename = f"{uuid.uuid4().hex[:8]}_{digest.hexdigest()[:12]}{ext}"
+        tmp.replace(base / filename)
+    finally:
+        tmp.unlink(missing_ok=True)
     # Absolute, because the content schema refuses relative image URLs (the
     # publishing platforms fetch them from their own servers). A relative path
     # here made every auto-save 422 once an uploaded image was in the draft.
     url = f"{settings.api_base_url}{settings.api_v1_prefix}/uploads/{filename}"
-    return UploadOut(url=url, filename=filename, size=len(data))
+    return UploadOut(url=url, filename=filename, size=size)
 
 
 @router.get(

@@ -89,7 +89,7 @@ def test_valid_upload_still_works(client, auth, monkeypatch, tmp_path):
 
     monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
 
-    data = b"\x89PNG" + b"\x00" * 4
+    data = b"\x89PNG\r\n\x1a\n" + b"\x00" * 8  # the full 8-byte PNG signature
     resp = client.post(
         "/api/v1/uploads",
         files={"file": ("ok.png", io.BytesIO(data), "image/png")},
@@ -97,7 +97,8 @@ def test_valid_upload_still_works(client, auth, monkeypatch, tmp_path):
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["url"].startswith("/api/v1/uploads/")
+    # Absolute: publishing platforms fetch cover images from their own servers.
+    assert "/api/v1/uploads/" in body["url"] and body["url"].startswith("http")
     assert body["size"] == len(data)
 
 

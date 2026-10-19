@@ -143,3 +143,57 @@ class TestAiGenerateFields:
         )
         assert resp.status_code == 503
         assert "unavailable" in resp.json()["detail"].lower()
+
+
+class TestUploadContentVerification:
+    """The stored type comes from the file's bytes, not the client's header."""
+
+    def test_html_labelled_as_png_is_refused(self, client, auth):
+        resp = client.post(
+            "/api/v1/uploads",
+            files={"file": ("x.png", io.BytesIO(b"<html><script>alert(1)</script>"), "image/png")},
+            headers=auth,
+        )
+        assert resp.status_code == 400, resp.text
+        assert "not a JPG, PNG, WebP or GIF" in resp.json()["detail"]
+
+    def test_extension_follows_the_bytes(self, client, auth):
+        webp = b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 32
+        resp = client.post(
+            "/api/v1/uploads",
+            files={"file": ("photo.png", io.BytesIO(webp), "image/png")},
+            headers=auth,
+        )
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["filename"].endswith(".webp")
+
+    def test_oversized_upload_is_refused_and_leaves_nothing(self, client, auth, monkeypatch):
+        from app.config import settings
+        from app.routers import uploads
+
+        monkeypatch.setattr(settings, "max_upload_bytes", 1024)
+        before = set(uploads._upload_dir().iterdir())
+        resp = client.post(
+            "/api/v1/uploads",
+            files={"file": ("big.png", io.BytesIO(TINY_PNG + b"\x00" * 4096), "image/png")},
+            headers=auth,
+        )
+        assert resp.status_code == 413, resp.text
+        assert set(uploads._upload_dir().iterdir()) == before  # no partial file kept
+
+
+@pytest.mark.parametrize(
+    "head, expected",
+    [
+        (b"\xff\xd8\xff\xe0" + b"\x00" * 8, "image/jpeg"),
+        (b"\x89PNG\r\n\x1a\n" + b"\x00" * 4, "image/png"),
+        (b"GIF89a" + b"\x00" * 6, "image/gif"),
+        (b"RIFF\x00\x00\x00\x00WEBP", "image/webp"),
+        (b"<svg xmlns=", None),
+        (b"", None),
+    ],
+)
+def test_sniff_image_type(head, expected):
+    from app.routers.uploads import sniff_image_type
+
+    assert sniff_image_type(head) == expected
