@@ -31,11 +31,12 @@ export const PLATFORM_GUIDES = {
   },
   medium: {
     tagline: "General-audience publishing",
-    setupUrl: "https://medium.com/me/settings/security",
+    // Medium stopped issuing integration tokens in 2023 and removed the
+    // section from its settings, so there is no page to link to.
+    setupUrl: null,
     steps: [
-      "Open Medium → Settings → Security and apps.",
-      "Under Integration tokens, enter a description (e.g. Pulse) and click Get token.",
-      "Copy the token and paste it below.",
+      "If you already have a Medium integration token (created before 2023), paste it below.",
+      "If you don't have one, Medium no longer supports API publishing for new accounts. Consider Dev.to or Hashnode instead.",
     ],
   },
   wordpress: {
