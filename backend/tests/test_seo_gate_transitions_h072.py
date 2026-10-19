@@ -67,11 +67,11 @@ def seo_poor_review(db, project) -> Content:
 
 
 # ================================================================== #
-# Bug 1: set_content_status now enforces SEO gate                    #
+# SEO findings are advisory: they never overrule a human approval    #
 # ================================================================== #
 
 
-def test_set_status_to_approved_blocked_by_seo_gate(
+def test_set_status_to_approved_succeeds_despite_poor_seo(
     client, auth, seo_poor_content, db
 ):
     resp = client.post(
@@ -79,13 +79,12 @@ def test_set_status_to_approved_blocked_by_seo_gate(
         json={"status": "approved"},
         headers=auth,
     )
-    assert resp.status_code == 409, resp.text
-    assert "SEO preflight" in resp.json()["detail"]
+    assert resp.status_code == 200, resp.text
     db.refresh(seo_poor_content)
-    assert seo_poor_content.status == ContentStatus.DRAFT
+    assert seo_poor_content.status == ContentStatus.APPROVED
 
 
-def test_set_status_from_review_to_approved_blocked_by_seo_gate(
+def test_set_status_from_review_to_approved_succeeds_despite_poor_seo(
     client, auth, seo_poor_review, db
 ):
     resp = client.post(
@@ -93,16 +92,20 @@ def test_set_status_from_review_to_approved_blocked_by_seo_gate(
         json={"status": "approved"},
         headers=auth,
     )
-    assert resp.status_code == 409, resp.text
-    assert "SEO preflight" in resp.json()["detail"]
+    assert resp.status_code == 200, resp.text
     db.refresh(seo_poor_review)
-    assert seo_poor_review.status == ContentStatus.REVIEW
+    assert seo_poor_review.status == ContentStatus.APPROVED
 
 
-def test_set_status_to_draft_not_blocked_by_seo_gate(
-    client, auth, seo_poor_review, db
-):
-    """Non-APPROVED transitions should not trigger the SEO gate."""
+def test_poor_seo_is_still_reported_after_approval(client, auth, seo_poor_review, db):
+    """Advisory, not silent: the findings stay on the piece for the editor."""
+    client.post(f"{API}/{seo_poor_review.id}/approve", headers=auth)
+    detail = client.get(f"{API}/{seo_poor_review.id}", headers=auth)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["seo_issues"], "SEO findings should still be shown"
+
+
+def test_set_status_to_draft_unaffected(client, auth, seo_poor_review, db):
     resp = client.post(
         f"{API}/{seo_poor_review.id}/status",
         json={"status": "draft"},
@@ -113,14 +116,7 @@ def test_set_status_to_draft_not_blocked_by_seo_gate(
     assert seo_poor_review.status == ContentStatus.DRAFT
 
 
-# ================================================================== #
-# Bug 2: bulk_approve_content now enforces SEO gate                  #
-# ================================================================== #
-
-
-def test_bulk_approve_reports_seo_failures(
-    client, auth, seo_poor_content, db
-):
+def test_bulk_approve_approves_poor_seo(client, auth, seo_poor_content, db):
     resp = client.post(
         f"{API}/bulk/approve",
         json={"content_ids": [seo_poor_content.id]},
@@ -128,74 +124,36 @@ def test_bulk_approve_reports_seo_failures(
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    failed_ids = [f["content_id"] for f in body["failed"]]
-    assert seo_poor_content.id in failed_ids
-    assert any("SEO preflight" in f["reason"] for f in body["failed"])
+    assert seo_poor_content.id in body["succeeded"]
+    assert not body["failed"]
     db.refresh(seo_poor_content)
-    assert seo_poor_content.status == ContentStatus.DRAFT
+    assert seo_poor_content.status == ContentStatus.APPROVED
 
 
-def test_bulk_approve_mixed_seo_pass_and_fail(
-    client, auth, seo_poor_content, db, project
-):
-    """A piece with good SEO succeeds while one with bad SEO fails."""
-    good = Content(
-        project_id=project.id,
-        content_type=ContentType.TUTORIAL,
-        title="A Perfectly Optimized Title That Hits Fifty Characters!",
-        slug="good-seo-piece",
-        body_markdown=(
-            "## First Section\n\n"
-            "Some testing body text with [link one](https://a.com) "
-            "and [link two](https://b.com). Testing is important. "
-            "We do testing every day. Testing keeps quality high. "
-            + ("Word " * 200) + "\n\n"
-            "## Second Section\n\n"
-            + ("More text. " * 50)
-        ),
-        meta_description=(
-            "This meta description is carefully crafted to fall within the "
-            "ideal 150 to 160 character range for search engine results pages "
-            "display purposes and more."
-        ),
-        keywords=["testing"],
-        status=ContentStatus.DRAFT,
-    )
-    db.add(good)
-    db.commit()
-    db.refresh(good)
-
-    resp = client.post(
-        f"{API}/bulk/approve",
-        json={"content_ids": [seo_poor_content.id, good.id]},
-        headers=auth,
-    )
-    assert resp.status_code == 200, resp.text
-    body = resp.json()
-    assert good.id in body["succeeded"]
-    failed_ids = [f["content_id"] for f in body["failed"]]
-    assert seo_poor_content.id in failed_ids
-
-
-# ================================================================== #
-# The single-item approve: gated by default, overridable with force  #
-# ================================================================== #
-
-
-def test_approve_blocked_by_seo_gate_without_force(client, auth, seo_poor_review, db):
+def test_approve_succeeds_with_or_without_force(client, auth, seo_poor_review, db):
     resp = client.post(f"{API}/{seo_poor_review.id}/approve", headers=auth)
-    assert resp.status_code == 409, resp.text
-    assert "SEO preflight" in resp.json()["detail"]
-    db.refresh(seo_poor_review)
-    assert seo_poor_review.status == ContentStatus.REVIEW
-
-
-def test_approve_with_force_overrides_seo_gate(client, auth, seo_poor_review, db):
-    """The dashboard's "Approve anyway": a human has read it and says yes."""
-    resp = client.post(
-        f"{API}/{seo_poor_review.id}/approve", params={"force": "true"}, headers=auth
-    )
     assert resp.status_code == 200, resp.text
     assert resp.json()["status"] == "approved"
-    db.refresh(seo_poor_review)
-    assert seo_poor_review.status == ContentStatus.APPROVED
+
+
+def test_approve_still_applies_mechanical_seo_fixes(client, auth, seo_poor_review, db, project):
+    """The autofix still runs on the way to APPROVED."""
+    from app.services import seo_autofix
+
+    calls = []
+    real = seo_autofix.apply
+
+    def spy(db_, content):
+        calls.append(content.id)
+        return real(db_, content)
+
+    import pytest as _pytest
+
+    mp = _pytest.MonkeyPatch()
+    mp.setattr(seo_autofix, "apply", spy)
+    try:
+        resp = client.post(f"{API}/{seo_poor_review.id}/approve", headers=auth)
+    finally:
+        mp.undo()
+    assert resp.status_code == 200, resp.text
+    assert seo_poor_review.id in calls

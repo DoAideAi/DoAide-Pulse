@@ -212,7 +212,7 @@ def test_bulk_approve_autofixes_and_approves(client, auth, db, flagged):
     assert flagged.status == ContentStatus.APPROVED
 
 
-def test_unfixable_piece_is_still_refused(client, auth, db, project):
+def test_unfixable_piece_is_approved_with_its_issues_reported(client, auth, db, project):
     row = Content(
         project_id=project.id,
         content_type=ContentType.TUTORIAL,
@@ -225,5 +225,9 @@ def test_unfixable_piece_is_still_refused(client, auth, db, project):
     db.add(row)
     db.commit()
     resp = client.post(f"{API}/{row.id}/approve", headers=auth)
-    assert resp.status_code == 409
-    assert "Title is 3 chars" in resp.json()["detail"]
+    # SEO is advisory: an unfixable title no longer blocks the approval, and
+    # what is still wrong stays visible on the piece.
+    assert resp.status_code == 200, resp.text
+    detail = client.get(f"{API}/{row.id}", headers=auth).json()
+    assert detail["status"] == "approved"
+    assert detail["seo_issues"]

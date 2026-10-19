@@ -401,11 +401,14 @@ def _seo_preflight(content: Content) -> list[str]:
 def _assert_seo_ready(
     db: Session, content: Content, previous_status: ContentStatus
 ) -> None:
-    """Refuse an APPROVED transition when the SEO preflight has issues.
+    """Tidy a piece's SEO on its way to APPROVED; never refuse the approval.
 
-    The gate fires only on transitions *to* APPROVED where the piece was
-    previously in draft or review. A human explicitly approving a piece with
-    SEO issues can still do so by fixing the issues first.
+    Fires on transitions *to* APPROVED from draft or review. The mechanical
+    repairs still run (a 64-character title or a 0.7% keyword density is an
+    edit, not a judgement), and whatever is left is logged and stays visible as
+    ``seo_issues`` on the piece. It used to raise a 409 instead, which let a
+    title three characters outside 50–60 overrule a reviewer saying yes —
+    approving is a human decision and the SEO checks are advice to that human.
     """
     if not settings.content_quality_gate_enabled:
         return
@@ -414,20 +417,12 @@ def _assert_seo_ready(
     if previous_status not in (ContentStatus.DRAFT, ContentStatus.REVIEW):
         return
 
-    # Repair what a program can before judging: a 64-character title or a 0.7%
-    # keyword density is a mechanical edit, not a reason to send a human back.
-    # Only what is left after the repair can refuse the approval.
     seo_autofix.apply(db, content)
     issues = _seo_preflight(content)
-    if not issues:
-        return
-
-    db.rollback()
-    detail = (
-        "SEO preflight failed — fix these before approving:\n• "
-        + "\n• ".join(issues)
-    )
-    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+    if issues:
+        logger.info(
+            "content %s approved with SEO advisories: %s", content.id, "; ".join(issues)
+        )
 
 
 def _owned_content_map(
@@ -770,16 +765,9 @@ def bulk_approve_content(
             # Same repair the single-item approve makes, so the batch and the
             # button agree. A dry run repairs nothing that survives — the
             # rollback below discards it — but judges the repaired piece.
+            # SEO findings are advisory (see ``_assert_seo_ready``): repair
+            # what is mechanical and approve regardless.
             seo_autofix.apply(db, content)
-            issues = _seo_preflight(content)
-            if issues:
-                failed.append(
-                    BulkFailureOut(
-                        content_id=content_id,
-                        reason="SEO preflight: " + "; ".join(issues),
-                    )
-                )
-                continue
         succeeded.append(content_id)
         if payload.dry_run:
             continue
