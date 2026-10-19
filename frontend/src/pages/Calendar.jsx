@@ -403,9 +403,12 @@ export default function Calendar() {
           <div className="panel p-5">
             <h2 className="mb-3 text-sm font-semibold text-ink-900">Cadence</h2>
             {(data?.cadence ?? []).length === 0 ? (
-              <p className="text-xs text-ink-400">
-                No platforms connected yet.
-              </p>
+              <div className="flex flex-col items-start gap-2">
+                <p className="text-xs text-ink-400">No platforms connected yet.</p>
+                <Link to="/settings" className="btn-ghost">
+                  Connect an account
+                </Link>
+              </div>
             ) : (
               <ul className="space-y-3">
                 {data.cadence.map((item) => (

@@ -658,7 +658,7 @@ function WebhooksSection() {
           title="No webhooks"
           hint="Get notified when content is published or fails."
           action={
-            <button className="btn-primary mt-1" onClick={() => setCreating(true)}>
+            <button className="btn-ghost mt-1" onClick={() => setCreating(true)}>
               Add webhook
             </button>
           }
@@ -991,7 +991,7 @@ function ApiKeysSection() {
           title="No API keys"
           hint="Create a key to let scripts file ideas or read analytics."
           action={
-            <button className="btn-primary mt-1" onClick={() => setCreating(true)}>
+            <button className="btn-ghost mt-1" onClick={() => setCreating(true)}>
               Create key
             </button>
           }
