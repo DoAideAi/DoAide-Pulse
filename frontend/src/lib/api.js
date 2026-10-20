@@ -255,6 +255,11 @@ export const api = {
   // Content by status and publish success rates — where everything stands.
   pipeline: () => request("/analytics/pipeline"),
   activitySummary: (days) => request(`/activity/summary${qs({ days })}`),
+  // Every DoAide product's traffic (read from Umami by the API, never by the
+  // browser) and the signups, logins and key actions the products reported.
+  // `refresh` skips the server's short Umami cache.
+  productActivity: (days, { refresh = false } = {}) =>
+    request(`/products/activity${qs({ days, refresh: refresh ? "true" : null })}`),
 
   // ---- triggers ----
   triggerKinds: () => request("/triggers/kinds"),

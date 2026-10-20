@@ -13,6 +13,7 @@ const TABS = [
   { to: "/calendar", label: "Calendar", icon: CalendarIcon },
   { to: "/publish", label: "Publish", icon: PublishIcon },
   { to: "/analytics", label: "Analytics", icon: AnalyticsIcon },
+  { to: "/products", label: "Products", icon: ProductsIcon },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -351,6 +352,17 @@ function AnalyticsIcon() {
   return (
     <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 17V10M8 17V7M13 17V3M18 17v-7" />
+    </svg>
+  );
+}
+
+function ProductsIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="2.5" width="6" height="6" rx="1" />
+      <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
+      <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
+      <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
     </svg>
   );
 }

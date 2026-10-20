@@ -514,6 +514,8 @@ describe("every endpoint's path and verb", () => {
     ["alerts", [5], "/analytics/alerts?limit=5", "GET"],
     ["pipeline", [], "/analytics/pipeline", "GET"],
     ["activitySummary", [7], "/activity/summary?days=7", "GET"],
+    ["productActivity", [7], "/products/activity?days=7", "GET"],
+    ["productActivity", [1, { refresh: true }], "/products/activity?days=1&refresh=true", "GET"],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],

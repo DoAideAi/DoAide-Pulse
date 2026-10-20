@@ -110,6 +110,7 @@ describe("the destinations", () => {
       "Calendar",
       "Publish",
       "Analytics",
+      "Products",
       "Settings",
     ]);
   });

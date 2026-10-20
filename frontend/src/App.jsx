@@ -17,6 +17,7 @@ import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import NewsletterGallery from "./pages/NewsletterGallery";
 import PreviewPage from "./pages/PreviewPage";
+import ProductActivity from "./pages/ProductActivity";
 import Projects from "./pages/Projects";
 import Publish from "./pages/Publish";
 import Settings from "./pages/Settings";
@@ -159,6 +160,14 @@ export default function App() {
         element={
           <Protected>
             <ContentEditor />
+          </Protected>
+        }
+      />
+      <Route
+        path="/products"
+        element={
+          <Protected>
+            <ProductActivity />
           </Protected>
         }
       />
