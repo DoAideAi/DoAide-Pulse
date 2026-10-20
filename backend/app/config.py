@@ -215,6 +215,9 @@ class Settings(BaseSettings):
     # The browser's activity beacon. It batches, so a busy session sends a few
     # requests a minute; this is a ceiling on a runaway tab, not a quota.
     rate_limit_activity: str = "60/minute;2000/day"
+    # Product backends reporting signups, logins and key actions, bucketed per
+    # caller address. Several products share each Hetzner box, hence generous.
+    rate_limit_product_ingest: str = "600/minute;50000/day"
 
     # ---- Database ----
     database_url: str = "postgresql+psycopg://pulse:pulse@localhost:5432/pulse"
@@ -368,6 +371,38 @@ class Settings(BaseSettings):
     # How long page views and actions are kept before the daily maintenance
     # sweep prunes them. Long enough for a quarter-over-quarter comparison.
     activity_retention_days: int = 90
+
+    # ---- Cross-product activity (the /products dashboard) ----
+    # The self-hosted Umami instance every DoAide product reports to. Pulse
+    # reads it server-side only: the credentials never reach the browser, and
+    # the dashboard calls Pulse, not Umami. Either a username/password pair
+    # (self-hosted Umami issues a bearer token from /api/auth/login) or a token
+    # already issued; blank all three and the dashboard shows the products with
+    # "Umami not configured" instead of numbers.
+    umami_base_url: str = "https://analytics.doaide.com"
+    umami_username: str = ""
+    umami_password: str = ""
+    umami_api_token: str = ""
+    # Per-request ceiling. The dashboard fans out a handful of calls per product,
+    # so a slow Umami should cost seconds, not a hung page.
+    umami_timeout_seconds: float = 8.0
+    # How long one product's numbers are reused before Umami is asked again.
+    # The dashboard auto-refreshes every minute; this keeps several open tabs
+    # from multiplying the load on analytics.doaide.com.
+    umami_cache_seconds: int = 60
+    # Overrides for products whose Umami site cannot be found by domain, as
+    # ``key=website-id`` pairs, comma separated (``prospect=…,realty=…``).
+    umami_website_ids: str = ""
+    # The shared secret a product's backend sends in ``X-Pulse-Ingest-Token`` to
+    # report a signup, login or key action. Blank closes the ingest endpoint.
+    product_ingest_token: str = ""
+    # Who may read the cross-product dashboard, comma separated. Blank means
+    # "every signed-in account" — right for the single-user install Pulse is
+    # by default, and refused while registration is open (see
+    # app.routers.product_activity), because then "every account" is anyone.
+    product_activity_admin_emails: str = ""
+    # How long reported product events are kept before the daily sweep.
+    product_event_retention_days: int = 90
 
     # ---- GitHub (project change monitoring) ----
     # A classic or fine-grained PAT with `repo` read. Optional: without it the
@@ -712,6 +747,8 @@ class Settings(BaseSettings):
         # are written.
         "llm_usage_retention_days",
         "activity_retention_days",
+        "product_event_retention_days",
+        "umami_cache_seconds",
         "password_reset_token_ttl_minutes",
         "preview_link_default_ttl_hours",
         "preview_link_max_ttl_hours",

@@ -17,6 +17,7 @@ from app.models.metrics import ContentMetric
 from app.models.password_reset import PasswordResetToken
 from app.models.platform_connection import ConnectionStatus, PlatformConnection
 from app.models.preview_link import PreviewLink
+from app.models.product_event import ProductEvent
 from app.models.project import AutopilotMode, Project, Tone, slugify
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.revision import ContentRevision, RevisionSource
@@ -39,6 +40,7 @@ __all__ = [
     "SUBSCRIBABLE_EVENTS",
     "TARGET_WORDS",
     "ActivityEvent",
+    "ProductEvent",
     "ApiKey",
     "ApiKeyScope",
     "AutopilotMode",

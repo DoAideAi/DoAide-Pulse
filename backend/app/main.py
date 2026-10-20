@@ -32,6 +32,7 @@ from app.routers import (
     machine,
     metrics,
     misc,
+    product_activity,
     projects,
     revisions,
     tags,
@@ -657,6 +658,7 @@ def create_app() -> FastAPI:
     app.include_router(calendar.router, prefix=prefix)
     app.include_router(analytics.router, prefix=prefix)
     app.include_router(activity.router, prefix=prefix)
+    app.include_router(product_activity.router, prefix=prefix)
     app.include_router(metrics.router, prefix=prefix)
     app.include_router(settings_router.router, prefix=prefix)
     app.include_router(webhooks.router, prefix=prefix)

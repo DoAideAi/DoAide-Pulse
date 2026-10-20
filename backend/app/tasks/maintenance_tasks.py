@@ -21,6 +21,7 @@ from app.services import (
     credential_rotation,
     llm_usage,
     password_reset,
+    product_activity,
 )
 from app.tasks.celery_app import task
 
@@ -238,6 +239,23 @@ def purge_old_activity() -> dict:
         count = activity.purge(db, days=settings.activity_retention_days)
         if count:
             logger.info("purged %d activity row(s)", count)
+        return {"purged": count}
+    finally:
+        db.close()
+
+
+@task(
+    name="app.tasks.maintenance_tasks.purge_old_product_events",
+    soft_time_limit=60,
+    time_limit=120,
+)
+def purge_old_product_events() -> dict:
+    """Drop product-reported events past ``product_event_retention_days``."""
+    db = SessionLocal()
+    try:
+        count = product_activity.purge(db, days=settings.product_event_retention_days)
+        if count:
+            logger.info("purged %d product event row(s)", count)
         return {"purged": count}
     finally:
         db.close()
