@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ErrorBanner, Skeleton } from "../components/ui/Bits";
 import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
@@ -73,6 +73,24 @@ export default function Calendar() {
     () => api.calendar({ start: range.start, end: range.end }),
     [range.start, range.end],
   );
+  // Unwritten ideas: planned ones land on the grid, the backlog in the sidebar.
+  const ideasState = useApi(
+    () =>
+      api.calendarIdeas({
+        start: localDayKey(range.days[0]),
+        end: localDayKey(range.days[41]),
+      }),
+    [range.start, range.end],
+  );
+  const ideasByDay = useMemo(() => {
+    const map = new Map();
+    for (const idea of ideasState.data?.planned ?? []) {
+      const list = map.get(idea.planned_date) ?? [];
+      list.push(idea);
+      map.set(idea.planned_date, list);
+    }
+    return map;
+  }, [ideasState.data]);
 
   const entries = data?.entries ?? [];
   // Offered from the unfiltered set, so choosing a platform never removes the
@@ -328,6 +346,13 @@ export default function Calendar() {
                       </span>
                     </div>
                     <div className="space-y-1">
+                      {(ideasByDay.get(key) ?? []).map((idea) => (
+                        <IdeaChip
+                          key={`idea-${idea.id}`}
+                          idea={idea}
+                          onChanged={ideasState.reload}
+                        />
+                      ))}
                       {dayEntries.map((entry) => (
                         <CalendarChip
                           key={chipKey(entry)}
@@ -399,6 +424,8 @@ export default function Calendar() {
               </ul>
             )}
           </div>
+
+          <IdeaBacklog state={ideasState} />
 
           <div className="panel p-5">
             <h2 className="mb-3 text-sm font-semibold text-ink-900">Cadence</h2>
@@ -552,5 +579,204 @@ function CalendarChip({ entry, onDragStart, onDragEnd, onNudge }) {
       )}
       {entry.title}
     </Link>
+  );
+}
+
+
+/**
+ * A planned-but-unwritten idea on the grid. Dashed, because it is a promise,
+ * not a scheduled post: writing it (✎) creates a real draft through the same
+ * endpoint the projects page uses, and × sends it back to the backlog.
+ */
+function IdeaChip({ idea, onChanged }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+
+  async function write() {
+    setBusy(true);
+    try {
+      const content = await api.writeFromIdea(idea.id);
+      toast.success("Draft created from the idea");
+      navigate(`/content/${content.id}`);
+    } catch (err) {
+      toast.error(`Could not write the draft: ${err.message}`);
+      setBusy(false);
+    }
+  }
+
+  async function unplan() {
+    setBusy(true);
+    try {
+      await api.planIdea(idea.id, null);
+      onChanged();
+    } catch (err) {
+      toast.error(`Could not unplan: ${err.message}`);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      title={`Idea — ${idea.headline} (${idea.project_name})`}
+      className="flex items-center gap-1 rounded border border-dashed border-warn/50 bg-warn-wash px-1.5 py-0.5 text-[11px] leading-tight text-ink-700"
+    >
+      <span className="min-w-0 flex-1 truncate">{idea.headline}</span>
+      <button
+        className="shrink-0 text-ink-500 hover:text-brand-600 disabled:opacity-40"
+        onClick={write}
+        disabled={busy}
+        aria-label={`Write a draft from “${idea.headline}”`}
+        title="Write the draft"
+      >
+        ✎
+      </button>
+      <button
+        className="shrink-0 text-ink-500 hover:text-bad disabled:opacity-40"
+        onClick={unplan}
+        disabled={busy}
+        aria-label={`Send “${idea.headline}” back to the backlog`}
+        title="Back to the backlog"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The pool of unwritten ideas beside the grid: plan one onto a day, write it
+ * now, dismiss it, or add one of your own. Generated ideas arrive here from
+ * the repo monitor and the projects page's "Generate ideas".
+ */
+function IdeaBacklog({ state }) {
+  const toast = useToast();
+  const navigate = useNavigate();
+  const { data: projects } = useApi(() => api.listProjects(), []);
+  const backlog = state.data?.backlog ?? [];
+  const [busy, setBusy] = useState(null);
+  const [headline, setHeadline] = useState("");
+  const [projectId, setProjectId] = useState("");
+
+  async function run(id, action) {
+    setBusy(id);
+    try {
+      await action();
+      state.reload();
+    } catch (err) {
+      toast.error(err.message || String(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function write(idea) {
+    setBusy(idea.id);
+    try {
+      const content = await api.writeFromIdea(idea.id);
+      toast.success("Draft created from the idea");
+      navigate(`/content/${content.id}`);
+    } catch (err) {
+      toast.error(`Could not write the draft: ${err.message}`);
+      setBusy(null);
+    }
+  }
+
+  async function add(event) {
+    event.preventDefault();
+    const pid = projectId || projects?.[0]?.id;
+    if (!pid || headline.trim().length < 3) return;
+    setBusy("add");
+    try {
+      await api.createCalendarIdea({ project_id: Number(pid), headline: headline.trim() });
+      setHeadline("");
+      state.reload();
+    } catch (err) {
+      toast.error(`Could not add the idea: ${err.message}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="panel p-5">
+      <h2 className="mb-1 text-sm font-semibold text-ink-900">Idea backlog</h2>
+      <p className="mb-3 text-xs text-ink-400">
+        Unwritten ideas. Pick a day to put one on the calendar, or write it now.
+      </p>
+      {backlog.length === 0 && (
+        <p className="text-xs text-ink-400">
+          Nothing waiting. Ideas from your repos land here, or add one below.
+        </p>
+      )}
+      <ul className="space-y-3">
+        {backlog.slice(0, 8).map((idea) => (
+          <li key={idea.id} className="rounded-lg bg-canvas px-3 py-2">
+            <p className="text-xs font-medium text-ink-800">{idea.headline}</p>
+            <p className="mt-0.5 text-[11px] text-ink-400">{idea.project_name}</p>
+            <div className="mt-1.5 flex items-center gap-2">
+              <input
+                type="date"
+                aria-label={`Plan “${idea.headline}” for a day`}
+                className="rounded border border-line bg-paper px-1.5 py-0.5 font-mono text-[11px] text-ink-700"
+                disabled={busy === idea.id}
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  run(idea.id, () => api.planIdea(idea.id, event.target.value));
+                }}
+              />
+              <button
+                className="btn-quiet text-xs"
+                onClick={() => write(idea)}
+                disabled={busy === idea.id}
+              >
+                {busy === idea.id ? "…" : "Write"}
+              </button>
+              <button
+                className="text-xs text-ink-400 hover:text-bad"
+                onClick={() => run(idea.id, () => api.dismissIdea(idea.id))}
+                disabled={busy === idea.id}
+                aria-label={`Dismiss “${idea.headline}”`}
+              >
+                Dismiss
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {(projects ?? []).length > 0 && (
+        <form onSubmit={add} className="mt-3 space-y-1.5 border-t border-line pt-3">
+          <input
+            value={headline}
+            onChange={(event) => setHeadline(event.target.value)}
+            placeholder="Your own idea…"
+            maxLength={300}
+            aria-label="New idea headline"
+            className="w-full rounded border border-line bg-paper px-2 py-1 text-xs text-ink-800"
+          />
+          {projects.length > 1 && (
+            <select
+              value={projectId || String(projects[0].id)}
+              onChange={(event) => setProjectId(event.target.value)}
+              aria-label="Project for the new idea"
+              className="w-full rounded border border-line bg-paper px-2 py-1 text-xs text-ink-700"
+            >
+              {projects.map((proj) => (
+                <option key={proj.id} value={proj.id}>
+                  {proj.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="submit"
+            className="btn-quiet w-full text-xs"
+            disabled={busy === "add" || headline.trim().length < 3}
+          >
+            {busy === "add" ? "Adding…" : "Add idea"}
+          </button>
+        </form>
+      )}
+    </div>
   );
 }

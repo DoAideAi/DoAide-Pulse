@@ -24,9 +24,11 @@ from app.schemas.seo import (
     LinkSuggestionsIn,
     LinkSuggestionsOut,
     MetaAuditOut,
+    SeoHealthHistoryOut,
     SeoHealthOut,
     SeoPostOut,
     SeoTrafficOut,
+    SitemapRunsOut,
     SitemapsOut,
 )
 from app.services import (
@@ -34,6 +36,7 @@ from app.services import (
     scheduling,
     search_console,
     seo_health,
+    seo_history,
     seo_posts,
     seo_sites,
     seo_traffic,
@@ -71,6 +74,22 @@ def health(
 
 
 @router.get(
+    "/health/history",
+    response_model=SeoHealthHistoryOut,
+    summary="Daily SEO health totals for the chart",
+    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN),
+)
+def health_history(
+    days: int = Query(default=90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_product_admin),
+) -> dict:
+    """One point per day: sitemap URLs, indexed pages, problems and meta
+    issues across the estate. Written nightly and by every sweep, read here."""
+    return {"days": days, "points": seo_history.history(db, days=days)}
+
+
+@router.get(
     "/sitemaps",
     response_model=SitemapsOut,
     summary="Sitemap state for every DoAide site",
@@ -102,8 +121,26 @@ def submit_sitemaps(
         targets = (seo_sites.BY_KEY[site],)
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown site.")
-    sitemaps.check(db, targets)
+    rows = sitemaps.check(db, targets)
+    seo_history.record_run(db, "manual", rows)
+    seo_history.record_snapshot(db)
     return _sitemaps_payload(db)
+
+
+@router.get(
+    "/sitemaps/runs",
+    response_model=SitemapRunsOut,
+    summary="Recent sitemap submission sweeps, scheduled and manual",
+    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN),
+)
+def sitemap_runs(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_product_admin),
+) -> dict:
+    """The status page for the automated weekly submission: when each sweep
+    ran, what triggered it, and which sites had problems."""
+    return {"runs": seo_history.runs(db, limit=limit)}
 
 
 # ---- meta-tag audit ----

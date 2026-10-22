@@ -242,6 +242,14 @@ export const api = {
   calendar: (params = {}) => request(`/calendar${qs(params)}`),
   reschedule: (contentId, payload) =>
     request(`/calendar/content/${contentId}`, { method: "PATCH", body: payload }),
+  // Unwritten ideas: planned onto days in the window, plus the backlog.
+  calendarIdeas: (params = {}) => request(`/calendar/ideas${qs(params)}`),
+  createCalendarIdea: (payload) =>
+    request("/calendar/ideas", { method: "POST", body: payload }),
+  // `plannedDate` is "YYYY-MM-DD", or null to send it back to the backlog.
+  planIdea: (ideaId, plannedDate) =>
+    request(`/calendar/ideas/${ideaId}`, { method: "PATCH", body: { planned_date: plannedDate } }),
+  dismissIdea: (ideaId) => request(`/calendar/ideas/${ideaId}`, { method: "DELETE" }),
 
   // ---- analytics ----
   dashboard: () => request("/analytics/dashboard"),
@@ -269,7 +277,11 @@ export const api = {
   // ---- SEO (every DoAide site; product admins only) ----
   // Read from what Pulse stored — cheap. `tz` sets the calendar's day boundaries.
   seoHealth: (tz) => request(`/seo/health${qs({ tz })}`),
+  // Daily totals for the health-over-time charts.
+  seoHealthHistory: (days) => request(`/seo/health/history${qs({ days })}`),
   seoSitemaps: () => request("/seo/sitemaps"),
+  // Recent submission sweeps, scheduled and manual, newest first.
+  seoSitemapRuns: () => request("/seo/sitemaps/runs"),
   // Fetches and submits synchronously; `site` is one catalog key, or null for all.
   submitSitemaps: (site = null) =>
     request(`/seo/sitemaps/submit${qs({ site })}`, { method: "POST" }),

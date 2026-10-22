@@ -1,5 +1,97 @@
 export const staticPosts = [
   {
+    slug: "free-seo-tools-india-2026",
+    title: "Free SEO Tools for India in 2026: The Complete Toolkit",
+    description:
+      "The best free SEO tools for Indian websites in 2026 — keyword research, technical audits, rank tracking, backlink analysis, and content optimisation, with what each tool actually does well.",
+    published: "2026-10-22",
+    keywords: [
+      "free SEO tools India",
+      "SEO tools 2026",
+      "keyword research tools free",
+      "website SEO audit free",
+      "SEO for Indian websites",
+    ],
+    faqs: [
+      {
+        question: "What are the best free SEO tools in India for 2026?",
+        answer: "The best free SEO tools for Indian websites in 2026 are Google Search Console (indexing and search performance), Google Keyword Planner and Google Trends (keyword research with India-specific data), PageSpeed Insights and Lighthouse (technical audits), Bing Webmaster Tools (a second search engine's view plus a free keyword tool), and Ahrefs Webmaster Tools (free backlink and site audit data for verified sites).",
+      },
+      {
+        question: "Is Google Search Console enough for SEO?",
+        answer: "Google Search Console is essential but not sufficient. It shows how Google already sees your site — queries, impressions, clicks, indexing problems — but it cannot research keywords you do not rank for yet, analyse competitors, or audit on-page content. Pair it with a keyword research tool and a technical audit tool for full coverage.",
+      },
+      {
+        question: "How do I do keyword research for the Indian market for free?",
+        answer: "Use Google Keyword Planner with location set to India for search volumes, Google Trends for regional and seasonal patterns across Indian states, and Google autocomplete and 'People also ask' for long-tail phrasing. Searching in Hindi and regional languages surfaces lower-competition keywords that most tools under-report.",
+      },
+      {
+        question: "Can I rank a website without paid SEO tools?",
+        answer: "Yes. Paid tools save time, but every core SEO task — keyword research, technical auditing, content optimisation, rank tracking, backlink monitoring — has a capable free option. Most small Indian businesses ranking on page one use nothing beyond Google's free tools plus consistent content publishing.",
+      },
+      {
+        question: "How often should I audit my website's SEO?",
+        answer: "Run a technical audit monthly and after every significant site change. Check Google Search Console weekly for indexing errors and manual actions. Review your keyword rankings and top pages monthly. A sitemap should be resubmitted whenever you add pages — or automatically, which is how tools like DoAide Pulse handle their own estate.",
+      },
+    ],
+    body: [
+      "SEO in India in 2026 is a different game from SEO in the West. Search volumes are enormous — India passed 900 million internet users — but they are split across English, Hindi, and a dozen regional languages, spread across devices that skew heavily mobile, and served by businesses that mostly cannot justify ₹20,000 a month for an enterprise SEO suite. The good news: the free tier of the SEO tool ecosystem has never been stronger. Everything a small Indian business or independent creator needs to rank — keyword research, technical audits, rank tracking, backlink data — exists in a free tool, if you know which one does what.",
+      "Start with Google Search Console, because nothing else matters until Google can see your site. Search Console is Google telling you, for free, exactly how it crawls, indexes, and ranks your pages: which queries you appear for, which pages earn clicks, which have indexing problems, and whether a penalty is dragging you down. Verify your site, submit your sitemap, and check the Performance and Indexing reports weekly. The most common SEO problem on small Indian sites is not weak content — it is pages Google never indexed because nobody submitted a sitemap or noticed a noindex tag left over from development. Search Console surfaces both in minutes.",
+      "For keyword research, the free stack is Google Keyword Planner plus Google Trends plus the search results page itself. Keyword Planner (inside a free Google Ads account) gives search volume ranges for India specifically — set the location filter, because global volumes are meaningless for a business serving Indian customers. Google Trends shows seasonality and regional splits: 'income tax calculator' spikes every July, 'GST return' every month-end, and the state-level breakdowns tell you whether your audience is in Maharashtra or Tamil Nadu. Then search your target keyword and read the page: the 'People also ask' boxes and autocomplete suggestions are Google handing you the exact long-tail questions Indians type. Searching in Hindi matters too — 'SEO kaise kare' pulls different, often less competitive results than 'how to do SEO'.",
+      "For technical SEO, PageSpeed Insights and Lighthouse are the standard. Both are free, both run from the browser, and both matter more in India than almost anywhere else because the median Indian user is on a mid-range Android phone on a 4G connection that behaves like 3G at peak hours. A site that loads in under three seconds on that connection beats a prettier competitor that takes eight. PageSpeed Insights reports Core Web Vitals from real Chrome users — the same data Google ranks with. Fix the big three first: compress and lazy-load images, split JavaScript bundles so the first page does not download the whole app, and serve everything over a CDN with an edge node in India.",
+      "For backlinks and competitive analysis, Ahrefs Webmaster Tools is the best free option nobody uses. Verify your site and you get Ahrefs' backlink index and site audit for your own domain free — the same crawler that powers their $99-a-month product. Bing Webmaster Tools deserves ten minutes too: it includes a free keyword research tool with no ads account required, and Bing powers a growing share of AI-assistant search results. For rank tracking on a budget, Search Console's query report covers your existing rankings; for keywords you do not rank for yet, a weekly manual check in an incognito window costs nothing and keeps you honest.",
+      "Content optimisation is where most free toolkits stop, and where the gap between writing pages and ranking pages lives. Every page needs one target keyword, a title tag under 60 characters that leads with it, a meta description under 160 that earns the click, one H1, and internal links from your other pages. None of that needs a paid tool — it needs a checklist and discipline. The same applies at estate scale: at DoAide we run fourteen product sites, and we built the checklist into our own tooling — DoAide Pulse audits every site's meta tags nightly, tracks sitemap submission automatically, and charts indexing health over time, which is the same loop any business should run manually each month: audit, fix, resubmit, measure.",
+      "The honest limits of free tools: you cannot see competitors' full backlink profiles, search volumes come as ranges rather than exact numbers, and rank tracking is manual. For most Indian small businesses those limits cost nothing, because the bottleneck is never the tool — it is publishing consistently. A business that writes one genuinely useful page a week with the free stack will outrank a business with an enterprise SEO suite and no content, every time. Spend your first year's SEO budget on writing, not software.",
+      "Put it together as a monthly routine: week one, check Search Console for indexing errors and new query opportunities; week two, run PageSpeed Insights on your top five pages and fix the slowest; week three, research one new keyword cluster and publish a page for it; week four, review what ranked, what did not, and why. That loop, run for twelve months with entirely free tools, is how small Indian sites reach page one. And if you publish a newsletter alongside your site — the single best way to turn one-time search visitors into a returning audience — DoAide Pulse at pulse.doaide.com automates the writing, publishing, and SEO tracking in one place, free to start.",
+    ],
+  },
+  {
+    slug: "how-to-improve-website-seo",
+    title: "How to Improve Website SEO: A Practical Step-by-Step Guide",
+    description:
+      "A practical guide to improving your website's SEO — technical foundations, keyword targeting, on-page optimisation, content strategy, internal linking, and how to measure what is working.",
+    published: "2026-10-22",
+    keywords: [
+      "how to improve website SEO",
+      "SEO guide for beginners",
+      "on-page SEO checklist",
+      "improve Google ranking",
+      "website SEO tips 2026",
+    ],
+    faqs: [
+      {
+        question: "How can I improve my website's SEO quickly?",
+        answer: "The fastest SEO improvements are technical: submit a sitemap in Google Search Console, fix pages blocked from indexing, compress images and enable lazy loading for speed, and write proper title tags and meta descriptions for your top ten pages. These take a day and often show results within two to four weeks.",
+      },
+      {
+        question: "How long does SEO take to show results?",
+        answer: "Technical fixes can move rankings within two to four weeks. New content typically takes three to six months to reach its ranking potential, because Google rewards pages that accumulate engagement signals and internal links over time. SEO compounds: a page that brings 5 visits a month in month one can bring 50 by month six.",
+      },
+      {
+        question: "What matters most for SEO in 2026?",
+        answer: "Three things dominate in 2026: content that genuinely answers the searcher's question better than competing pages, Core Web Vitals (loading speed, interactivity, and layout stability, measured from real users), and topical authority — a cluster of interlinked pages covering one subject deeply rather than scattered posts on many subjects.",
+      },
+      {
+        question: "Do I need to hire an SEO agency?",
+        answer: "Most small websites do not. The fundamentals — fast pages, clear titles, useful content published consistently, internal links — are entirely doable in-house with free tools. An agency makes sense when you compete in a high-stakes commercial niche, need link-building at scale, or have a large site with complex technical debt.",
+      },
+      {
+        question: "Why is my website not ranking on Google?",
+        answer: "The most common reasons: the pages are not indexed (check Google Search Console's Pages report), the site targets keywords far too competitive for its authority, pages load slowly on mobile, the content does not match search intent, or the site is too new — domains under six months old rank slowly regardless of quality.",
+      },
+    ],
+    body: [
+      "Most advice about improving website SEO fails because it lists two hundred ranking factors without telling you which ten matter. Here is the practical version: SEO is making it easy for Google to find your pages, fast for users to load them, and obvious to both that your page answers the search better than the alternatives. Everything below serves one of those three goals, in the order you should actually do them.",
+      "Step one: make sure Google can see your site at all. Verify your site in Google Search Console and open the Pages report. Every URL you care about should show as indexed; if it does not, the report tells you why — blocked by robots.txt, tagged noindex, redirected, or simply never discovered. Submit an XML sitemap and resubmit it whenever you publish new pages; it is the difference between Google finding your new page tomorrow and finding it next month. This step is boring and it is where most broken SEO lives. No amount of content strategy helps a page Google has never indexed.",
+      "Step two: make the site fast, especially on mobile. Google ranks with Core Web Vitals measured from real users — how fast the main content appears (LCP, target under 2.5 seconds), how quickly the page responds to taps (INP, under 200 ms), and whether the layout jumps around while loading (CLS, under 0.1). The fixes with the highest payoff: compress images to WebP and add lazy loading so below-the-fold images do not block the first paint, split your JavaScript so each page loads only its own code, set explicit dimensions on images so the layout never shifts, and serve through a CDN. Run PageSpeed Insights on your five most important pages and fix the worst one first.",
+      "Step three: target one keyword per page, and pick keywords you can win. A new site will not rank for 'insurance' — but it can rank for 'term insurance tax benefit for NRIs', because specificity beats authority at the long tail. Find these in Google's autocomplete, the 'People also ask' boxes, and Keyword Planner. Then check what already ranks: if page one for your keyword is all major publishers, go longer-tail; if it contains a forum thread or a thin page from 2019, that keyword is winnable. Map every page on your site to exactly one target keyword — pages competing with each other for the same term split their strength and both lose.",
+      "Step four: on-page optimisation, the fifteen-minute checklist that most sites skip. The title tag leads with the target keyword and stays under 60 characters, because Google truncates longer ones. The meta description is a 150-character advertisement for the click — it does not affect ranking directly, but a better click-through rate does. One H1 that matches the search intent, H2s that structure the page the way a reader scans it, and the keyword appearing naturally in the first hundred words. Add structured data — FAQ and Article schema — so Google can show rich results; it is a copy-paste of JSON-LD, not a development project. Every image gets descriptive alt text, which is both an accessibility requirement and how you rank in image search.",
+      "Step five: build topical authority with content clusters, not scattered posts. Google increasingly rewards sites that cover one subject deeply. Pick the subject your business owns, write one comprehensive pillar page, then surround it with eight to twelve specific pages answering individual questions — each linking to the pillar and to each other. Internal links are the most underused free ranking lever: they tell Google which pages matter most and pass authority from pages that rank to pages that should. Every new page you publish should receive links from at least two existing pages, and orphan pages — reachable only through the sitemap — effectively do not exist.",
+      "Step six: earn backlinks the boring, reliable way. Links remain a top ranking factor, and the sustainable sources for a small site are: free tools and calculators that other sites reference, original data or surveys from your niche, genuinely useful guides that answer questions forums keep asking, and listings in the legitimate directories of your industry. Skip bought links and link exchanges — they work until a core update erases two years of progress overnight. One link from a relevant, respected site in your niche outweighs fifty from a link farm.",
+      "Step seven: measure, and let the data pick your next move. Check Search Console weekly: the Performance report shows queries where you rank on page two — those are your cheapest wins, since a small content improvement moves position eleven to position six far more easily than position fifty to page one. Track indexing health over time, not just as a snapshot; a slow decline in indexed pages is an early warning that something broke. We follow the same loop across all fourteen DoAide product sites — automated sitemap submission, nightly meta tag audits, and health-over-time charts in DoAide Pulse — because SEO is not a project you finish, it is a loop you run. Run it monthly for a year and you will outrank most competitors, because most of them never run the loop at all. And when search visitors arrive, give them a reason to return: a newsletter converts one-time readers into a durable audience, and DoAide Pulse at pulse.doaide.com makes publishing one nearly automatic.",
+    ],
+  },
+  {
     slug: "best-ai-newsletter-platforms-2026",
     title: "Best AI Newsletter Platforms in 2026: Automate, Personalise, and Grow",
     description:

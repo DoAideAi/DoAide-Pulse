@@ -9,9 +9,9 @@ estate, and only a product admin reads them.
 from __future__ import annotations
 
 # Imported at runtime: SQLAlchemy resolves Mapped[...] at class-definition time.
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Date, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -44,6 +44,46 @@ class SitemapStatus(Base, TimestampMixin):
     gsc_last_downloaded: Mapped[str | None] = mapped_column(String(40))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SeoHealthSnapshot(Base, TimestampMixin):
+    """One row per day: the estate's search footing, summed across sites.
+
+    Written once a day (and refreshed by every sitemap or audit sweep that
+    lands on the same day), so the dashboard can draw "how did it get here"
+    next to the live table that answers "where does it stand now".
+    """
+
+    __tablename__ = "seo_health_snapshots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, unique=True, nullable=False)
+    sites: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sitemaps_submitted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sitemap_problems: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    urls_in_sitemaps: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    indexed_pages: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    meta_issues: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class SitemapRun(Base, TimestampMixin):
+    """One row per sitemap submission sweep, scheduled or button-pressed.
+
+    The run log answers "did Monday's automated submission actually happen,
+    and did it work" — something the per-site snapshot cannot, because a later
+    manual submit of one site overwrites the evidence.
+    """
+
+    __tablename__ = "seo_sitemap_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    #: ``scheduled`` (the weekly beat job) or ``manual`` (the dashboard button).
+    trigger: Mapped[str] = mapped_column(String(20), nullable=False)
+    sites_checked: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    sites_submitted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: Site keys whose fetch or submission failed, with the first error line.
+    problems: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
 class MetaAudit(Base, TimestampMixin):

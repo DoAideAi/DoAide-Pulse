@@ -1,7 +1,7 @@
 """Content calendar: what is going out, when, and where there is room for more."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db, refresh_all
 from app.deps import QueryRowId, RowId, get_current_user, owned_project
-from app.models.content import Content, ContentStatus
+from app.models.content import Content, ContentIdea, ContentStatus
 from app.models.mixins import as_aware, utcnow
 from app.models.project import Project
 from app.models.publication import Platform, Publication, PublicationStatus
@@ -18,6 +18,10 @@ from app.models.user import User
 from app.schemas.content import (
     CadenceGuideOut,
     CalendarEntry,
+    CalendarIdeaCreate,
+    CalendarIdeaOut,
+    CalendarIdeaPlan,
+    CalendarIdeasOut,
     CalendarOut,
     PublicationOut,
     ScheduleUpdate,
@@ -350,3 +354,145 @@ def cadence_guide(
         CadenceGuideOut(**entry)
         for entry in learned_cadence.describe_all(db, user.id, list(targets))
     ]
+
+# ---- content ideas on the calendar ----
+#
+# An idea is a subject nobody has written yet. Planning one onto a day is a
+# promise to future-you, not a schedule: nothing publishes from it until it is
+# written into a draft (``POST /content/ideas/{id}/write``), which is the same
+# path the projects page uses.
+
+#: The backlog shown beside the calendar. Capped: a pool to plan from, not an archive.
+IDEA_BACKLOG_LIMIT = 30
+
+
+def _idea_out(idea: ContentIdea, project_name: str) -> CalendarIdeaOut:
+    return CalendarIdeaOut(
+        id=idea.id,
+        project_id=idea.project_id,
+        project_name=project_name,
+        content_type=idea.content_type,
+        headline=idea.headline,
+        rationale=idea.rationale,
+        planned_date=idea.planned_date,
+    )
+
+
+def _owned_idea(idea_id: int, db: Session, user: User) -> tuple[ContentIdea, Project]:
+    row = db.execute(
+        select(ContentIdea, Project)
+        .join(Project, Project.id == ContentIdea.project_id)
+        .where(ContentIdea.id == idea_id, Project.user_id == user.id)
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Idea not found.")
+    return row[0], row[1]
+
+
+@router.get(
+    "/ideas",
+    response_model=CalendarIdeasOut,
+    summary="Unwritten ideas: planned onto days, and the backlog",
+    responses=errors(status.HTTP_400_BAD_REQUEST, *AUTHENTICATED),
+)
+def calendar_ideas(
+    start: date | None = None,
+    end: date | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CalendarIdeasOut:
+    """Ideas for the calendar: those planned inside the window, plus a backlog
+    of unplanned ones to drag onto days. Only ideas not yet written show up —
+    a written idea lives on as its draft, which the calendar already draws.
+    """
+    window_start = start or (utcnow().date() - timedelta(days=30))
+    window_end = end or (utcnow().date() + timedelta(days=60))
+    if window_end < window_start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="end is before start."
+        )
+
+    base = (
+        select(ContentIdea, Project.name)
+        .join(Project, Project.id == ContentIdea.project_id)
+        .where(Project.user_id == user.id, ContentIdea.used_content_id.is_(None))
+    )
+    planned = db.execute(
+        base.where(ContentIdea.planned_date.between(window_start, window_end)).order_by(
+            ContentIdea.planned_date
+        )
+    ).all()
+    backlog = db.execute(
+        base.where(ContentIdea.planned_date.is_(None))
+        .order_by(ContentIdea.created_at.desc())
+        .limit(IDEA_BACKLOG_LIMIT)
+    ).all()
+    return CalendarIdeasOut(
+        planned=[_idea_out(i, name) for i, name in planned],
+        backlog=[_idea_out(i, name) for i, name in backlog],
+    )
+
+
+@router.post(
+    "/ideas",
+    response_model=CalendarIdeaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add your own idea, optionally straight onto a day",
+    responses=errors(*OWNED, status.HTTP_422_UNPROCESSABLE_CONTENT),
+)
+def create_idea(
+    payload: CalendarIdeaCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CalendarIdeaOut:
+    """A hand-written idea, next to the generated ones. The repo monitor banks
+    ideas it finds; this is for the ones you already have."""
+    project = owned_project(payload.project_id, db, user)
+    idea = ContentIdea(
+        project_id=project.id,
+        content_type=payload.content_type,
+        headline=payload.headline.strip(),
+        rationale="",
+        source={"kind": "calendar_manual"},
+        planned_date=payload.planned_date,
+    )
+    db.add(idea)
+    db.commit()
+    db.refresh(idea)
+    return _idea_out(idea, project.name)
+
+
+@router.patch(
+    "/ideas/{idea_id}",
+    response_model=CalendarIdeaOut,
+    summary="Plan an idea onto a day, or send it back to the backlog",
+    responses=errors(*OWNED, status.HTTP_422_UNPROCESSABLE_CONTENT),
+)
+def plan_idea(
+    idea_id: RowId,
+    payload: CalendarIdeaPlan,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> CalendarIdeaOut:
+    idea, project = _owned_idea(idea_id, db, user)
+    idea.planned_date = payload.planned_date
+    db.commit()
+    return _idea_out(idea, project.name)
+
+
+@router.delete(
+    "/ideas/{idea_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Dismiss an idea",
+    responses=errors(*OWNED),
+)
+def dismiss_idea(
+    idea_id: RowId,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> None:
+    """Gone for good — the backlog is only useful while everything in it is
+    something someone might write."""
+    idea, _ = _owned_idea(idea_id, db, user)
+    db.delete(idea)
+    db.commit()

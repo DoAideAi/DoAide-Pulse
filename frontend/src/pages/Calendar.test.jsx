@@ -8,7 +8,16 @@ import { formatDateTime } from "../lib/format";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
 
 vi.mock("../lib/api", () => ({
-  api: { calendar: vi.fn(), reschedule: vi.fn() },
+  api: {
+    calendar: vi.fn(),
+    reschedule: vi.fn(),
+    calendarIdeas: vi.fn(),
+    createCalendarIdea: vi.fn(),
+    planIdea: vi.fn(),
+    dismissIdea: vi.fn(),
+    writeFromIdea: vi.fn(),
+    listProjects: vi.fn(),
+  },
 }));
 
 const toast = { success: vi.fn(), error: vi.fn() };
@@ -76,6 +85,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 7, 15, 12, 0, 0));
   respond([]);
+  api.calendarIdeas.mockResolvedValue({ planned: [], backlog: [] });
+  api.listProjects.mockResolvedValue([{ id: 1, name: "Pulse" }]);
 });
 
 afterEach(() => {
@@ -752,5 +763,69 @@ describe("the suggestions aside", () => {
     expect(screen.getByText("Hashnode")).toBeInTheDocument();
     // One post, not "1 posts".
     expect(screen.getByText("Learned from 1 post")).toBeInTheDocument();
+  });
+});
+
+describe("ideas on the calendar", () => {
+  const idea = (overrides = {}) => ({
+    id: 90,
+    project_id: 1,
+    project_name: "Pulse",
+    content_type: "tutorial",
+    headline: "Why retries are idempotent",
+    rationale: "",
+    planned_date: null,
+    ...overrides,
+  });
+
+  it("draws a planned idea on its day, dashed and writable", async () => {
+    api.calendarIdeas.mockResolvedValue({
+      planned: [idea({ planned_date: "2026-08-12" })],
+      backlog: [],
+    });
+    draw();
+    await screen.findByText("Why retries are idempotent");
+    expect(within(cell(12)).getByText("Why retries are idempotent")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Write a draft from/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("sends a planned idea back to the backlog", async () => {
+    api.calendarIdeas.mockResolvedValue({
+      planned: [idea({ planned_date: "2026-08-12" })],
+      backlog: [],
+    });
+    api.planIdea.mockResolvedValue(idea());
+    draw();
+    await screen.findByText("Why retries are idempotent");
+    await userEvent.click(screen.getByRole("button", { name: /back to the backlog/i }));
+    await waitFor(() => expect(api.planIdea).toHaveBeenCalledWith(90, null));
+  });
+
+  it("plans a backlog idea onto a chosen day", async () => {
+    api.calendarIdeas.mockResolvedValue({ planned: [], backlog: [idea()] });
+    api.planIdea.mockResolvedValue(idea({ planned_date: "2026-08-20" }));
+    draw();
+    await screen.findByText("Why retries are idempotent");
+    fireEvent.change(screen.getByLabelText(/Plan .* for a day/), {
+      target: { value: "2026-08-20" },
+    });
+    await waitFor(() => expect(api.planIdea).toHaveBeenCalledWith(90, "2026-08-20"));
+  });
+
+  it("adds a hand-written idea", async () => {
+    api.calendarIdeas.mockResolvedValue({ planned: [], backlog: [] });
+    api.createCalendarIdea.mockResolvedValue(idea());
+    draw();
+    const input = await screen.findByLabelText("New idea headline");
+    await userEvent.type(input, "A fresh idea");
+    await userEvent.click(screen.getByRole("button", { name: "Add idea" }));
+    await waitFor(() =>
+      expect(api.createCalendarIdea).toHaveBeenCalledWith({
+        project_id: 1,
+        headline: "A fresh idea",
+      }),
+    );
   });
 });

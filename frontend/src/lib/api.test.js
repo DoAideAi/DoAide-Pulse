@@ -505,6 +505,12 @@ describe("every endpoint's path and verb", () => {
 
     ["calendar", [], "/calendar", "GET"],
     ["reschedule", [3, { scheduled_for: null }], "/calendar/content/3", "PATCH"],
+    ["calendarIdeas", [], "/calendar/ideas", "GET"],
+    ["calendarIdeas", [{ start: "2026-10-01" }], "/calendar/ideas?start=2026-10-01", "GET"],
+    ["createCalendarIdea", [{ project_id: 1, headline: "h" }], "/calendar/ideas", "POST"],
+    ["planIdea", [4, "2026-10-30"], "/calendar/ideas/4", "PATCH"],
+    ["planIdea", [4, null], "/calendar/ideas/4", "PATCH"],
+    ["dismissIdea", [4], "/calendar/ideas/4", "DELETE"],
 
     ["dashboard", [], "/analytics/dashboard", "GET"],
     ["analytics", [], "/analytics/overview", "GET"],
@@ -517,7 +523,9 @@ describe("every endpoint's path and verb", () => {
     ["productActivity", [7], "/products/activity?days=7", "GET"],
     ["productActivity", [1, { refresh: true }], "/products/activity?days=1&refresh=true", "GET"],
     ["seoHealth", ["Asia/Kolkata"], "/seo/health?tz=Asia%2FKolkata", "GET"],
+    ["seoHealthHistory", [90], "/seo/health/history?days=90", "GET"],
     ["seoSitemaps", [], "/seo/sitemaps", "GET"],
+    ["seoSitemapRuns", [], "/seo/sitemaps/runs", "GET"],
     ["submitSitemaps", [], "/seo/sitemaps/submit", "POST"],
     ["submitSitemaps", ["gst"], "/seo/sitemaps/submit?site=gst", "POST"],
     ["seoAudit", [], "/seo/audit", "GET"],

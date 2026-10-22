@@ -80,6 +80,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.reviewQueue.mockResolvedValue([]);
   api.listContent.mockResolvedValue([]);
+  // The dashboard's setup checklist asks which platforms are connected.
+  api.platforms.mockResolvedValue([]);
 });
 
 describe("the analytics page", () => {
@@ -229,7 +231,8 @@ describe("the dashboard", () => {
 
     await draw(<Dashboard />);
 
-    expect(screen.getByText("Nothing written yet")).toBeInTheDocument();
+    // An empty account gets the first-run checklist where the stats would be.
+    expect(screen.getByText("Get your first post out")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

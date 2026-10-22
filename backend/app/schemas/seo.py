@@ -40,6 +40,37 @@ class SitemapsOut(BaseModel):
     sites: list[SitemapOut]
 
 
+class SitemapRunOut(BaseModel):
+    id: int
+    #: ``scheduled`` (the weekly beat job) or ``manual`` (the dashboard button).
+    trigger: str
+    sites_checked: int
+    sites_submitted: int
+    problems: list[dict]
+    ran_at: datetime
+
+
+class SitemapRunsOut(BaseModel):
+    #: Newest first.
+    runs: list[SitemapRunOut]
+
+
+class HealthHistoryDayOut(BaseModel):
+    date: date
+    sites: int
+    sitemaps_submitted: int
+    sitemap_problems: int
+    urls_in_sitemaps: int
+    indexed_pages: int
+    meta_issues: int
+
+
+class SeoHealthHistoryOut(BaseModel):
+    days: int
+    #: Oldest first — ready to chart.
+    points: list[HealthHistoryDayOut]
+
+
 class LinkSuggestionsIn(BaseModel):
     """A draft, saved or not — the editor asks while the author is typing."""
 

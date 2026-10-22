@@ -58,3 +58,7 @@ docs/pulse-seo-features.js
 # Environment
 .env*
 !.env.example
+
+# Local dev config
+.claude/
+vite.preview.local.mjs

@@ -224,6 +224,12 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.seo_tasks.submit_sitemaps",
         "schedule": crontab(day_of_week="1", hour="2", minute="30"),
     },
+    "record-seo-snapshot": {
+        # Nightly, late UTC, so each calendar day closes with its point on the
+        # health-over-time chart even in weeks where no sweep ran that day.
+        "task": "app.tasks.seo_tasks.record_seo_snapshot",
+        "schedule": crontab(hour="23", minute="45"),
+    },
     "audit-meta-tags": {
         # After the sitemaps are resubmitted, so it reads the same URL list.
         "task": "app.tasks.seo_tasks.audit_meta_tags",

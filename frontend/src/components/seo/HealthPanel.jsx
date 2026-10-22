@@ -13,6 +13,7 @@ import {
   toneClass,
 } from "../../lib/seo";
 import { ErrorBanner, SectionHeader, Skeleton, Stat } from "../ui/Bits";
+import { MultiLineChart } from "../ui/Charts";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -23,6 +24,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  */
 export default function HealthPanel() {
   const state = useApi(() => api.seoHealth(browserZone()), []);
+  const history = useApi(() => api.seoHealthHistory(90), []);
   const data = state.data;
 
   return (
@@ -46,6 +48,8 @@ export default function HealthPanel() {
             />
             <Stat label="Meta tag issues" value={formatCount(data.totals.meta_issues)} hint="latest audit" />
           </div>
+
+          <HealthOverTime history={history} />
 
           <section aria-label="Sites" className="space-y-3">
             <SectionHeader title="By site" subtitle={`Updated ${formatWhen(data.generated_at)}`} />
@@ -122,6 +126,74 @@ export default function HealthPanel() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * How the estate's footing moved: one point per day, written nightly and by
+ * every sweep. Two charts rather than one — URL counts live in the hundreds
+ * while problems live near zero, and one shared scale would flatten the line
+ * that matters into the baseline.
+ */
+function HealthOverTime({ history }) {
+  const points = history.data?.points ?? [];
+  return (
+    <section aria-label="Health over time" className="space-y-3">
+      <SectionHeader
+        title="Health over time"
+        subtitle="Daily snapshots, last 90 days. New points appear nightly and after each sweep."
+      />
+      <ErrorBanner message={history.error} onRetry={history.reload} />
+      {history.loading && !history.data && <Skeleton rows={3} />}
+      {history.data && points.length < 2 && (
+        <p className="rounded-lg border border-line bg-canvas px-4 py-3 text-sm text-ink-500">
+          Not enough snapshots yet — the chart starts drawing after two days of data.
+        </p>
+      )}
+      {points.length >= 2 && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="panel p-5">
+            <h3 className="mb-3 text-sm font-semibold text-ink-900">Pages in search</h3>
+            <MultiLineChart
+              label="Pages in search"
+              series={[
+                {
+                  key: "urls",
+                  label: "URLs in sitemaps",
+                  points: points.map((p) => ({ label: p.date, value: p.urls_in_sitemaps })),
+                },
+                {
+                  key: "indexed",
+                  label: "Indexed (Google)",
+                  points: points.map((p) => ({ label: p.date, value: p.indexed_pages })),
+                },
+              ]}
+              formatValue={formatCount}
+            />
+          </div>
+          <div className="panel p-5">
+            <h3 className="mb-3 text-sm font-semibold text-ink-900">Problems</h3>
+            <MultiLineChart
+              label="Problems"
+              series={[
+                {
+                  key: "meta",
+                  label: "Meta tag issues",
+                  points: points.map((p) => ({ label: p.date, value: p.meta_issues })),
+                },
+                {
+                  key: "sitemap",
+                  label: "Sitemap problems",
+                  points: points.map((p) => ({ label: p.date, value: p.sitemap_problems })),
+                },
+              ]}
+              formatValue={formatCount}
+              emptyHint="No problems recorded in this window — as it should be."
+            />
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

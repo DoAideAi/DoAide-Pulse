@@ -1,7 +1,7 @@
 """Content, publication and calendar schemas."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -904,6 +904,42 @@ class CalendarOut(BaseModel):
     entries: list[CalendarEntry] = []
     cadence: list[CadenceGuideOut] = []
     suggested_slots: list[datetime] = []
+
+
+class CalendarIdeaOut(BaseModel):
+    """An unwritten idea as the calendar shows it — planned on a day or in the backlog."""
+
+    id: int
+    project_id: int
+    project_name: str
+    content_type: ContentType
+    headline: str
+    rationale: str = ""
+    planned_date: date | None = None
+
+
+class CalendarIdeasOut(BaseModel):
+    #: Ideas planned onto a day inside the requested window, soonest first.
+    planned: list[CalendarIdeaOut] = []
+    #: Unplanned ideas, newest first, capped — the pool to plan from.
+    backlog: list[CalendarIdeaOut] = []
+
+
+class CalendarIdeaCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    project_id: BoundedId
+    headline: str = Field(min_length=3, max_length=300)
+    content_type: ContentType = ContentType.TUTORIAL
+    planned_date: date | None = None
+
+
+class CalendarIdeaPlan(BaseModel):
+    """Set or clear the day an idea is planned for."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    planned_date: date | None = None
 
 
 class PreviewLinkCreate(BaseModel):

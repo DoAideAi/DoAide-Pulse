@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from app.database import SessionLocal
-from app.services import meta_audit, sitemaps
+from app.services import meta_audit, seo_history, sitemaps
 from app.tasks.celery_app import task
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,8 @@ def submit_sitemaps() -> dict:
     db = SessionLocal()
     try:
         rows = sitemaps.check(db)
+        seo_history.record_run(db, "scheduled", rows)
+        seo_history.record_snapshot(db)
         failed = [r.site_key for r in rows if r.fetch_error or r.submit_status == "error"]
         if failed:
             logger.warning("sitemaps: problems on %s", ", ".join(failed))
@@ -44,6 +46,27 @@ def audit_meta_tags() -> dict:
     db = SessionLocal()
     try:
         rows = meta_audit.run(db)
+        seo_history.record_snapshot(db)
         return {"audited": len(rows), "issues": sum(r.issue_count for r in rows)}
+    finally:
+        db.close()
+
+
+@task(
+    name="app.tasks.seo_tasks.record_seo_snapshot",
+    soft_time_limit=60,
+    time_limit=90,
+)
+def record_seo_snapshot() -> dict:
+    """The nightly backstop for the health-over-time chart.
+
+    The sweeps write a snapshot when they run, but they run weekly; without
+    this, the chart would have one point a week and flat interpolation would
+    pass for data. Reads only what Pulse already stored — no network.
+    """
+    db = SessionLocal()
+    try:
+        row = seo_history.record_snapshot(db)
+        return {"date": row.snapshot_date.isoformat(), "urls": row.urls_in_sitemaps}
     finally:
         db.close()

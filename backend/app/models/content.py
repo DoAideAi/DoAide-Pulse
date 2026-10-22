@@ -8,13 +8,14 @@ from __future__ import annotations
 
 # Imported at runtime, not under TYPE_CHECKING: SQLAlchemy 2.0 resolves the
 # `Mapped[...]` annotations at class-definition time and needs the real name.
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -506,6 +507,9 @@ class ContentIdea(Base, TimestampMixin):
     #: Set once the idea has been turned into a piece, so it stops being
     #: suggested. Not a FK — an idea outlives the draft that a user deletes.
     used_content_id: Mapped[int | None] = mapped_column(Integer)
+    #: The day the user plans to write it, set from the content calendar.
+    #: Null means the idea sits in the backlog, not on a day.
+    planned_date: Mapped[date | None] = mapped_column(Date, index=True)
 
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<ContentIdea id={self.id} headline={self.headline!r}>"

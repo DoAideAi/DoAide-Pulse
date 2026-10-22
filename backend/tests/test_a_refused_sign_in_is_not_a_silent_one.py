@@ -184,7 +184,7 @@ def test_a_refused_registration_says_which_refusal_it_was(client, monkeypatch, c
     warnings = _lines(caplog, logging.WARNING)
     assert len(warnings) == 1
     assert "registration refused" in warnings[0]
-    assert "Registration is closed." in warnings[0]
+    assert "Registration is currently closed." in warnings[0]
 
 
 def test_a_wrong_invite_token_is_distinguishable_in_the_log(client, monkeypatch, caplog):

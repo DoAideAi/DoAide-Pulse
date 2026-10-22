@@ -12,6 +12,7 @@ import { ErrorBanner, SectionHeader, Skeleton } from "../ui/Bits";
  */
 export default function SitemapsPanel() {
   const state = useApi(() => api.seoSitemaps(), []);
+  const runsState = useApi(() => api.seoSitemapRuns(), []);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
 
@@ -20,6 +21,7 @@ export default function SitemapsPanel() {
     setError(null);
     try {
       state.setData(await api.submitSitemaps(site));
+      runsState.reload();
     } catch (err) {
       setError(err.message || String(err));
     } finally {
@@ -108,6 +110,75 @@ export default function SitemapsPanel() {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <SubmissionHistory state={runsState} />
+    </section>
+  );
+}
+
+/**
+ * The automated submission's status page: one row per sweep, scheduled or
+ * manual, with what went wrong. Without this, a later manual submit of one
+ * site overwrites the only evidence Monday's run left behind.
+ */
+function SubmissionHistory({ state }) {
+  const runs = state.data?.runs ?? [];
+  return (
+    <section aria-label="Submission history" className="space-y-3 pt-2">
+      <SectionHeader
+        title="Submission history"
+        subtitle="Every sweep — the scheduled Monday run and manual submits."
+      />
+      <ErrorBanner message={state.error} onRetry={state.reload} />
+      {state.loading && !state.data && <Skeleton rows={3} />}
+      {state.data && runs.length === 0 && (
+        <p className="text-sm text-ink-500">
+          No sweeps recorded yet. The next scheduled run is Monday 02:30 UTC; pressing
+          Submit also records one.
+        </p>
+      )}
+      {runs.length > 0 && (
+        <div className="panel overflow-x-auto">
+          <table className="w-full min-w-[560px] text-sm">
+            <thead>
+              <tr className="border-b border-line text-left">
+                <th className="cell eyebrow">When</th>
+                <th className="cell eyebrow">Trigger</th>
+                <th className="cell eyebrow text-right">Checked</th>
+                <th className="cell eyebrow text-right">Submitted</th>
+                <th className="cell eyebrow">Problems</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {runs.map((run) => (
+                <tr key={run.id}>
+                  <td className="cell text-xs text-ink-500">{formatWhen(run.ran_at)}</td>
+                  <td className="cell">
+                    <span className={`badge ${run.trigger === "scheduled" ? "bg-brand-50 text-brand-600" : "bg-canvas text-ink-500"}`}>
+                      {run.trigger}
+                    </span>
+                  </td>
+                  <td className="cell text-right font-mono">{run.sites_checked}</td>
+                  <td className="cell text-right font-mono">{run.sites_submitted}</td>
+                  <td className="cell">
+                    {run.problems.length === 0 ? (
+                      <span className="text-xs text-good">none</span>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {run.problems.map((p) => (
+                          <li key={p.site_key} className="text-xs text-bad">
+                            <span className="font-mono">{p.site_key}</span> — {p.error}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

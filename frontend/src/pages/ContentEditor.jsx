@@ -1178,6 +1178,7 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
                 <img
                   src={url}
                   alt={`Marketing image ${index + 1}`}
+                  loading="lazy"
                   draggable={false}
                   className="aspect-square w-full rounded-lg border border-line object-cover"
                 />
