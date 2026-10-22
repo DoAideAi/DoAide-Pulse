@@ -1190,6 +1190,29 @@ describe("sharing a preview link", () => {
     expect(screen.getByText(/Shown once/)).toBeInTheDocument();
   });
 
+  it("offers the new link for sharing on WhatsApp", async () => {
+    api.listPreviewLinks.mockResolvedValue([]);
+    api.createPreviewLink.mockResolvedValue({
+      id: 9,
+      url: "https://pulse.example.com/preview/abc123",
+      expires_at: "2026-08-16T10:00:00Z",
+      revoked_at: null,
+      view_count: 0,
+      last_viewed_at: null,
+    });
+    draw();
+    await screen.findByDisplayValue("Saved title");
+
+    await userEvent.click(screen.getByRole("button", { name: "New link" }));
+
+    const link = await screen.findByTestId("preview-whatsapp");
+    expect(link.getAttribute("href")).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    expect(decodeURIComponent(link.getAttribute("href"))).toContain(
+      "https://pulse.example.com/preview/abc123",
+    );
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
   it("copies the link to the clipboard", async () => {
     api.listPreviewLinks.mockResolvedValue([]);
     api.createPreviewLink.mockResolvedValue({

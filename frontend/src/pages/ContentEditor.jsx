@@ -1344,6 +1344,13 @@ function LinksPanel({ contentId }) {
  * creating it: a link in the list below is shown as "issued" and "revoke",
  * never re-copyable, because the server only ever stored its hash.
  */
+/** A wa.me link that pre-fills a review request around a preview URL. */
+export function whatsappShareUrl(url) {
+  return `https://wa.me/?text=${encodeURIComponent(
+    `Could you take a look at this draft before it goes out? ${url}`,
+  )}`;
+}
+
 function PreviewLinksPanel({ contentId }) {
   const toast = useToast();
   const { data: links, loading, reload } = useApi(
@@ -1412,13 +1419,24 @@ function PreviewLinksPanel({ contentId }) {
 
       {justCreated && (
         <div className="rounded-lg border border-line bg-canvas px-3 py-2">
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 break-all font-mono text-[11px] text-ink-700">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="min-w-0 basis-full break-all sm:basis-0 sm:flex-1 font-mono text-[11px] text-ink-700">
               {justCreated.url}
             </code>
             <button className="btn-quiet shrink-0" onClick={() => copy(justCreated.url)}>
               Copy
             </button>
+            {/* Reviewers are as often a phone away as an inbox away; wa.me
+                opens the app on mobile and WhatsApp Web on a desktop. */}
+            <a
+              className="btn-quiet shrink-0"
+              href={whatsappShareUrl(justCreated.url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="preview-whatsapp"
+            >
+              WhatsApp
+            </a>
             {/* The list below deliberately excludes this link, so without a
                 revoke here a URL created by mistake — pasted into the wrong
                 chat, say — cannot be taken back until the page is reloaded.
