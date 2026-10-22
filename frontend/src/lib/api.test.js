@@ -523,6 +523,8 @@ describe("every endpoint's path and verb", () => {
     ["seoAudit", [], "/seo/audit", "GET"],
     ["runSeoAudit", [], "/seo/audit", "POST"],
     ["runSeoAudit", ["gst"], "/seo/audit?site=gst", "POST"],
+    ["seoTraffic", [30], "/seo/traffic?days=30", "GET"],
+    ["seoTraffic", [7, { refresh: true }], "/seo/traffic?days=7&refresh=true", "GET"],
     ["seoPosts", [], "/seo/posts", "GET"],
     ["seoLinkSuggestions", [{ title: "t" }], "/seo/link-suggestions", "POST"],
     ["seoOptimalSlots", [["devto", "hashnode"]], "/seo/optimal-slots?platforms=devto&platforms=hashnode", "GET"],

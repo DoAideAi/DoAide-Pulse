@@ -26,6 +26,7 @@ from app.schemas.seo import (
     MetaAuditOut,
     SeoHealthOut,
     SeoPostOut,
+    SeoTrafficOut,
     SitemapsOut,
 )
 from app.services import (
@@ -35,6 +36,7 @@ from app.services import (
     seo_health,
     seo_posts,
     seo_sites,
+    seo_traffic,
     sitemaps,
 )
 
@@ -161,6 +163,24 @@ def run_audit(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown site.")
     meta_audit.run(db, [seo_sites.BY_KEY[site]])
     return _audit_payload(db)
+
+
+# ---- traffic (Umami) ----
+
+
+@router.get(
+    "/traffic",
+    response_model=SeoTrafficOut,
+    summary="Which pages and referrers bring visitors to each DoAide site",
+    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN),
+)
+def traffic(
+    days: int = Query(default=30, ge=1, le=90),
+    refresh: bool = Query(default=False, description="Skip the Umami cache."),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_product_admin),
+) -> dict:
+    return seo_traffic.traffic(db, user.id, days=days, force=refresh)
 
 
 # ---- SEO posts ----

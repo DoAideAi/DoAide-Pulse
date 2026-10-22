@@ -184,3 +184,54 @@ class MetaAuditOut(BaseModel):
 
 class AuditQueuedOut(BaseModel):
     queued: bool
+
+
+class TrafficPageOut(BaseModel):
+    path: str
+    url: str
+    views: int
+    #: A Pulse piece lives here, or the path is under a blog-like prefix.
+    is_content: bool
+    content_id: int | None = None
+    title: str | None = None
+
+
+class TopContentOut(TrafficPageOut):
+    site_key: str
+    domain: str
+
+
+class ReferrerOut(BaseModel):
+    referrer: str
+    visits: int
+    search: bool
+
+
+class SiteTrafficOut(BaseModel):
+    key: str
+    name: str
+    domain: str
+    #: ``ok``, ``not_found`` (no Umami site for the domain) or ``error``.
+    status: str
+    error: str | None = None
+    pageviews: int = 0
+    visitors: int = 0
+    search_visits: int = 0
+    top_pages: list[TrafficPageOut] = []
+    referrers: list[ReferrerOut] = []
+
+
+class TrafficTotalsOut(BaseModel):
+    pageviews: int
+    visitors: int
+    search_visits: int
+
+
+class SeoTrafficOut(BaseModel):
+    days: int
+    generated_at: datetime
+    umami_configured: bool
+    umami_error: str | None = None
+    totals: TrafficTotalsOut
+    sites: list[SiteTrafficOut]
+    top_content: list[TopContentOut]

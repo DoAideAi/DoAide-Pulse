@@ -277,6 +277,9 @@ export const api = {
   // One `site` audits in the request and returns the whole report; no site
   // queues every site on the worker and returns `{queued: true}`.
   runSeoAudit: (site = null) => request(`/seo/audit${qs({ site })}`, { method: "POST" }),
+  // Umami, read by the API. `refresh` skips its short cache.
+  seoTraffic: (days, { refresh = false } = {}) =>
+    request(`/seo/traffic${qs({ days, refresh: refresh ? "true" : null })}`),
   // SEO posts are ordinary pieces tagged `seo`; these are the parts the
   // content endpoints do not already cover.
   seoPosts: () => request("/seo/posts"),

@@ -134,6 +134,15 @@ def _site_ids(client: UmamiClient) -> dict[str, str]:
     return mapping
 
 
+def website_ids(client: UmamiClient) -> dict[str, str]:
+    """Umami's ``domain → website id`` map, cached as the dashboard caches it.
+
+    Public for the SEO traffic view, which reads the same Umami for a different
+    list of sites and should not list them a second time.
+    """
+    return _site_ids(client)
+
+
 def resolve_website_id(product: Product, sites: dict[str, str]) -> str:
     """Override, then Umami's own record for the domain, then the catalog."""
     override = product_catalog.website_id_overrides(settings.umami_website_ids)

@@ -173,3 +173,13 @@ export function shortPath(url, domain) {
     return url;
   }
 }
+
+/** Windows the traffic view offers. The API accepts 1..90. */
+export const TRAFFIC_WINDOWS = [7, 30, 90];
+
+/** Search-engine visits as a share of all referred visits, or null. */
+export function searchShare(site) {
+  const referred = (site?.referrers || []).reduce((n, r) => n + r.visits, 0);
+  if (!referred) return null;
+  return site.search_visits / referred;
+}

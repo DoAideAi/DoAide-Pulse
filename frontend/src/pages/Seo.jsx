@@ -4,6 +4,7 @@ import AuditPanel from "../components/seo/AuditPanel";
 import HealthPanel from "../components/seo/HealthPanel";
 import SeoPostsPanel from "../components/seo/SeoPostsPanel";
 import SitemapsPanel from "../components/seo/SitemapsPanel";
+import TrafficPanel from "../components/seo/TrafficPanel";
 
 /**
  * SEO across every DoAide site. One page, one panel per job, the open one
@@ -14,6 +15,7 @@ export const SEO_TABS = [
   { key: "sitemaps", label: "Sitemaps", Panel: SitemapsPanel },
   { key: "posts", label: "Posts", Panel: SeoPostsPanel },
   { key: "audit", label: "Meta audit", Panel: AuditPanel },
+  { key: "traffic", label: "Traffic", Panel: TrafficPanel },
 ];
 
 export default function Seo() {

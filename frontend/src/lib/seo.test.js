@@ -9,6 +9,7 @@ import {
   postLabel,
   postTone,
   rankedCounts,
+  searchShare,
   shortPath,
   sortAudits,
   sitemapState,
@@ -167,5 +168,20 @@ describe("audit helpers", () => {
     expect(shortPath("https://gst.doaide.com/blog?x=1", "gst.doaide.com")).toBe("/blog?x=1");
     expect(shortPath("https://other.test/a", "gst.doaide.com")).toBe("https://other.test/a");
     expect(shortPath("not a url", "gst.doaide.com")).toBe("not a url");
+  });
+});
+
+describe("searchShare", () => {
+  it("is search visits over referred visits", () => {
+    expect(
+      searchShare({
+        search_visits: 75,
+        referrers: [
+          { referrer: "google.com", visits: 75, search: true },
+          { referrer: "t.co", visits: 25, search: false },
+        ],
+      }),
+    ).toBe(0.75);
+    expect(searchShare({ search_visits: 0, referrers: [] })).toBeNull();
   });
 });
