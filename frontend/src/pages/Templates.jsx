@@ -20,6 +20,7 @@ import {
   undeclaredIn,
   unusedVariables,
 } from "../lib/templates";
+import { STARTER_TEMPLATES } from "../lib/starterTemplates";
 import { CONTENT_TYPES } from "../lib/triggers";
 
 /**
@@ -84,6 +85,8 @@ export default function Templates() {
 
       <ErrorBanner message={error} onRetry={reload} />
 
+      <QuickStart onPick={setEditing} />
+
       {loading && !templates ? (
         <Skeleton rows={3} />
       ) : templates?.length === 0 ? (
@@ -136,6 +139,35 @@ export default function Templates() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Three cadence starters above the list. Picking one opens the editor already
+ * filled in, so the user reviews and saves a copy instead of facing a blank form.
+ */
+function QuickStart({ onPick }) {
+  return (
+    <section aria-labelledby="quick-start-title" className="space-y-3">
+      <h2 id="quick-start-title" className="eyebrow">
+        Quick start
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {STARTER_TEMPLATES.map((starter) => (
+          <button
+            key={starter.key}
+            type="button"
+            onClick={() => onPick(starter)}
+            className="panel flex min-h-[48px] flex-col items-start gap-1 p-4 text-left transition-shadow hover:shadow-lift"
+            aria-label={`Start from ${starter.name}`}
+          >
+            <span className="chip">{starter.cadence}</span>
+            <span className="mt-1 text-sm font-medium text-ink-900">{starter.name}</span>
+            <span className="text-xs text-ink-500">{starter.description}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -286,7 +318,8 @@ function TemplateDialog({ template, projects, builtins, onClose, onSaved, onErro
     setBusy(true);
     try {
       const payload = payloadFromForm(form);
-      if (template) await api.updateTemplate(template.id, payload);
+      // A starter has no id: saving it makes the user's own copy.
+      if (template?.id) await api.updateTemplate(template.id, payload);
       else await api.createTemplate(payload);
       onSaved();
     } catch (err) {
@@ -298,13 +331,13 @@ function TemplateDialog({ template, projects, builtins, onClose, onSaved, onErro
 
   return (
     <Dialog
-      label={template ? "Edit template" : "New template"}
+      label={template?.id ? "Edit template" : "New template"}
       onClose={onClose}
       width="3xl"
       onSubmit={submit}
     >
       <h2 className="font-display text-2xl text-ink-900">
-        {template ? "Edit template" : "New template"}
+        {template?.id ? "Edit template" : "New template"}
       </h2>
 
       <div className="grid gap-4 sm:grid-cols-2">

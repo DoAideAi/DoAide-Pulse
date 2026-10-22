@@ -640,6 +640,31 @@ describe("the editor, on the parts the live check does not cover", () => {
     expect(api.createTemplate.mock.calls[0][0].name).toBe("Release note");
   });
 
+  it("opens a quick-start starter filled in and saves it as a new template", async () => {
+    const user = userEvent.setup();
+    api.templateBuiltins.mockResolvedValue(
+      ["project.name", "project.url", "date.long", "signal.items"].map((name) => ({
+        name,
+        description: "",
+      })),
+    );
+    api.createTemplate.mockResolvedValue(template({ id: 8 }));
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Start from Weekly check-in" }));
+    expect(screen.getByRole("heading", { name: "New template" })).toBeInTheDocument();
+    expect(templateName()).toHaveValue("Weekly check-in");
+    await user.click(screen.getByRole("button", { name: /save template/i }));
+
+    await waitFor(() => expect(api.createTemplate).toHaveBeenCalled());
+    expect(api.updateTemplate).not.toHaveBeenCalled();
+    expect(api.createTemplate.mock.calls[0][0]).toMatchObject({
+      name: "Weekly check-in",
+      mode: "prompt",
+      content_type: "changelog",
+    });
+  });
+
   it("closes, re-reads the list and says so on a successful save", async () => {
     const user = userEvent.setup();
     api.updateTemplate.mockResolvedValue(template());
