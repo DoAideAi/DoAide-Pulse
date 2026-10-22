@@ -81,4 +81,18 @@ describe("LandingPage", () => {
       expect(screen.getByText("See what your audience does")).toBeInTheDocument();
     });
   });
+
+  describe("no fabricated social proof", () => {
+    it("has no fabricated testimonials", () => {
+      wrap();
+      expect(screen.queryByText(/Trusted by newsletter creators/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Priya S\./)).not.toBeInTheDocument();
+    });
+
+    it("has no fabricated usage counters", () => {
+      wrap();
+      expect(screen.queryByText(/Newsletters sent/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Avg open rate/)).not.toBeInTheDocument();
+    });
+  });
 });

@@ -87,13 +87,6 @@ const PIPELINE_STAGES = [
   },
 ];
 
-const STATS = [
-  { value: "3x", label: "Higher engagement" },
-  { value: "10s", label: "To generate" },
-  { value: "42%", label: "Avg open rate" },
-  { value: "500+", label: "Newsletters sent" },
-];
-
 const FEATURES = [
   {
     title: "AI Content Research",
@@ -155,12 +148,6 @@ const FEATURES = [
       </svg>
     ),
   },
-];
-
-const TESTIMONIALS = [
-  { quote: "Pulse cut our newsletter production from 4 hours to 30 minutes. The AI research alone is worth it.", author: "Priya S.", role: "Founder, SaaS startup" },
-  { quote: "Our open rates jumped from 18% to 41% after switching to AI-optimized subject lines and send times.", author: "Rahul M.", role: "Marketing lead, D2C brand" },
-  { quote: "Finally a newsletter tool that understands Indian audiences. Regional language support is a game changer.", author: "Anita K.", role: "Content strategist" },
 ];
 
 function RobotFace({ size = 32, color }) {
@@ -262,22 +249,6 @@ function PipelineGraphic() {
   );
 }
 
-function StatsBar() {
-  return (
-    <div className="landing-stats">
-      {STATS.map((stat, i) => (
-        <Fragment key={stat.label}>
-          {i > 0 && <div className="landing-stats-divider" />}
-          <div className="landing-stat">
-            <span className="landing-stat-value">{stat.value}</span>
-            <span className="landing-stat-label">{stat.label}</span>
-          </div>
-        </Fragment>
-      ))}
-    </div>
-  );
-}
-
 function FeaturesGrid() {
   return (
     <div className="landing-features">
@@ -294,33 +265,6 @@ function FeaturesGrid() {
             <div className="landing-feature-icon">{f.icon}</div>
             <h3 className="landing-feature-title">{f.title}</h3>
             <p className="landing-feature-desc">{f.desc}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TestimonialsSection() {
-  return (
-    <div className="landing-testimonials">
-      <div className="landing-section-header">
-        <span className="landing-section-eyebrow">Social proof</span>
-        <h2 className="landing-section-title">Trusted by newsletter creators</h2>
-      </div>
-      <div className="landing-testimonials-grid">
-        {TESTIMONIALS.map((t) => (
-          <div key={t.author} className="landing-testimonial-card">
-            <p className="landing-testimonial-quote">&ldquo;{t.quote}&rdquo;</p>
-            <div className="landing-testimonial-author">
-              <div className="landing-testimonial-avatar">
-                {t.author.charAt(0)}
-              </div>
-              <div>
-                <div className="landing-testimonial-name">{t.author}</div>
-                <div className="landing-testimonial-role">{t.role}</div>
-              </div>
-            </div>
           </div>
         ))}
       </div>
@@ -746,12 +690,10 @@ export default function LandingPage() {
         </div>
       </main>
 
-      <StatsBar />
       <FeaturesGrid />
       <AnalyticsMockup />
       <ComparisonTable />
       <PricingSection />
-      <TestimonialsSection />
       <QuickLinks />
       <CtaSection />
 
