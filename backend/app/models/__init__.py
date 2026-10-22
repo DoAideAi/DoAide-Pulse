@@ -21,6 +21,7 @@ from app.models.product_event import ProductEvent
 from app.models.project import AutopilotMode, Project, Tone, slugify
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.revision import ContentRevision, RevisionSource
+from app.models.seo import SitemapStatus
 from app.models.subscriber import Subscriber
 from app.models.template import ContentTemplate, TemplateMode
 from app.models.translation import ContentTranslation, TranslationStatus
@@ -63,6 +64,7 @@ __all__ = [
     "Publication",
     "PublicationStatus",
     "RevisionSource",
+    "SitemapStatus",
     "Subscriber",
     "TemplateMode",
     "Tone",

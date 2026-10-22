@@ -404,6 +404,23 @@ class Settings(BaseSettings):
     # How long reported product events are kept before the daily sweep.
     product_event_retention_days: int = 90
 
+    # ---- SEO automation (the /seo page) ----
+    # A Google Cloud service account that has been added as an owner of the
+    # DoAide properties in Search Console. Either a path to its JSON key or the
+    # JSON itself; blank both and sitemaps are still fetched and counted, just
+    # not submitted.
+    gsc_service_account_file: str = ""
+    gsc_service_account_json: str = ""
+    # The Search Console property every sitemap is submitted under. Blank means
+    # one URL-prefix property per product (``https://gst.doaide.com/``); a
+    # domain property (``sc-domain:doaide.com``) covers every subdomain at once.
+    gsc_site_url: str = ""
+    gsc_timeout_seconds: float = 15.0
+    # How many URLs from each product's sitemap the meta-tag auditor fetches.
+    # Every page is one outbound request, and fourteen products share a sweep.
+    seo_audit_max_pages: int = 25
+    seo_audit_timeout_seconds: float = 10.0
+
     # ---- GitHub (project change monitoring) ----
     # A classic or fine-grained PAT with `repo` read. Optional: without it the
     # monitor still works against public repos at the anonymous rate limit
@@ -748,6 +765,7 @@ class Settings(BaseSettings):
         "llm_usage_retention_days",
         "activity_retention_days",
         "product_event_retention_days",
+        "seo_audit_max_pages",
         "umami_cache_seconds",
         "password_reset_token_ttl_minutes",
         "preview_link_default_ttl_hours",

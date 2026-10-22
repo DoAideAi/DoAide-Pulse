@@ -18,6 +18,7 @@ import Login from "./pages/Login";
 import NewsletterGallery from "./pages/NewsletterGallery";
 import PreviewPage from "./pages/PreviewPage";
 import ProductActivity from "./pages/ProductActivity";
+import Seo from "./pages/Seo";
 import Projects from "./pages/Projects";
 import Publish from "./pages/Publish";
 import Settings from "./pages/Settings";
@@ -168,6 +169,14 @@ export default function App() {
         element={
           <Protected>
             <ProductActivity />
+          </Protected>
+        }
+      />
+      <Route
+        path="/seo"
+        element={
+          <Protected>
+            <Seo />
           </Protected>
         }
       />

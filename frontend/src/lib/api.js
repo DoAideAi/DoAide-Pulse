@@ -261,6 +261,12 @@ export const api = {
   productActivity: (days, { refresh = false } = {}) =>
     request(`/products/activity${qs({ days, refresh: refresh ? "true" : null })}`),
 
+  // ---- SEO (every DoAide site; product admins only) ----
+  seoSitemaps: () => request("/seo/sitemaps"),
+  // Fetches and submits synchronously; `site` is one catalog key, or null for all.
+  submitSitemaps: (site = null) =>
+    request(`/seo/sitemaps/submit${qs({ site })}`, { method: "POST" }),
+
   // ---- triggers ----
   triggerKinds: () => request("/triggers/kinds"),
   listTriggers: (params = {}) => request(`/triggers${qs(params)}`),

@@ -76,6 +76,7 @@ celery_app = Celery(
         "app.tasks.digest_tasks",
         "app.tasks.webhook_tasks",
         "app.tasks.trigger_tasks",
+        "app.tasks.seo_tasks",
     ],
 )
 
@@ -215,6 +216,13 @@ celery_app.conf.beat_schedule = {
         # after a rotation the operator runs it by hand rather than waiting.
         "task": "app.tasks.maintenance_tasks.rewrap_credentials",
         "schedule": 86400.0,
+    },
+    "submit-sitemaps": {
+        # Weekly, early Monday UTC: Google re-reads a resubmitted sitemap within
+        # days, so more often buys nothing, and a product that shipped pages
+        # during the week is picked up before the next one starts.
+        "task": "app.tasks.seo_tasks.submit_sitemaps",
+        "schedule": crontab(day_of_week="1", hour="2", minute="30"),
     },
     "verify-platform-connections": {
         # Re-check stored credentials so a revoked token is noticed before

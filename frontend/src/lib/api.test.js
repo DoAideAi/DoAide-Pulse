@@ -516,6 +516,9 @@ describe("every endpoint's path and verb", () => {
     ["activitySummary", [7], "/activity/summary?days=7", "GET"],
     ["productActivity", [7], "/products/activity?days=7", "GET"],
     ["productActivity", [1, { refresh: true }], "/products/activity?days=1&refresh=true", "GET"],
+    ["seoSitemaps", [], "/seo/sitemaps", "GET"],
+    ["submitSitemaps", [], "/seo/sitemaps/submit", "POST"],
+    ["submitSitemaps", ["gst"], "/seo/sitemaps/submit?site=gst", "POST"],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],

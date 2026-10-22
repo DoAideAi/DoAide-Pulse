@@ -111,6 +111,7 @@ describe("the destinations", () => {
       "Publish",
       "Analytics",
       "Products",
+      "SEO",
       "Settings",
     ]);
   });
