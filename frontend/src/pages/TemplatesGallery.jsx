@@ -5,6 +5,7 @@ import DoAideFooter from "../components/DoAideFooter";
 import CrossProductLinks from "../components/CrossProductLinks";
 import trackEvent from "../lib/trackEvent";
 import { usePageMeta } from "../lib/pageMeta";
+import { PUBLIC_ROUTE_META } from "../data/publicRouteMeta";
 
 const TEMPLATES = [
   {
@@ -238,12 +239,7 @@ function TemplateCard({ template, isExpanded, onToggle }) {
 export default function TemplatesGallery() {
   const [expanded, setExpanded] = useState(null);
 
-  usePageMeta({
-    title: "Free Newsletter Templates | DoAide Pulse",
-    description:
-      "Browse free newsletter templates for marketing, product updates, digests, announcements, tutorials, and community roundups. Customize and send with DoAide Pulse.",
-    path: "/templates",
-  });
+  usePageMeta(PUBLIC_ROUTE_META["/templates"]);
 
   useEffect(() => {
     const ld = document.createElement("script");

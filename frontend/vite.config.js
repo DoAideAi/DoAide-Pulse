@@ -1,9 +1,38 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { PUBLIC_ROUTE_META } from "./src/data/publicRouteMeta.js";
+import { staticPosts } from "./src/data/blogPosts.js";
+import { prerenderRoutes, withPageMeta } from "./src/lib/prerenderHead.js";
+
+/**
+ * After the build, write `dist/<route>/index.html` for each public route with
+ * that route's title, description and canonical in the static head. See
+ * `src/lib/prerenderHead.js` for why.
+ */
+function prerenderHeads() {
+  let outDir;
+  return {
+    name: "pulse-prerender-heads",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const shell = readFileSync(join(outDir, "index.html"), "utf-8");
+      for (const meta of prerenderRoutes(PUBLIC_ROUTE_META, staticPosts)) {
+        const file = join(outDir, meta.path, "index.html");
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, withPageMeta(shell, meta));
+      }
+    },
+  };
+}
 
 // Proxy /api to the FastAPI backend during development.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), prerenderHeads()],
   build: {
     rollupOptions: {
       output: {

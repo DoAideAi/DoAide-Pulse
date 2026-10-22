@@ -6,6 +6,7 @@ import DoAideFooter from "../../components/DoAideFooter";
 import trackEvent from "../../lib/trackEvent";
 import { api } from "../../lib/api";
 import { usePageMeta } from "../../lib/pageMeta";
+import { PUBLIC_ROUTE_META } from "../../data/publicRouteMeta";
 
 const EXAMPLE_NICHES = [
   "SaaS marketing",
@@ -22,12 +23,7 @@ export default function ContentIdeaGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  usePageMeta({
-    title: "Free Content Idea Generator | DoAide Pulse",
-    description:
-      "Generate fresh content ideas for your newsletter or blog with AI. Free, no login required. Powered by DoAide Pulse.",
-    path: "/tools/content-idea-generator",
-  });
+  usePageMeta(PUBLIC_ROUTE_META["/tools/content-idea-generator"]);
 
   async function handleGenerate(e) {
     e.preventDefault();

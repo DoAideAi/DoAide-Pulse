@@ -7,6 +7,7 @@ import DoAideFooter from "../components/DoAideFooter";
 import trackEvent from "../lib/trackEvent";
 import "./LandingPage.css";
 import { usePageMeta } from "../lib/pageMeta";
+import { PUBLIC_ROUTE_META } from "../data/publicRouteMeta";
 
 const ACCENT = "#0D9488";
 
@@ -575,12 +576,7 @@ export default function LandingPage() {
     requestAnimationFrame(() => setVisible(true));
   }, []);
 
-  usePageMeta({
-    title: "DoAide Pulse — AI Newsletter Platform for Indian Businesses",
-    description:
-      "Create, publish, and grow AI-powered newsletters. Research, write, and optimize — all automated. Built for Indian businesses with multilingual support.",
-    path: "/",
-  });
+  usePageMeta(PUBLIC_ROUTE_META["/"]);
 
   useEffect(() => {
     const ld = document.createElement("script");

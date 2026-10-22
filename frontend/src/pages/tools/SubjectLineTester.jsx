@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import ShareButtons from "../../components/ShareButtons";
 import trackEvent from "../../lib/trackEvent";
 import { usePageMeta } from "../../lib/pageMeta";
+import { PUBLIC_ROUTE_META } from "../../data/publicRouteMeta";
 
 const POWER_WORDS = [
   "exclusive",
@@ -100,12 +101,7 @@ export default function SubjectLineTester() {
   const [text, setText] = useState("");
   const { score, tips } = scoreSubjectLine(text);
 
-  usePageMeta({
-    title: "Subject Line Tester | DoAide Pulse",
-    description:
-      "Score your email subject line on open-rate predictors — length, urgency, personalisation, spam words. Free, no signup.",
-    path: "/tools/subject-line-tester",
-  });
+  usePageMeta(PUBLIC_ROUTE_META["/tools/subject-line-tester"]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">

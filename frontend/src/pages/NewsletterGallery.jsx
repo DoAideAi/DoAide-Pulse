@@ -5,6 +5,7 @@ import DoAideFooter from "../components/DoAideFooter";
 import CrossProductLinks from "../components/CrossProductLinks";
 import trackEvent from "../lib/trackEvent";
 import { usePageMeta } from "../lib/pageMeta";
+import { PUBLIC_ROUTE_META } from "../data/publicRouteMeta";
 
 const NEWSLETTERS = [
   {
@@ -182,12 +183,7 @@ function NewsletterCard({ newsletter, isExpanded, onToggle }) {
 export default function NewsletterGallery() {
   const [expanded, setExpanded] = useState(null);
 
-  usePageMeta({
-    title: "Newsletter Gallery | DoAide Pulse",
-    description:
-      "Explore AI-generated newsletter examples across industries — technology, startups, design, e-commerce, engineering, and lifestyle. See what DoAide Pulse can create.",
-    path: "/gallery",
-  });
+  usePageMeta(PUBLIC_ROUTE_META["/gallery"]);
 
   useEffect(() => {
     const ld = document.createElement("script");
