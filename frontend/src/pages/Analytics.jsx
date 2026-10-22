@@ -42,6 +42,7 @@ export default function Analytics() {
   const trend = useApi(() => api.engagementTrend(days), [days]);
   const velocity = useApi(() => api.velocity(), []);
   const alerts = useApi(() => api.alerts(20), []);
+  const subscribers = useApi(() => api.subscriberGrowth(), []);
 
   if (overview.loading && !overview.data) {
     return (
@@ -134,6 +135,10 @@ export default function Analytics() {
 
       <Section name="velocity">
         <VelocityPanel velocity={velocity} />
+      </Section>
+
+      <Section name="subscribers">
+        <SubscriberPanel subscribers={subscribers} />
       </Section>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -682,6 +687,96 @@ function PublishingRhythm({ timeline }) {
           emptyHint="Nothing published in the last 30 days."
         />
       </div>
+    </section>
+  );
+}
+
+/**
+ * Newsletter sign-ups — the audience the writing accumulates, as opposed to
+ * the views it borrows from the platforms above.
+ *
+ * The chart draws the cumulative line rather than the per-day bars: sign-ups
+ * arrive in single digits, and a daily bar chart of ones and zeros reads as
+ * noise where the climbing line reads as the actual fact — how big the list
+ * is and whether it is still growing. The per-day counts still decide the
+ * 30-day figure next to it.
+ */
+function SubscriberPanel({ subscribers }) {
+  if (subscribers.loading && !subscribers.data) {
+    return (
+      <section>
+        <SectionHeader title="Subscribers" />
+        <Skeleton rows={3} />
+      </section>
+    );
+  }
+  if (subscribers.error) {
+    return (
+      <section>
+        <SectionHeader title="Subscribers" />
+        <ErrorBanner message={subscribers.error} onRetry={subscribers.reload} />
+      </section>
+    );
+  }
+
+  const { total, last_30_days, series, by_source } = subscribers.data;
+  if (total === 0) {
+    return (
+      <section>
+        <SectionHeader
+          title="Subscribers"
+          subtitle="Sign-ups collected by the embed widget and public article pages."
+        />
+        <Empty
+          title="No subscribers yet"
+          hint="Share a public article or put the embed widget on your site — sign-ups land here."
+        />
+      </section>
+    );
+  }
+
+  const maxSource = Math.max(...by_source.map((row) => row.count), 0);
+
+  return (
+    <section>
+      <SectionHeader
+        title="Subscribers"
+        subtitle="Sign-ups collected by the embed widget and public article pages."
+      />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-3">
+          <Stat label="Total subscribers" value={formatCount(total)} />
+          <Stat
+            label="Last 30 days"
+            value={formatCount(last_30_days)}
+            hint={last_30_days === 0 ? "no new sign-ups" : "new sign-ups"}
+          />
+        </div>
+        <div className="panel px-5 py-4 lg:col-span-2">
+          <AreaChart
+            label="Subscribers over time"
+            points={series.map((dayRow) => ({
+              label: dayRow.date,
+              value: dayRow.cumulative,
+            }))}
+            formatValue={formatCount}
+            emptyHint="No sign-ups in this window yet."
+          />
+        </div>
+      </div>
+      {by_source.length > 0 && (
+        <div className="panel mt-4 divide-y divide-line">
+          {by_source.map((row) => (
+            <BarRow
+              key={row.source}
+              label={titleize(row.source)}
+              value={row.count}
+              max={maxSource}
+              display={formatCount(row.count)}
+            />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

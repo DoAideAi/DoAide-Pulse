@@ -519,6 +519,7 @@ describe("every endpoint's path and verb", () => {
     ["velocity", [], "/analytics/velocity", "GET"],
     ["alerts", [5], "/analytics/alerts?limit=5", "GET"],
     ["pipeline", [], "/analytics/pipeline", "GET"],
+    ["subscriberGrowth", [30], "/analytics/subscribers?days=30", "GET"],
     ["activitySummary", [7], "/activity/summary?days=7", "GET"],
     ["productActivity", [7], "/products/activity?days=7", "GET"],
     ["productActivity", [1, { refresh: true }], "/products/activity?days=1&refresh=true", "GET"],

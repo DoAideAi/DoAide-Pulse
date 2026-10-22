@@ -1,5 +1,52 @@
 export const staticPosts = [
   {
+    slug: "how-to-start-email-newsletter-2026",
+    title: "How to Start an Email Newsletter in 2026: From Zero to First Issue",
+    description:
+      "A step-by-step guide to starting an email newsletter in 2026 — picking a niche and format, choosing a platform, setting up your list legally, writing the first issue, and getting your first 100 subscribers.",
+    published: "2026-10-23",
+    keywords: [
+      "how to start an email newsletter",
+      "start a newsletter 2026",
+      "newsletter for beginners",
+      "email newsletter guide",
+      "grow newsletter subscribers",
+      "newsletter platform setup",
+    ],
+    faqs: [
+      {
+        question: "How do I start an email newsletter with no audience?",
+        answer: "Start with the audience you already touch: your email signature, WhatsApp groups, LinkedIn connections, and existing customers. Publish a simple landing page describing what the newsletter delivers and to whom, ask the first 20 subscribers personally, and show up on a fixed schedule. The first 100 subscribers come from direct asks, not discovery.",
+      },
+      {
+        question: "How much does it cost to run a newsletter?",
+        answer: "Nothing to begin. DoAide Pulse, Kit, and Beehiiv all have free tiers that cover a small list, and a custom domain costs a few hundred rupees a year. Costs only appear when the list grows into the thousands — by which point the newsletter should be earning its keep through sales, sponsorships, or client work.",
+      },
+      {
+        question: "How often should a new newsletter publish?",
+        answer: "Pick the cadence you can sustain for six months, which for most people is weekly or fortnightly. Consistency beats frequency: a fortnightly issue that always arrives builds more trust than a daily one that stops in week three. You can always increase frequency once the habit and the content pipeline are solid.",
+      },
+      {
+        question: "Do I need a website to start a newsletter?",
+        answer: "No. Every major newsletter platform gives you a hosted sign-up page and a public archive. A website helps later — it collects search traffic that converts to subscribers — but plenty of five-figure newsletters run on nothing but a sign-up page and an archive.",
+      },
+      {
+        question: "What legal rules apply to newsletters in India?",
+        answer: "Collect addresses with actual consent (no bought lists, no auto-ticked boxes), identify yourself in every send, include a working unsubscribe link, and honour it promptly. If you process subscriber data digitally, the DPDP Act 2023 applies: state your purpose at collection, use the data only for that purpose, and delete it on request.",
+      },
+    ],
+    body: [
+      "Every newsletter you admire started the same way: one person, zero subscribers, and a first issue that went out to almost nobody. The difference between the newsletters that grew and the millions that quietly stopped is rarely talent — it is that the growers made a handful of structural decisions correctly before writing a word. This guide walks through those decisions in order: niche, format, platform, list setup, first issue, and first hundred subscribers.",
+      "Start with the intersection of what you know and who needs it. 'Marketing tips' is not a niche; 'weekly teardown of one D2C brand's email funnel' is. The test for a good niche is that you can name the specific person who would forward it — a role, not a demographic. Write down: who the reader is, what problem each issue solves for them, and what they would miss if you stopped publishing. That last answer becomes your sign-up page copy. If you cannot answer it, narrow the niche until you can.",
+      "Format and cadence are promises, so make ones you can keep. The three formats that work for beginners: the curated digest (five links with your two-sentence take on each — lowest effort, ideal for staying current in a field), the single-idea essay (one insight developed properly — builds authority fastest), and the teardown/case-study (one example analysed — most forwardable). Pick one format and a weekly or fortnightly cadence. The newsletter graveyard is full of ambitious daily publications; it contains very few boring-but-reliable fortnightly ones.",
+      "Choose a platform you will not outgrow in a year. The things that matter at zero subscribers: a free tier, a hosted sign-up page, a public archive (it collects search traffic), and automation for a welcome email. The things that will matter at five thousand: deliverability reputation, paid subscriptions or sponsorship tooling, and an export path that is not hostage-taking. DoAide Pulse covers the full arc with AI research and drafting plus Indian-language support; Kit and Beehiiv are strong English-first options; Substack trades tooling for simplicity and a recommendation network. All are free to start — pick one in an afternoon and move on, because platform deliberation is the most popular form of procrastination in this hobby.",
+      "Set the list up properly before the first address arrives. Use a custom domain if you can, and set up SPF, DKIM, and DMARC — your platform's docs walk you through the DNS records, it takes twenty minutes, and it is the single biggest deliverability lever you control. Write a welcome email that sends immediately on sign-up: what to expect, how often, one best-of link, and a one-question reply prompt ('what are you working on?') — replies train inbox providers to treat you as wanted mail. Collect consent honestly: no pre-ticked boxes, no imported contact dumps. A 200-address list that chose you outperforms a 2,000-address list that did not, in both engagement and legal safety.",
+      "The first issue should be issue #3, not issue #1. Write three issues before you announce anything: it proves the format is sustainable, gives new subscribers an archive to binge, and means your announcement links to evidence rather than intention. Keep the structure identical across issues — a recognisable shape is what turns readers into habitual openers. Subject lines earn the open: lead with the specific payoff ('The pricing mistake in Zomato's new tier'), not the issue number ('Newsletter #3'), and keep it under 50 characters so it survives mobile truncation.",
+      "The first 100 subscribers are recruited one at a time. In order of effectiveness: personally message 20 people who match your reader profile and ask them directly (expect 15 yeses); add the sign-up link to your email signature, LinkedIn headline, and WhatsApp status; post each issue's best insight natively on the platform where your readers already are, with the newsletter as the 'full version'; and answer questions in the communities your niche inhabits with genuinely useful replies, link in profile rather than spammed in-thread. Skip paid ads, giveaways, and subscriber-swap schemes at this stage — they fill the list with people who will never open, which poisons your deliverability for the readers who would.",
+      "Measure two numbers and ignore the rest for six months: open rate (above 40% means the niche and subject lines work; below 25% means one of them does not) and replies per issue (the strongest signal that you are useful rather than merely tolerated). When an issue earns replies, write more like that issue. After six months of consistent publishing you will have the three assets that compound: a predictable content pipeline, a deliverability reputation, and a few hundred people who open on sight. That is the foundation everything else — sponsorships, products, paid tiers — gets built on. Start this week: pick the niche tonight, set up the platform tomorrow, and send issue #1 to yourself by Sunday.",
+    ],
+  },
+  {
     slug: "free-seo-tools-india-2026",
     title: "Free SEO Tools for India in 2026: The Complete Toolkit",
     description:

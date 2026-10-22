@@ -54,7 +54,7 @@ describe("Blog", () => {
     );
     const titles = links.map((el) => el.textContent);
     const firstTitle = titles[0];
-    expect(firstTitle).toMatch(/Free SEO Tools for India|How to Improve Website SEO|Best AI Newsletter Platforms|Email Marketing in India|Content Curation Tools|Subject Lines That Get 40%|Free AI GST|Best Free Newsletter Tools|Deliverability Guide/);
+    expect(firstTitle).toMatch(/How to Start an Email Newsletter|Free SEO Tools for India|How to Improve Website SEO|Best AI Newsletter Platforms|Email Marketing in India|Content Curation Tools|Subject Lines That Get 40%|Free AI GST|Best Free Newsletter Tools|Deliverability Guide/);
   });
 
   it("shows the SEO guides", () => {

@@ -14,6 +14,7 @@ vi.mock("../lib/api", () => ({
     alerts: vi.fn(),
     pipeline: vi.fn(),
     activitySummary: vi.fn(),
+    subscriberGrowth: vi.fn(),
   },
 }));
 
@@ -215,6 +216,20 @@ beforeEach(() => {
     top_pages: [],
     top_actions: [],
     by_day: [],
+  });
+  api.subscriberGrowth.mockResolvedValue({
+    total: 42,
+    last_30_days: 5,
+    series: [
+      { date: "2026-07-27", count: 0, cumulative: 37 },
+      { date: "2026-07-28", count: 2, cumulative: 39 },
+      { date: "2026-07-29", count: 1, cumulative: 40 },
+      { date: "2026-07-30", count: 2, cumulative: 42 },
+    ],
+    by_source: [
+      { source: "embed", count: 30 },
+      { source: "article", count: 12 },
+    ],
   });
   api.alerts.mockResolvedValue({
     alerts: [
@@ -501,6 +516,7 @@ describe("a section that is slow or broken on its own", () => {
     api.engagementTrend.mockReturnValue(new Promise(() => {}));
     api.velocity.mockReturnValue(new Promise(() => {}));
     api.alerts.mockReturnValue(new Promise(() => {}));
+    api.subscriberGrowth.mockReturnValue(new Promise(() => {}));
     const { container } = draw();
 
     expect(screen.getByText("Analytics")).toBeInTheDocument();
@@ -761,5 +777,27 @@ describe("an alert row", () => {
     // reads as a finding, and this section is the one that most often has
     // nothing to report.
     expect(screen.queryByText("Needs attention")).not.toBeInTheDocument();
+  });
+});
+
+describe("subscribers", () => {
+  it("shows the list size, the 30-day figure, and the sources", async () => {
+    render(<MemoryRouter future={ROUTER_FUTURE}><Analytics /></MemoryRouter>);
+    expect(await screen.findByText("Total subscribers")).toBeInTheDocument();
+    expect(screen.getByText("42")).toBeInTheDocument();
+    expect(screen.getByText("Last 30 days")).toBeInTheDocument();
+    expect(screen.getByText("Embed")).toBeInTheDocument();
+    expect(screen.getByText("Article")).toBeInTheDocument();
+  });
+
+  it("says so when nobody has signed up yet", async () => {
+    api.subscriberGrowth.mockResolvedValue({
+      total: 0,
+      last_30_days: 0,
+      series: [],
+      by_source: [],
+    });
+    render(<MemoryRouter future={ROUTER_FUTURE}><Analytics /></MemoryRouter>);
+    expect(await screen.findByText("No subscribers yet")).toBeInTheDocument();
   });
 });

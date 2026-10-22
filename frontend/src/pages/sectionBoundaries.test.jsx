@@ -31,6 +31,7 @@ vi.mock("../lib/api", () => ({
     // threw "api.pipeline is not a function" and took the whole page down.
     pipeline: vi.fn(),
     activitySummary: vi.fn(),
+    subscriberGrowth: vi.fn(),
     dashboard: vi.fn(),
     readTime: vi.fn(),
     reviewQueue: vi.fn(),
@@ -137,6 +138,9 @@ describe("the analytics page", () => {
     });
     api.activitySummary.mockResolvedValue({
       days: 30, page_views: 0, actions: 0, top_pages: [], top_actions: [], by_day: [],
+    });
+    api.subscriberGrowth.mockResolvedValue({
+      total: 0, last_30_days: 0, series: [], by_source: [],
     });
   });
 

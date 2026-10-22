@@ -12,7 +12,7 @@ const wrap = () =>
   );
 
 describe("TemplatesGallery", () => {
-  it("renders all 11 template cards", () => {
+  it("renders all 15 template cards", () => {
     wrap();
     expect(screen.getByText("Marketing Campaign")).toBeInTheDocument();
     expect(screen.getByText("Product Update")).toBeInTheDocument();
@@ -23,17 +23,31 @@ describe("TemplatesGallery", () => {
     expect(screen.getByText("Weekly Roundup")).toBeInTheDocument();
     expect(screen.getByText("Event Invitation")).toBeInTheDocument();
     expect(screen.getByText("Feedback Request")).toBeInTheDocument();
+    expect(screen.getByText("Founder / Investor Update")).toBeInTheDocument();
+    expect(screen.getByText("Festive Sale")).toBeInTheDocument();
+    expect(screen.getByText("Hiring & Jobs Digest")).toBeInTheDocument();
+    expect(screen.getByText("Re-engagement")).toBeInTheDocument();
     const cards = screen.getAllByText("Use Template");
-    expect(cards).toHaveLength(11);
+    expect(cards).toHaveLength(15);
+  });
+
+  it("filters the grid by category", async () => {
+    const user = userEvent.setup();
+    wrap();
+    await user.click(screen.getByRole("tab", { name: "Promotion" }));
+    expect(screen.getAllByText("Use Template")).toHaveLength(2);
+    expect(screen.getByText("Festive Sale")).toBeInTheDocument();
+    expect(screen.queryByText("Product Update")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "All" }));
+    expect(screen.getAllByText("Use Template")).toHaveLength(15);
   });
 
   it("shows category badges for new templates", () => {
     wrap();
-    expect(screen.getByText("Onboarding")).toBeInTheDocument();
-    expect(screen.getByText("Launch")).toBeInTheDocument();
-    expect(screen.getByText("Digest")).toBeInTheDocument();
-    expect(screen.getByText("Events")).toBeInTheDocument();
-    expect(screen.getByText("Survey")).toBeInTheDocument();
+    // The filter tabs reuse the category names, so scope to the badges.
+    for (const name of ["Onboarding", "Launch", "Events", "Survey", "Updates", "Retention"]) {
+      expect(screen.getAllByText(name).length).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("expands and collapses a template preview", async () => {

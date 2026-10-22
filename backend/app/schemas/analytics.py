@@ -593,6 +593,38 @@ class DashboardOut(BaseModel):
     alerts: list[AlertOut] = []
 
 
+class SubscriberPointOut(BaseModel):
+    """Newsletter sign-ups on one day.
+
+    ``cumulative`` carries the running total including sign-ups before the
+    charted window, so the series' right-hand edge equals the account total.
+    """
+
+    date: str
+    count: int
+    cumulative: int
+
+
+class SubscriberSourceOut(BaseModel):
+    """Sign-ups attributed to one source (embed widget, article page, ...)."""
+
+    source: str
+    count: int
+
+
+class SubscriberGrowthOut(BaseModel):
+    """Newsletter audience growth for the analytics page.
+
+    Counts only — subscriber addresses never leave the table through this
+    endpoint.
+    """
+
+    total: int
+    last_30_days: int
+    series: list[SubscriberPointOut] = []
+    by_source: list[SubscriberSourceOut] = []
+
+
 __all__ = [
     "AlertOut",
     "AlertsOut",
@@ -616,6 +648,9 @@ __all__ = [
     "PlatformStatsOut",
     "ProjectStatsOut",
     "ReadTimeOut",
+    "SubscriberGrowthOut",
+    "SubscriberPointOut",
+    "SubscriberSourceOut",
     "TimelinePointOut",
     "TopContentOut",
     "TotalsOut",

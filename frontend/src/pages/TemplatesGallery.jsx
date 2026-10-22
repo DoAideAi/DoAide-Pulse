@@ -140,6 +140,54 @@ const TEMPLATES = [
       sections: ["Personal ask", "What we'll improve", "Take the survey CTA"],
     },
   },
+  {
+    id: "founder-update",
+    name: "Founder / Investor Update",
+    category: "Updates",
+    description: "Monthly founder update with metrics snapshot, wins and misses, asks, and runway — the format investors actually read to the end.",
+    preview: {
+      headerBg: "linear-gradient(135deg, #14B8A6 0%, #0F766E 100%)",
+      headerText: "October Update",
+      subhead: "Metrics, wins, and one ask",
+      sections: ["KPI snapshot table", "Wins / misses / learnings", "The ask"],
+    },
+  },
+  {
+    id: "festive-promotion",
+    name: "Festive Sale",
+    category: "Promotion",
+    description: "Festival-season promotion layout with countdown urgency, gift-guide product grid, and offer-code block — built for Diwali, Christmas, and year-end sales.",
+    preview: {
+      headerBg: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
+      headerText: "Festive Offers",
+      subhead: "Season's best deals inside",
+      sections: ["Countdown banner", "Gift guide grid", "Offer code block"],
+    },
+  },
+  {
+    id: "hiring-digest",
+    name: "Hiring & Jobs Digest",
+    category: "Digest",
+    description: "Role roundup for talent communities and company talent brands — open positions with location and stack tags, team spotlight, and referral CTA.",
+    preview: {
+      headerBg: "linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)",
+      headerText: "We're Hiring",
+      subhead: "6 open roles this month",
+      sections: ["Role cards with tags", "Team spotlight", "Refer a friend CTA"],
+    },
+  },
+  {
+    id: "re-engagement",
+    name: "Re-engagement",
+    category: "Retention",
+    description: "Win-back email for quiet subscribers — a what-you-missed recap, a one-click stay-subscribed button, and a graceful unsubscribe path that protects deliverability.",
+    preview: {
+      headerBg: "linear-gradient(135deg, #64748B 0%, #475569 100%)",
+      headerText: "Still With Us?",
+      subhead: "Here's what you missed",
+      sections: ["What you missed recap", "Stay subscribed button", "Preference center link"],
+    },
+  },
 ];
 
 const FAQS = [
@@ -236,8 +284,12 @@ function TemplateCard({ template, isExpanded, onToggle }) {
   );
 }
 
+const CATEGORIES = ["All", ...new Set(TEMPLATES.map((t) => t.category))];
+
 export default function TemplatesGallery() {
   const [expanded, setExpanded] = useState(null);
+  const [category, setCategory] = useState("All");
+  const shown = category === "All" ? TEMPLATES : TEMPLATES.filter((t) => t.category === category);
 
   usePageMeta(PUBLIC_ROUTE_META["/templates"]);
 
@@ -285,8 +337,26 @@ export default function TemplatesGallery() {
           </p>
         </div>
 
+        <div className="mb-8 flex flex-wrap justify-center gap-2" role="tablist" aria-label="Filter templates by category">
+          {CATEGORIES.map((c) => (
+            <button
+              key={c}
+              role="tab"
+              aria-selected={category === c}
+              onClick={() => setCategory(c)}
+              className={
+                category === c
+                  ? "rounded-full bg-brand-500 px-4 py-1.5 text-sm font-medium text-canvas"
+                  : "rounded-full border border-line bg-paper px-4 py-1.5 text-sm text-ink-500 transition hover:border-brand-500/40 hover:text-brand-500"
+              }
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+
         <div className="grid md:grid-cols-2 gap-6 mb-16">
-          {TEMPLATES.map((t) => (
+          {shown.map((t) => (
             <TemplateCard
               key={t.id}
               template={t}

@@ -36,6 +36,7 @@ from app.models.metrics import ContentMetric
 from app.models.mixins import as_aware, utcnow
 from app.models.project import Project
 from app.models.publication import Platform, Publication, PublicationStatus
+from app.models.subscriber import Subscriber
 
 #: Reading-time bands, in minutes, for "does length pay off here?". Bounds are
 #: inclusive upper edges; the last band is open-ended. Three bands rather than
@@ -1491,6 +1492,76 @@ def pipeline(db: Session, user_id: int) -> dict:
     }
 
 
+def subscriber_growth(db: Session, user_id: int, *, days: int = 90) -> dict:
+    """Newsletter sign-ups: total, last 30 days, per-day series, and sources.
+
+    Sign-ups arrive unauthenticated (see ``routers/viral.py``) and the widget
+    rarely attributes them to a project, so the pool is: subscribers on this
+    user's projects, plus the unattributed ones. Only counts leave this
+    function — addresses stay in the table.
+
+    Every day in the window is present, zeros included, for the same reason
+    :func:`engagement_trend` fills them: a gap reads as "no data", a zero reads
+    as "nobody signed up", and the chart must not let the first pass for the
+    second. ``cumulative`` starts from the count before the window, so the
+    right-hand edge of the chart equals ``total`` instead of understating it
+    for accounts older than the window.
+    """
+    owned = select(Project.id).where(Project.user_id == user_id)
+    mine = or_(Subscriber.project_id.is_(None), Subscriber.project_id.in_(owned))
+
+    total = db.execute(select(func.count()).select_from(Subscriber).where(mine)).scalar_one()
+
+    since = window_start(days)
+    last_30 = db.execute(
+        select(func.count())
+        .select_from(Subscriber)
+        .where(mine, Subscriber.created_at >= window_start(30))
+    ).scalar_one()
+
+    before = db.execute(
+        select(func.count())
+        .select_from(Subscriber)
+        .where(mine, Subscriber.created_at < since)
+    ).scalar_one()
+
+    per_day = dict(
+        db.execute(
+            select(func.date(Subscriber.created_at), func.count())
+            .where(mine, Subscriber.created_at >= since)
+            .group_by(func.date(Subscriber.created_at))
+        ).all()
+    )
+
+    series = []
+    running = before
+    day = since.date()
+    today = utcnow().date()
+    while day <= today:
+        # SQLite hands back strings from func.date(); Postgres hands back dates.
+        count = per_day.get(day, per_day.get(day.isoformat(), 0))
+        running += count
+        series.append({"date": day.isoformat(), "count": count, "cumulative": running})
+        day += timedelta(days=1)
+
+    by_source = [
+        {"source": source or "direct", "count": count}
+        for source, count in db.execute(
+            select(Subscriber.source, func.count())
+            .where(mine)
+            .group_by(Subscriber.source)
+            .order_by(func.count().desc())
+        ).all()
+    ]
+
+    return {
+        "total": total,
+        "last_30_days": last_30,
+        "series": series,
+        "by_source": by_source,
+    }
+
+
 __all__ = [
     "TOP_CONTENT_SORTS",
     "Totals",
@@ -1504,6 +1575,7 @@ __all__ = [
     "pipeline",
     "published_series",
     "read_time",
+    "subscriber_growth",
     "timeline",
     "top_content",
     "totals",

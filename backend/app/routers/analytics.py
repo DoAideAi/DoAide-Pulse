@@ -24,6 +24,7 @@ from app.schemas.analytics import (
     PlatformStatsOut,
     PublishedPointOut,
     ReadTimeOut,
+    SubscriberGrowthOut,
     TopContentOut,
     VelocityCurveDetailOut,
     VelocitySummaryOut,
@@ -45,6 +46,21 @@ def overview(
 ) -> dict:
     """Everything the analytics page needs, in one round trip."""
     return analytics_service.overview(db, user.id)
+
+
+@router.get(
+    "/subscribers",
+    response_model=SubscriberGrowthOut,
+    summary="Newsletter subscriber growth",
+    responses=errors(*AUTHENTICATED),
+)
+def subscriber_growth(
+    days: int = Query(default=90, ge=7, le=365),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Total sign-ups, the last 30 days, a per-day series, and sources."""
+    return analytics_service.subscriber_growth(db, user.id, days=days)
 
 
 @router.get(

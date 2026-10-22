@@ -267,6 +267,8 @@ export const api = {
   alerts: (limit) => request(`/analytics/alerts${qs({ limit })}`),
   // Content by status and publish success rates — where everything stands.
   pipeline: () => request("/analytics/pipeline"),
+  // Newsletter sign-ups: totals, per-day series, sources. Counts only.
+  subscriberGrowth: (days) => request(`/analytics/subscribers${qs({ days })}`),
   activitySummary: (days) => request(`/activity/summary${qs({ days })}`),
   // Every DoAide product's traffic (read from Umami by the API, never by the
   // browser) and the signups, logins and key actions the products reported.

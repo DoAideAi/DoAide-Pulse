@@ -400,9 +400,9 @@ def test_no_analytics_endpoint_still_answers_an_untyped_object():
     Twelve now — the three dashboard endpoints (published series, top content,
     platform breakdown) were added after; generation-cost was removed (cross-
     tenant leak — token spend is install-wide, served via /metrics). Thirteen with
-    the pipeline (content by status, publish success rates). The count is the
-    guard on the walk, so it moves when the surface does; what must not move is
-    ``untyped``.
+    the pipeline (content by status, publish success rates), fourteen with
+    subscriber growth. The count is the guard on the walk, so it moves when the
+    surface does; what must not move is ``untyped``.
     """
     from fastapi.routing import APIRoute
 
@@ -422,7 +422,7 @@ def test_no_analytics_endpoint_still_answers_an_untyped_object():
         if "analytics" in (route.tags or [])
     ]
 
-    assert len(analytics_routes) == 13
+    assert len(analytics_routes) == 14
     untyped = [r.path for r in analytics_routes if r.response_model is None]
     assert untyped == []
 
@@ -435,4 +435,8 @@ def test_the_models_reach_the_generated_schema(client):
 
     assert schema_ref["$ref"].endswith("OverviewOut")
     assert "OverviewOut" in spec["components"]["schemas"]
-    assert "TotalsOut" in spec["components"]["schemas"]
+    # Two schemas are named TotalsOut (analytics and product_activity), so
+    # FastAPI module-qualifies both; follow the ref rather than guess the name.
+    totals_ref = spec["components"]["schemas"]["OverviewOut"]["properties"]["totals"]["$ref"]
+    assert totals_ref.rsplit("/", 1)[-1] in spec["components"]["schemas"]
+    assert totals_ref.endswith("TotalsOut")
