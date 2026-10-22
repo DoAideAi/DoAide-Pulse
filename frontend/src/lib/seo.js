@@ -123,3 +123,30 @@ export function postLabel(post) {
   if (post.scheduled_for) return "Scheduled";
   return post.status === "draft" ? "Draft" : post.status.charAt(0).toUpperCase() + post.status.slice(1);
 }
+
+/**
+ * Lay the API's run of days out as week rows starting on Monday, padding the
+ * first row with nulls so each date sits under its weekday.
+ */
+export function calendarWeeks(days) {
+  if (!days?.length) return [];
+  const first = new Date(`${days[0].date}T00:00:00`);
+  const lead = (first.getDay() + 6) % 7; // Monday = 0
+  const cells = [...Array(lead).fill(null), ...days];
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    const week = cells.slice(i, i + 7);
+    while (week.length < 7) week.push(null);
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+/** The browser's IANA zone, for the calendar's day boundaries. */
+export function browserZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}

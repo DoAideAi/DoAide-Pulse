@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  browserZone,
+  calendarWeeks,
   indexedLabel,
   insertLink,
   metaLengthHint,
@@ -116,5 +118,25 @@ describe("post status", () => {
     expect(postLabel({ status: "draft" })).toBe("Draft");
     expect(postLabel({ status: "review" })).toBe("Review");
     expect(postTone({ status: "failed" })).toBe("bad");
+  });
+});
+
+describe("calendarWeeks", () => {
+  it("pads so each day sits under its weekday, Monday first", () => {
+    // 2026-10-22 is a Thursday.
+    const days = ["2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25", "2026-10-26"].map(
+      (date) => ({ date, posts: [] }),
+    );
+    const weeks = calendarWeeks(days);
+    expect(weeks).toHaveLength(2);
+    expect(weeks[0].slice(0, 3)).toEqual([null, null, null]);
+    expect(weeks[0][3].date).toBe("2026-10-22");
+    expect(weeks[1][0].date).toBe("2026-10-26");
+    expect(weeks[1].slice(1)).toEqual([null, null, null, null, null, null]);
+    expect(calendarWeeks([])).toEqual([]);
+  });
+
+  it("knows the browser's zone", () => {
+    expect(typeof browserZone()).toBe("string");
   });
 });

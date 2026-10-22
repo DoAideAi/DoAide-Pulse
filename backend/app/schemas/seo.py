@@ -1,7 +1,7 @@
 """Response models for the SEO automation endpoints (``/seo``)."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -83,3 +83,56 @@ class SeoPostOut(BaseModel):
     scheduled_for: datetime | None = None
     published_at: datetime | None = None
     created_at: datetime
+
+
+class HealthSiteOut(BaseModel):
+    key: str
+    name: str
+    domain: str
+    url: str
+    checked: bool
+    url_count: int | None = None
+    fetch_error: str | None = None
+    submit_status: str
+    submit_error: str | None = None
+    gsc_submitted: int | None = None
+    gsc_indexed: int | None = None
+    gsc_errors: int | None = None
+    checked_at: datetime | None = None
+    #: SEO posts published in the last 30 days by a project living on this site.
+    recent_posts: int
+    scheduled_posts: int
+
+
+class HealthTotalsOut(BaseModel):
+    sites: int
+    sitemaps_submitted: int
+    sitemap_problems: int
+    urls_in_sitemaps: int
+    indexed_pages: int
+    posts_published_30d: int
+    posts_scheduled: int
+
+
+class RecentSeoPostOut(SeoPostOut):
+    site_key: str | None = None
+
+
+class CalendarEntryOut(BaseModel):
+    id: int
+    title: str
+    status: str
+    when: datetime
+
+
+class CalendarDayOut(BaseModel):
+    date: date
+    posts: list[CalendarEntryOut]
+
+
+class SeoHealthOut(BaseModel):
+    generated_at: datetime
+    totals: HealthTotalsOut
+    sites: list[HealthSiteOut]
+    recent_posts: list[RecentSeoPostOut]
+    calendar: list[CalendarDayOut]

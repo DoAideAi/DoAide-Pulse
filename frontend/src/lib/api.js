@@ -267,6 +267,8 @@ export const api = {
     request(`/products/activity${qs({ days, refresh: refresh ? "true" : null })}`),
 
   // ---- SEO (every DoAide site; product admins only) ----
+  // Read from what Pulse stored — cheap. `tz` sets the calendar's day boundaries.
+  seoHealth: (tz) => request(`/seo/health${qs({ tz })}`),
   seoSitemaps: () => request("/seo/sitemaps"),
   // Fetches and submits synchronously; `site` is one catalog key, or null for all.
   submitSitemaps: (site = null) =>

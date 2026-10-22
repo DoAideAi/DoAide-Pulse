@@ -16,8 +16,21 @@ from app.models.user import User
 from app.routers.product_activity import require_product_admin
 from app.schemas.content import SlotOut
 from app.schemas.errors import AUTHENTICATED, errors
-from app.schemas.seo import LinkSuggestionsIn, LinkSuggestionsOut, SeoPostOut, SitemapsOut
-from app.services import scheduling, search_console, seo_posts, seo_sites, sitemaps
+from app.schemas.seo import (
+    LinkSuggestionsIn,
+    LinkSuggestionsOut,
+    SeoHealthOut,
+    SeoPostOut,
+    SitemapsOut,
+)
+from app.services import (
+    scheduling,
+    search_console,
+    seo_health,
+    seo_posts,
+    seo_sites,
+    sitemaps,
+)
 
 router = APIRouter(prefix="/seo", tags=["seo"])
 
@@ -29,6 +42,22 @@ def _sitemaps_payload(db: Session) -> dict:
         "gsc_account": gsc.client_email,
         "sites": sitemaps.status(db),
     }
+
+
+@router.get(
+    "/health",
+    response_model=SeoHealthOut,
+    summary="Sitemaps, indexed pages, recent posts and the content calendar",
+    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN),
+)
+def health(
+    tz: str = Query(default="UTC", max_length=64, description="IANA zone for calendar days."),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_product_admin),
+) -> dict:
+    """Reads only what Pulse already stored — no fetch to Google or the sites —
+    so it is cheap enough to open on every visit."""
+    return seo_health.health(db, user.id, tz=tz)
 
 
 @router.get(

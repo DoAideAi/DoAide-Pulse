@@ -8,6 +8,7 @@ import { ROUTER_FUTURE } from "../lib/routerFuture";
 
 vi.mock("../lib/api", () => ({
   api: {
+    seoHealth: vi.fn(),
     seoSitemaps: vi.fn(),
     submitSitemaps: vi.fn(),
   },
@@ -36,7 +37,7 @@ function site(key, overrides = {}) {
   };
 }
 
-function draw(path = "/seo") {
+function draw(path = "/seo?tab=sitemaps") {
   return render(
     <MemoryRouter initialEntries={[path]} future={ROUTER_FUTURE}>
       <Seo />
@@ -101,5 +102,77 @@ describe("SEO page — sitemaps", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Submit all" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Search Console answered 500");
+  });
+});
+
+describe("SEO page — health", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function health(overrides = {}) {
+    return {
+      generated_at: "2026-10-22T10:00:00Z",
+      totals: {
+        sites: 14,
+        sitemaps_submitted: 12,
+        sitemap_problems: 1,
+        urls_in_sitemaps: 420,
+        indexed_pages: 300,
+        posts_published_30d: 3,
+        posts_scheduled: 2,
+      },
+      sites: [{ ...site("tax"), recent_posts: 2, scheduled_posts: 1 }],
+      recent_posts: [
+        {
+          id: 5,
+          title: "File ITR online",
+          slug: "file-itr-online",
+          status: "published",
+          focus_keyword: "itr",
+          published_at: "2026-10-20T10:00:00Z",
+          scheduled_for: null,
+          created_at: "2026-10-19T10:00:00Z",
+          site_key: "tax",
+        },
+      ],
+      calendar: [
+        { date: "2026-10-22", posts: [] },
+        {
+          date: "2026-10-23",
+          posts: [{ id: 7, title: "GST due dates", status: "approved", when: "2026-10-23T08:00:00Z" }],
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  it("opens on health by default and shows the totals, sites, calendar and posts", async () => {
+    api.seoHealth.mockResolvedValue(health());
+    draw("/seo");
+
+    expect(await screen.findByText("12/14")).toBeInTheDocument();
+    expect(screen.getByText("1 with problems")).toBeInTheDocument();
+    expect(api.seoHealth).toHaveBeenCalledWith(expect.any(String));
+
+    const sites = screen.getByRole("region", { name: "Sites" });
+    expect(within(sites).getByText("tax.doaide.com")).toBeInTheDocument();
+
+    const cal = screen.getByRole("region", { name: "Content calendar" });
+    expect(within(cal).getByRole("link", { name: "GST due dates" })).toHaveAttribute("href", "/content/7");
+
+    const recent = screen.getByRole("region", { name: "Recent SEO posts" });
+    expect(within(recent).getByRole("link", { name: "File ITR online" })).toBeInTheDocument();
+  });
+
+  it("switches tabs and keeps the choice in the URL", async () => {
+    api.seoHealth.mockResolvedValue(health({ recent_posts: [] }));
+    api.seoSitemaps.mockResolvedValue({ gsc_configured: true, gsc_account: null, sites: [site("gst")] });
+    draw("/seo");
+
+    expect(await screen.findByText(/Nothing published yet/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Sitemaps" }));
+    expect(await screen.findByRole("tab", { name: "Sitemaps" })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText("gst.doaide.com")).toBeInTheDocument();
   });
 });

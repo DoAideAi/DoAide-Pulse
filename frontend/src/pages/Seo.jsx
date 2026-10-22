@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { SectionBoundary } from "../components/ErrorBoundary";
+import HealthPanel from "../components/seo/HealthPanel";
 import SeoPostsPanel from "../components/seo/SeoPostsPanel";
 import SitemapsPanel from "../components/seo/SitemapsPanel";
 
@@ -8,6 +9,7 @@ import SitemapsPanel from "../components/seo/SitemapsPanel";
  * kept in `?tab=` so a link to "the meta audit" lands on the meta audit.
  */
 export const SEO_TABS = [
+  { key: "health", label: "Health", Panel: HealthPanel },
   { key: "sitemaps", label: "Sitemaps", Panel: SitemapsPanel },
   { key: "posts", label: "Posts", Panel: SeoPostsPanel },
 ];
