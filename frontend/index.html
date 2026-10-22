@@ -139,17 +139,8 @@
     />
   </head>
   <body>
-    <script>
-      (function(){var s=localStorage.getItem('pulse-theme');var d=s==='dark'||(s!=='light'&&s==='system'&&matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.classList.add('dark');var m=document.querySelector('meta[name="theme-color"]');if(m)m.content=d?'#0A0A0B':'#FFFFFF';var c=document.querySelector('meta[name="color-scheme"]');if(c)c.content=d?'dark':'light'})();
-    </script>
+    <script src="/theme-init.js"></script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ("serviceWorker" in navigator) {
-        window.addEventListener("load", () => {
-          navigator.serviceWorker.register("/sw.js").catch(() => {});
-        });
-      }
-    </script>
   </body>
 </html>

@@ -6,6 +6,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/ui/Toast";
 import { AuthProvider } from "./hooks/useAuth";
 import { ROUTER_FUTURE } from "./lib/routerFuture";
+import registerServiceWorker from "./lib/registerServiceWorker";
 import reportWebVitals from "./lib/webVitals";
 import "./index.css";
 
@@ -29,3 +30,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 );
 
 reportWebVitals();
+registerServiceWorker();

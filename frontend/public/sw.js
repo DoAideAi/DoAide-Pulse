@@ -1,4 +1,4 @@
-const CACHE_NAME = "doaide-pulse-v1";
+const CACHE_NAME = "doaide-pulse-v2";
 const STATIC_ASSETS = ["/", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -27,18 +27,9 @@ self.addEventListener("fetch", (e) => {
 
   if (request.method !== "GET") return;
 
-  if (url.pathname.startsWith("/api")) {
-    e.respondWith(
-      fetch(request)
-        .then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return res;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
+  // The API is never cached: its responses are per-account, and a cached copy
+  // would outlive a sign-out on a shared machine.
+  if (url.pathname.startsWith("/api")) return;
 
   if (
     url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff2?)$/) ||

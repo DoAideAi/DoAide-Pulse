@@ -193,3 +193,20 @@ def test_the_traversal_guard_still_holds(base_url: str):
     resp = httpx.get(f"{base_url}/../../etc/passwd")
     assert resp.status_code in {200, 404}
     assert "root:" not in resp.text
+
+
+def test_index_html_has_no_inline_script_the_policy_would_block():
+    """Every executable <script> in the shell must load from a file.
+
+    The theme bootstrap and the service-worker registration were both inline,
+    and ``script-src 'self'`` blocked them in every browser without a visible
+    error: dark mode flashed light on load and the PWA never installed. JSON-LD
+    blocks are data, not script, and the policy does not apply to them.
+    """
+    import re
+
+    index = (_REPO / "frontend" / "index.html").read_text("utf-8")
+    for attrs, body in re.findall(r"<script([^>]*)>(.*?)</script>", index, re.S):
+        if 'type="application/ld+json"' in attrs:
+            continue
+        assert "src=" in attrs and not body.strip(), f"inline script: <script{attrs}>"
