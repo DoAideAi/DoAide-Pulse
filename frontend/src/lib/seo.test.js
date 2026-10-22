@@ -8,6 +8,9 @@ import {
   parseKeywords,
   postLabel,
   postTone,
+  rankedCounts,
+  shortPath,
+  sortAudits,
   sitemapState,
   sortSites,
   toneClass,
@@ -138,5 +141,31 @@ describe("calendarWeeks", () => {
 
   it("knows the browser's zone", () => {
     expect(typeof browserZone()).toBe("string");
+  });
+});
+
+describe("audit helpers", () => {
+  it("sorts by issues, unscanned last", () => {
+    const sorted = sortAudits([
+      { name: "B", scanned_at: null, issue_count: 0 },
+      { name: "A", scanned_at: "x", issue_count: 2 },
+      { name: "C", scanned_at: "x", issue_count: 9 },
+    ]);
+    expect(sorted.map((s) => s.name)).toEqual(["C", "A", "B"]);
+  });
+
+  it("ranks issue counts", () => {
+    expect(rankedCounts({ missing_og_image: 3, missing_title: 5, noindex: 3 })).toEqual([
+      ["missing_title", 5],
+      ["missing_og_image", 3],
+      ["noindex", 3],
+    ]);
+    expect(rankedCounts(undefined)).toEqual([]);
+  });
+
+  it("shortens on-site URLs to their path", () => {
+    expect(shortPath("https://gst.doaide.com/blog?x=1", "gst.doaide.com")).toBe("/blog?x=1");
+    expect(shortPath("https://other.test/a", "gst.doaide.com")).toBe("https://other.test/a");
+    expect(shortPath("not a url", "gst.doaide.com")).toBe("not a url");
   });
 });

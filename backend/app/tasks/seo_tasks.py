@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from app.database import SessionLocal
-from app.services import sitemaps
+from app.services import meta_audit, sitemaps
 from app.tasks.celery_app import task
 
 logger = logging.getLogger(__name__)
@@ -29,5 +29,21 @@ def submit_sitemaps() -> dict:
         if failed:
             logger.warning("sitemaps: problems on %s", ", ".join(failed))
         return {"checked": len(rows), "problems": failed}
+    finally:
+        db.close()
+
+
+@task(
+    name="app.tasks.seo_tasks.audit_meta_tags",
+    soft_time_limit=900,
+    time_limit=960,
+)
+def audit_meta_tags() -> dict:
+    """Audit every site's meta tags. Sequential by site, a few pages at a time
+    within one, so a sweep is a trickle of requests rather than a burst."""
+    db = SessionLocal()
+    try:
+        rows = meta_audit.run(db)
+        return {"audited": len(rows), "issues": sum(r.issue_count for r in rows)}
     finally:
         db.close()

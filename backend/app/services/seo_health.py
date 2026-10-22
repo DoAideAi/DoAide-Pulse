@@ -7,7 +7,8 @@ the page loads from the database alone:
 * the account's SEO posts (:mod:`app.services.seo_posts`), attributed to a site
   by their project's ``live_url`` — a project whose live URL is on
   ``tax.doaide.com`` writes posts *for* Tax;
-* a content calendar of those posts around today.
+* a content calendar of those posts around today;
+* the issue count from each site's latest meta-tag audit.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.models.mixins import utcnow
 from app.models.project import Project
-from app.services import seo_posts, seo_sites, sitemaps
+from app.services import meta_audit, seo_posts, seo_sites, sitemaps
 
 #: The calendar shows this many days before today and after it.
 CALENDAR_BACK_DAYS = 7
@@ -106,6 +107,7 @@ def health(db: Session, user_id: int, *, tz: str = "UTC") -> dict:
         elif p["scheduled_for"] and not p["published_at"] and p["scheduled_for"] >= now:
             per_site[key]["scheduled"] += 1
 
+    audits = {a["key"]: a for a in meta_audit.summary(db, include_pages=False)}
     sites = []
     for row in sitemaps.status(db):
         counts = per_site.get(row["key"], {"recent": 0, "scheduled": 0})
@@ -131,6 +133,9 @@ def health(db: Session, user_id: int, *, tz: str = "UTC") -> dict:
                 },
                 "recent_posts": counts["recent"],
                 "scheduled_posts": counts["scheduled"],
+                "meta_issues": audits[row["key"]]["issue_count"]
+                if audits[row["key"]]["scanned_at"]
+                else None,
             }
         )
 
@@ -144,6 +149,7 @@ def health(db: Session, user_id: int, *, tz: str = "UTC") -> dict:
         "indexed_pages": sum(s["gsc_indexed"] or 0 for s in sites),
         "posts_published_30d": sum(1 for p in published if p["published_at"] >= recent_cutoff),
         "posts_scheduled": sum(1 for p in upcoming if p["scheduled_for"] >= now),
+        "meta_issues": sum(s["meta_issues"] or 0 for s in sites),
     }
 
     return {

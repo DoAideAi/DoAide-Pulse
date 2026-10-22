@@ -6,9 +6,12 @@ rather than one Pulse user's content.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.publication import Platform
@@ -17,13 +20,16 @@ from app.routers.product_activity import require_product_admin
 from app.schemas.content import SlotOut
 from app.schemas.errors import AUTHENTICATED, errors
 from app.schemas.seo import (
+    AuditQueuedOut,
     LinkSuggestionsIn,
     LinkSuggestionsOut,
+    MetaAuditOut,
     SeoHealthOut,
     SeoPostOut,
     SitemapsOut,
 )
 from app.services import (
+    meta_audit,
     scheduling,
     search_console,
     seo_health,
@@ -31,6 +37,8 @@ from app.services import (
     seo_sites,
     sitemaps,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/seo", tags=["seo"])
 
@@ -94,6 +102,65 @@ def submit_sitemaps(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown site.")
     sitemaps.check(db, targets)
     return _sitemaps_payload(db)
+
+
+# ---- meta-tag audit ----
+
+
+def _audit_payload(db: Session) -> dict:
+    return {"issue_labels": meta_audit.ISSUES, "sites": meta_audit.summary(db)}
+
+
+@router.get(
+    "/audit",
+    response_model=MetaAuditOut,
+    summary="The latest meta-tag audit of every DoAide site",
+    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN),
+)
+def get_audit(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_product_admin),
+) -> dict:
+    return _audit_payload(db)
+
+
+@router.post(
+    "/audit",
+    response_model=MetaAuditOut | AuditQueuedOut,
+    summary="Audit one site now, or queue every site",
+    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
+)
+def run_audit(
+    response: Response,
+    background: BackgroundTasks,
+    site: str | None = Query(default=None, description="One site key; omit to queue all."),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_product_admin),
+) -> dict:
+    """One site runs in the request — up to ``seo_audit_max_pages`` fetches,
+    four at a time. All fourteen is minutes of fetching, so it goes to the
+    worker and the answer is 202; the page re-reads ``GET /seo/audit``."""
+    if site is None:
+        from app.tasks import seo_tasks
+
+        # Same shape as the content router's dispatch: the worker if there is
+        # one, otherwise after the response on this process, so the button
+        # still does what it says when Redis is down.
+        queued = False
+        if settings.celery_enabled:
+            try:
+                seo_tasks.audit_meta_tags.delay()
+                queued = True
+            except Exception as exc:
+                logger.warning("meta audit dispatch failed, running inline: %s", exc)
+        if not queued:
+            background.add_task(seo_tasks.audit_meta_tags)
+        response.status_code = status.HTTP_202_ACCEPTED
+        return {"queued": True}
+    if site not in seo_sites.BY_KEY:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown site.")
+    meta_audit.run(db, [seo_sites.BY_KEY[site]])
+    return _audit_payload(db)
 
 
 # ---- SEO posts ----

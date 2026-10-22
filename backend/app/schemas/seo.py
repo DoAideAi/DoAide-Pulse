@@ -102,6 +102,8 @@ class HealthSiteOut(BaseModel):
     #: SEO posts published in the last 30 days by a project living on this site.
     recent_posts: int
     scheduled_posts: int
+    #: From the latest meta audit; null when the site has never been audited.
+    meta_issues: int | None = None
 
 
 class HealthTotalsOut(BaseModel):
@@ -112,6 +114,7 @@ class HealthTotalsOut(BaseModel):
     indexed_pages: int
     posts_published_30d: int
     posts_scheduled: int
+    meta_issues: int
 
 
 class RecentSeoPostOut(SeoPostOut):
@@ -136,3 +139,48 @@ class SeoHealthOut(BaseModel):
     sites: list[HealthSiteOut]
     recent_posts: list[RecentSeoPostOut]
     calendar: list[CalendarDayOut]
+
+
+class AuditPageOut(BaseModel):
+    url: str
+    final_url: str | None = None
+    error: str | None = None
+    title: str | None = None
+    description: str | None = None
+    canonical: str | None = None
+    og: dict[str, str | None] = {}
+    issues: list[str]
+
+
+class DuplicateOut(BaseModel):
+    value: str
+    urls: list[str]
+
+
+class AuditDuplicatesOut(BaseModel):
+    title: list[DuplicateOut] = []
+    description: list[DuplicateOut] = []
+
+
+class SiteAuditOut(BaseModel):
+    key: str
+    name: str
+    domain: str
+    scanned_at: datetime | None = None
+    pages_scanned: int
+    issue_count: int
+    error: str | None = None
+    #: Issue code → how many pages have it.
+    counts: dict[str, int]
+    pages: list[AuditPageOut] = []
+    duplicates: AuditDuplicatesOut = AuditDuplicatesOut()
+
+
+class MetaAuditOut(BaseModel):
+    #: Issue code → the sentence the page shows for it.
+    issue_labels: dict[str, str]
+    sites: list[SiteAuditOut]
+
+
+class AuditQueuedOut(BaseModel):
+    queued: bool

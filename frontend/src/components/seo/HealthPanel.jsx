@@ -31,7 +31,7 @@ export default function HealthPanel() {
       {!data && state.loading && <Skeleton rows={6} />}
       {data && (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <Stat
               label="Sitemaps submitted"
               value={`${data.totals.sitemaps_submitted}/${data.totals.sites}`}
@@ -44,6 +44,7 @@ export default function HealthPanel() {
               value={formatCount(data.totals.posts_published_30d)}
               hint={`last 30 days · ${data.totals.posts_scheduled} scheduled`}
             />
+            <Stat label="Meta tag issues" value={formatCount(data.totals.meta_issues)} hint="latest audit" />
           </div>
 
           <section aria-label="Sites" className="space-y-3">
@@ -58,6 +59,7 @@ export default function HealthPanel() {
                     <th className="cell eyebrow text-right">Indexed</th>
                     <th className="cell eyebrow text-right">Posts 30d</th>
                     <th className="cell eyebrow text-right">Scheduled</th>
+                    <th className="cell eyebrow text-right">Meta issues</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
@@ -77,6 +79,11 @@ export default function HealthPanel() {
                         <td className="cell text-right font-mono">{indexedLabel(site)}</td>
                         <td className="cell text-right font-mono">{site.recent_posts}</td>
                         <td className="cell text-right font-mono">{site.scheduled_posts}</td>
+                        <td className="cell text-right font-mono">
+                          <Link to="/seo?tab=audit" className="hover:text-brand-600">
+                            {site.meta_issues ?? "—"}
+                          </Link>
+                        </td>
                       </tr>
                     );
                   })}

@@ -273,6 +273,10 @@ export const api = {
   // Fetches and submits synchronously; `site` is one catalog key, or null for all.
   submitSitemaps: (site = null) =>
     request(`/seo/sitemaps/submit${qs({ site })}`, { method: "POST" }),
+  seoAudit: () => request("/seo/audit"),
+  // One `site` audits in the request and returns the whole report; no site
+  // queues every site on the worker and returns `{queued: true}`.
+  runSeoAudit: (site = null) => request(`/seo/audit${qs({ site })}`, { method: "POST" }),
   // SEO posts are ordinary pieces tagged `seo`; these are the parts the
   // content endpoints do not already cover.
   seoPosts: () => request("/seo/posts"),

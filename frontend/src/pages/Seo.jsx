@@ -1,5 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { SectionBoundary } from "../components/ErrorBoundary";
+import AuditPanel from "../components/seo/AuditPanel";
 import HealthPanel from "../components/seo/HealthPanel";
 import SeoPostsPanel from "../components/seo/SeoPostsPanel";
 import SitemapsPanel from "../components/seo/SitemapsPanel";
@@ -12,6 +13,7 @@ export const SEO_TABS = [
   { key: "health", label: "Health", Panel: HealthPanel },
   { key: "sitemaps", label: "Sitemaps", Panel: SitemapsPanel },
   { key: "posts", label: "Posts", Panel: SeoPostsPanel },
+  { key: "audit", label: "Meta audit", Panel: AuditPanel },
 ];
 
 export default function Seo() {

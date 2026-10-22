@@ -224,6 +224,11 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.seo_tasks.submit_sitemaps",
         "schedule": crontab(day_of_week="1", hour="2", minute="30"),
     },
+    "audit-meta-tags": {
+        # After the sitemaps are resubmitted, so it reads the same URL list.
+        "task": "app.tasks.seo_tasks.audit_meta_tags",
+        "schedule": crontab(day_of_week="1", hour="3", minute="0"),
+    },
     "verify-platform-connections": {
         # Re-check stored credentials so a revoked token is noticed before
         # the next publish attempt.

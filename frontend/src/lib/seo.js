@@ -150,3 +150,26 @@ export function browserZone() {
     return "UTC";
   }
 }
+
+/** Audited sites with the most issues first; never-scanned ones last, by name. */
+export function sortAudits(sites) {
+  return [...(sites || [])].sort((a, b) => {
+    const scanned = Number(Boolean(b.scanned_at)) - Number(Boolean(a.scanned_at));
+    return scanned || b.issue_count - a.issue_count || a.name.localeCompare(b.name);
+  });
+}
+
+/** Issue codes by how many pages have them, most first. */
+export function rankedCounts(counts) {
+  return Object.entries(counts || {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+/** "/pricing" for a page on the site, the full URL for anything else. */
+export function shortPath(url, domain) {
+  try {
+    const u = new URL(url);
+    return u.hostname === domain ? `${u.pathname}${u.search}` || "/" : url;
+  } catch {
+    return url;
+  }
+}

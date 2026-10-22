@@ -11,7 +11,7 @@ from __future__ import annotations
 # Imported at runtime: SQLAlchemy resolves Mapped[...] at class-definition time.
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -45,3 +45,17 @@ class SitemapStatus(Base, TimestampMixin):
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+
+class MetaAudit(Base, TimestampMixin):
+    __tablename__ = "seo_meta_audits"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    site_key: Mapped[str] = mapped_column(
+        String(SITE_KEY_MAX_LENGTH), unique=True, nullable=False
+    )
+    pages_scanned: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    issue_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: The full report: per-page findings and the site-wide duplicates.
+    report: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    error: Mapped[str | None] = mapped_column(Text)
+    scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

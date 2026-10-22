@@ -101,6 +101,7 @@ def test_the_dashboard_joins_sitemaps_posts_and_the_calendar(client, auth, db, u
         "indexed_pages": 31,
         "posts_published_30d": 1,
         "posts_scheduled": 2,
+        "meta_issues": 0,
     }
     tax_row = next(s for s in body["sites"] if s["key"] == "tax")
     assert tax_row["recent_posts"] == 1 and tax_row["scheduled_posts"] == 1

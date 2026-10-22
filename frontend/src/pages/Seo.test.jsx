@@ -121,8 +121,9 @@ describe("SEO page — health", () => {
         indexed_pages: 300,
         posts_published_30d: 3,
         posts_scheduled: 2,
+        meta_issues: 7,
       },
-      sites: [{ ...site("tax"), recent_posts: 2, scheduled_posts: 1 }],
+      sites: [{ ...site("tax"), recent_posts: 2, scheduled_posts: 1, meta_issues: 7 }],
       recent_posts: [
         {
           id: 5,
