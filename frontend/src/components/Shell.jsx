@@ -60,7 +60,7 @@ export default function Shell({ children }) {
             <ThemeToggle />
           </div>
           <button
-            className="w-full rounded-lg border border-line px-3 py-2 text-xs text-ink-500 transition-colors hover:border-line-strong hover:text-ink-900"
+            className="min-h-[48px] w-full rounded-lg border border-line px-3 py-2 text-xs text-ink-500 transition-colors hover:border-line-strong hover:text-ink-900"
             onClick={() => {
               logout();
               navigate("/login");
@@ -80,7 +80,7 @@ export default function Shell({ children }) {
           </span>
         </div>
         <button
-          className="btn-quiet -mr-1 min-h-[44px] min-w-[44px]"
+          className="btn-quiet -mr-1 min-h-[48px] min-w-[48px]"
           onClick={() => setMenuOpen((v) => !v)}
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
@@ -115,7 +115,7 @@ export default function Shell({ children }) {
           <div className="mt-2 flex items-center gap-3 border-t border-line px-3 py-2.5">
             <ThemeToggle />
             <button
-              className="ml-auto text-sm text-ink-500 hover:text-ink-900"
+              className="ml-auto min-h-[48px] rounded-md px-3 text-sm text-ink-500 hover:text-ink-900"
               onClick={() => {
                 logout();
                 navigate("/login");
@@ -129,7 +129,7 @@ export default function Shell({ children }) {
 
       {/* Main content area */}
       <div className="flex min-w-0 flex-1 flex-col md:ml-56">
-        <main id="main" tabIndex={-1} className="flex-1 px-6 py-8 pt-20 md:px-8 md:pt-8">
+        <main id="main" tabIndex={-1} className="flex-1 px-4 py-8 pt-20 sm:px-6 md:px-8 md:pt-8">
           <div className="mx-auto max-w-5xl">
             {children}
           </div>
@@ -229,7 +229,7 @@ function MobileTab({ to, end, badge, children }) {
       end={end}
       className={({ isActive }) =>
         [
-          "flex min-h-[44px] items-center justify-between rounded-md px-3 py-2.5 text-sm transition-colors",
+          "flex min-h-[48px] items-center justify-between rounded-md px-3 py-2.5 text-sm transition-colors",
           isActive
             ? "bg-brand-50 text-brand-500"
             : "text-ink-500 hover:bg-ink-400/10 hover:text-ink-900",

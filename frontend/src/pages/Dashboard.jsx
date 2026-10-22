@@ -339,7 +339,7 @@ function ReviewCard({ item, onApproved }) {
 
       <div className="mt-auto flex items-center gap-2 pt-1">
         <button
-          className="min-h-[44px] flex-1 rounded-lg bg-good px-3 py-2 text-sm font-medium text-canvas transition-colors hover:bg-good/90 active:scale-[0.98] disabled:opacity-40"
+          className="min-h-[48px] flex-1 rounded-lg bg-good px-3 py-2 text-sm font-medium text-canvas transition-colors hover:bg-good/90 active:scale-[0.98] disabled:opacity-40"
           onClick={() => approve(Boolean(issues))}
           disabled={busy}
         >
@@ -347,7 +347,7 @@ function ReviewCard({ item, onApproved }) {
         </button>
         <Link
           to={`/content/${item.id}`}
-          className="min-h-[44px] flex-1 rounded-lg border border-line px-3 py-2 text-center text-sm text-ink-600 transition-colors hover:bg-canvas"
+          className="min-h-[48px] flex-1 rounded-lg border border-line px-3 py-2 text-center text-sm text-ink-600 transition-colors hover:bg-canvas"
         >
           Review
         </Link>

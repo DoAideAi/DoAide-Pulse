@@ -67,7 +67,7 @@ describe("QuickActions", () => {
     });
   });
 
-  it("has 44px minimum touch targets on all interactive elements", () => {
+  it("has 48px minimum touch targets on all interactive elements", () => {
     draw({ reviewCount: 2 });
 
     const buttons = screen.getAllByRole("button");

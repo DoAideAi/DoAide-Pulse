@@ -505,7 +505,7 @@ function ReviewContentCard({ item, selected, onToggle, onApproved }) {
   return (
     <div className={`panel flex flex-col gap-2 p-4 transition-shadow ${selected ? "ring-2 ring-brand-500/50" : ""}`}>
       <div className="flex items-start gap-3">
-        <label className="mt-0.5 flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center">
+        <label className="mt-0.5 flex min-h-[48px] min-w-[48px] cursor-pointer items-center justify-center">
           <input
             type="checkbox"
             checked={selected}
@@ -548,14 +548,14 @@ function ReviewContentCard({ item, selected, onToggle, onApproved }) {
 
       <div className="mt-auto flex items-center gap-2 pt-1">
         <button
-          className="min-h-[44px] flex-1 rounded-lg bg-good px-3 py-2 text-sm font-medium text-canvas transition-colors hover:bg-good/90 disabled:opacity-40"
+          className="min-h-[48px] flex-1 rounded-lg bg-good px-3 py-2 text-sm font-medium text-canvas transition-colors hover:bg-good/90 disabled:opacity-40"
           onClick={approve}
           disabled={busy}
         >
           Approve
         </button>
         <button
-          className="min-h-[44px] flex-1 rounded-lg border border-line px-3 py-2 text-sm text-ink-600 transition-colors hover:bg-canvas disabled:opacity-40"
+          className="min-h-[48px] flex-1 rounded-lg border border-line px-3 py-2 text-sm text-ink-600 transition-colors hover:bg-canvas disabled:opacity-40"
           onClick={reject}
           disabled={busy}
         >
@@ -563,7 +563,7 @@ function ReviewContentCard({ item, selected, onToggle, onApproved }) {
         </button>
         <Link
           to={`/content/${item.id}`}
-          className="min-h-[44px] rounded-lg border border-line px-3 py-2 text-center text-sm text-ink-600 transition-colors hover:bg-canvas"
+          className="min-h-[48px] rounded-lg border border-line px-3 py-2 text-center text-sm text-ink-600 transition-colors hover:bg-canvas"
         >
           View
         </Link>
