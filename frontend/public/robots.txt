@@ -1,6 +1,18 @@
 User-agent: *
 Allow: /
+# Signed-in app — nothing here renders for a crawler but the sign-in redirect.
 Disallow: /dashboard
+Disallow: /projects
 Disallow: /content
+Disallow: /products
+Disallow: /triggers
+Disallow: /my-templates
+Disallow: /calendar
+Disallow: /publish
+Disallow: /analytics
 Disallow: /settings
+Disallow: /login
+# Expiring, token-bearing review links.
+Disallow: /preview/
+Disallow: /api/
 Sitemap: https://pulse.doaide.com/sitemap.xml

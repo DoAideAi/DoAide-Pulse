@@ -1,15 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import PublicNav from "../components/PublicNav";
+import { usePageMeta } from "../lib/pageMeta";
 
 export default function Embed() {
   const [name, setName] = useState("My Newsletter");
   const [color, setColor] = useState("#0D9488");
   const [layout, setLayout] = useState("compact");
 
-  useEffect(() => {
-    document.title = "Embed Widget Generator | DoAide Pulse";
-  }, []);
+  usePageMeta({
+    title: "Embed Widget Generator | DoAide Pulse",
+    description:
+      "Generate a free embeddable newsletter signup widget for your website. Pick a colour and layout, copy the code — no login required.",
+    path: "/embed",
+  });
 
   const origin =
     typeof window !== "undefined"

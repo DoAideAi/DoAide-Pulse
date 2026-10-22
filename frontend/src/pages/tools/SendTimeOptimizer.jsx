@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import ShareButtons from "../../components/ShareButtons";
 import trackEvent from "../../lib/trackEvent";
+import { usePageMeta } from "../../lib/pageMeta";
 
 const INDUSTRIES = {
   Tech: [
@@ -74,9 +75,12 @@ export default function SendTimeOptimizer() {
   const [industry, setIndustry] = useState("Tech");
   const [tz, setTz] = useState("IST");
 
-  useEffect(() => {
-    document.title = "Send Time Optimizer | DoAide Pulse";
-  }, []);
+  usePageMeta({
+    title: "Send Time Optimizer | DoAide Pulse",
+    description:
+      "Find the best day and hour to send your newsletter for your industry and time zone. Free, no signup.",
+    path: "/tools/send-time-optimizer",
+  });
 
   const baseSlots = INDUSTRIES[industry];
   const adjusted = baseSlots.map((s) => ({

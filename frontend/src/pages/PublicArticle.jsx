@@ -10,6 +10,7 @@ import { api } from "../lib/api";
 import { formatCount, formatReadLength } from "../lib/format";
 import { renderMarkdown } from "../lib/markdown";
 import trackEvent from "../lib/trackEvent";
+import { applyPageMeta } from "../lib/pageMeta";
 
 export default function PublicArticle() {
   const { slug } = useParams();
@@ -19,9 +20,11 @@ export default function PublicArticle() {
 
   useEffect(() => {
     if (data) {
-      document.title = `${data.title} | DoAide Pulse`;
-      const meta = document.querySelector('meta[name="description"]');
-      if (meta) meta.setAttribute("content", data.meta_description || data.excerpt);
+      applyPageMeta({
+        title: `${data.title} | DoAide Pulse`,
+        description: data.meta_description || data.excerpt,
+        path: `/article/${slug}`,
+      });
     }
   }, [data]);
 

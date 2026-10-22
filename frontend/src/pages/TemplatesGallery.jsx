@@ -4,6 +4,7 @@ import PublicNav from "../components/PublicNav";
 import DoAideFooter from "../components/DoAideFooter";
 import CrossProductLinks from "../components/CrossProductLinks";
 import trackEvent from "../lib/trackEvent";
+import { usePageMeta } from "../lib/pageMeta";
 
 const TEMPLATES = [
   {
@@ -237,11 +238,12 @@ function TemplateCard({ template, isExpanded, onToggle }) {
 export default function TemplatesGallery() {
   const [expanded, setExpanded] = useState(null);
 
-  useEffect(() => {
-    document.title = "Free Newsletter Templates | DoAide Pulse";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Browse free newsletter templates for marketing, product updates, digests, announcements, tutorials, and community roundups. Customize and send with DoAide Pulse.");
-  }, []);
+  usePageMeta({
+    title: "Free Newsletter Templates | DoAide Pulse",
+    description:
+      "Browse free newsletter templates for marketing, product updates, digests, announcements, tutorials, and community roundups. Customize and send with DoAide Pulse.",
+    path: "/templates",
+  });
 
   useEffect(() => {
     const ld = document.createElement("script");

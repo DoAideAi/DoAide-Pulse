@@ -6,6 +6,7 @@ import CrossProductLinks from "../components/CrossProductLinks";
 import DoAideFooter from "../components/DoAideFooter";
 import trackEvent from "../lib/trackEvent";
 import "./LandingPage.css";
+import { usePageMeta } from "../lib/pageMeta";
 
 const ACCENT = "#0D9488";
 
@@ -574,11 +575,12 @@ export default function LandingPage() {
     requestAnimationFrame(() => setVisible(true));
   }, []);
 
-  useEffect(() => {
-    document.title = "DoAide Pulse — AI Newsletter Platform for Indian Businesses";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Create, publish, and grow AI-powered newsletters. Research, write, and optimize — all automated. Built for Indian businesses with multilingual support.");
-  }, []);
+  usePageMeta({
+    title: "DoAide Pulse — AI Newsletter Platform for Indian Businesses",
+    description:
+      "Create, publish, and grow AI-powered newsletters. Research, write, and optimize — all automated. Built for Indian businesses with multilingual support.",
+    path: "/",
+  });
 
   useEffect(() => {
     const ld = document.createElement("script");

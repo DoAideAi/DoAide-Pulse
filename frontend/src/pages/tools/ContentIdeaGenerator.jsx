@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import ShareButtons from "../../components/ShareButtons";
 import PublicNav from "../../components/PublicNav";
 import DoAideFooter from "../../components/DoAideFooter";
 import trackEvent from "../../lib/trackEvent";
 import { api } from "../../lib/api";
+import { usePageMeta } from "../../lib/pageMeta";
 
 const EXAMPLE_NICHES = [
   "SaaS marketing",
@@ -21,15 +22,12 @@ export default function ContentIdeaGenerator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    document.title = "Free Content Idea Generator | DoAide Pulse";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta)
-      meta.setAttribute(
-        "content",
-        "Generate fresh content ideas for your newsletter or blog with AI. Free, no login required. Powered by DoAide Pulse."
-      );
-  }, []);
+  usePageMeta({
+    title: "Free Content Idea Generator | DoAide Pulse",
+    description:
+      "Generate fresh content ideas for your newsletter or blog with AI. Free, no login required. Powered by DoAide Pulse.",
+    path: "/tools/content-idea-generator",
+  });
 
   async function handleGenerate(e) {
     e.preventDefault();

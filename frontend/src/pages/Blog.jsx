@@ -4,13 +4,15 @@ import { staticPosts } from "../data/blogPosts";
 import PublicNav from "../components/PublicNav";
 import DoAideFooter from "../components/DoAideFooter";
 import CrossProductLinks from "../components/CrossProductLinks";
+import { usePageMeta } from "../lib/pageMeta";
 
 export default function Blog() {
-  useEffect(() => {
-    document.title = "Blog — Newsletter Tips & Email Marketing Strategies | DoAide Pulse";
-    const meta = document.querySelector('meta[name="description"]');
-    if (meta) meta.setAttribute("content", "Expert articles on email marketing, newsletter best practices, AI content creation, and subscriber growth strategies for Indian businesses.");
-  }, []);
+  usePageMeta({
+    title: "Blog — Newsletter Tips & Email Marketing Strategies | DoAide Pulse",
+    description:
+      "Expert articles on email marketing, newsletter best practices, AI content creation, and subscriber growth strategies for Indian businesses.",
+    path: "/blog",
+  });
 
   useEffect(() => {
     const ld = document.createElement("script");

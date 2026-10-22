@@ -6,14 +6,20 @@ import PublicNav from "../components/PublicNav";
 import DoAideFooter from "../components/DoAideFooter";
 import ShareButtons from "../components/ShareButtons";
 import trackEvent from "../lib/trackEvent";
+import { applyPageMeta } from "../lib/pageMeta";
 
 export default function BlogPost() {
   const { slug } = useParams();
   const post = staticPosts.find((p) => p.slug === slug);
 
   useEffect(() => {
-    if (post) document.title = `${post.title} | DoAide Pulse`;
-    else document.title = "Post not found | DoAide Pulse";
+    if (post)
+      applyPageMeta({
+        title: `${post.title} | DoAide Pulse`,
+        description: post.description,
+        path: `/blog/${post.slug}`,
+      });
+    else applyPageMeta({ title: "Post not found | DoAide Pulse" });
   }, [post]);
 
   useEffect(() => {

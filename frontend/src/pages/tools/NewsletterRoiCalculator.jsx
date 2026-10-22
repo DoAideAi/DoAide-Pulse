@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import ShareButtons from "../../components/ShareButtons";
 import trackEvent from "../../lib/trackEvent";
+import { usePageMeta } from "../../lib/pageMeta";
 
 const fmt = (n) =>
   n.toLocaleString("en-US", {
@@ -21,9 +22,12 @@ export default function NewsletterRoiCalculator() {
   const [revenuePerConversion, setRevenuePerConversion] = useState(50);
   const [monthlyCost, setMonthlyCost] = useState(200);
 
-  useEffect(() => {
-    document.title = "Newsletter ROI Calculator | DoAide Pulse";
-  }, []);
+  usePageMeta({
+    title: "Newsletter ROI Calculator | DoAide Pulse",
+    description:
+      "Estimate the revenue and return on your newsletter from subscribers, open, click and conversion rates. Free, no signup.",
+    path: "/tools/newsletter-roi-calculator",
+  });
 
   const safeSubs = Math.max(0, subscribers) || 0;
   const safeOpen = Math.min(100, Math.max(0, openRate)) || 0;
