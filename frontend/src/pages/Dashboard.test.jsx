@@ -15,6 +15,7 @@ vi.mock("../lib/api", () => ({
     approveContent: vi.fn(),
     bulkApprove: vi.fn(),
     listContent: vi.fn(),
+    platforms: vi.fn(),
   },
 }));
 
@@ -56,15 +57,53 @@ beforeEach(() => {
   api.readTime.mockResolvedValue({ published_pieces: 0 });
   api.engagementTrend.mockResolvedValue({ points: [] });
   api.reviewQueue.mockResolvedValue([]);
+  api.platforms.mockResolvedValue([]);
+  window.localStorage.clear();
 });
 
 describe("an empty account", () => {
-  it("offers to register a project instead of showing zeroed stat tiles", async () => {
-    api.dashboard.mockResolvedValue(payload({ totals: { ...payload().totals, content_count: 0 } }));
+  const empty = () =>
+    payload({ totals: { ...payload().totals, content_count: 0, published_count: 0 } });
+
+  it("walks through setup instead of showing zeroed stat tiles", async () => {
+    api.dashboard.mockResolvedValue(empty());
     draw();
 
-    expect(await screen.findByText("Nothing written yet")).toBeInTheDocument();
+    expect(await screen.findByText("Get your first post out")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Add project" })).toHaveAttribute("href", "/projects");
     expect(screen.queryByText("Projects")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nothing written yet")).not.toBeInTheDocument();
+  });
+
+  it("counts a connected destination as done", async () => {
+    api.dashboard.mockResolvedValue(empty());
+    api.platforms.mockResolvedValue([
+      { platform: "devto", connection: { status: "connected" } },
+      { platform: "hashnode", connection: null },
+    ]);
+    draw();
+
+    expect(await screen.findByTestId("step-destination")).toHaveAttribute("data-done", "true");
+  });
+
+  it("falls back to the empty state once setup is hidden", async () => {
+    api.dashboard.mockResolvedValue(empty());
+    draw();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Hide" }));
+    expect(screen.getByText("Nothing written yet")).toBeInTheDocument();
+  });
+});
+
+describe("the stat tiles", () => {
+  it("show reach and engagement alongside the counts", async () => {
+    api.dashboard.mockResolvedValue(payload());
+    draw();
+
+    expect(await screen.findByText("Views")).toBeInTheDocument();
+    expect(screen.getByText((1200).toLocaleString())).toBeInTheDocument();
+    expect(screen.getByText("Engagement rate")).toBeInTheDocument();
+    expect(screen.getByText("5.0%")).toBeInTheDocument();
   });
 });
 
@@ -72,6 +111,7 @@ describe("loading and errors", () => {
   it("shows a skeleton before the first response arrives", () => {
     api.dashboard.mockReturnValue(new Promise(() => {}));
     api.reviewQueue.mockReturnValue(new Promise(() => {}));
+    api.platforms.mockReturnValue(new Promise(() => {}));
     draw();
 
     expect(screen.getByText("Dashboard")).toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { SectionBoundary } from "../components/ErrorBoundary";
+import GettingStarted from "../components/GettingStarted";
 import PublishedLinks from "../components/PublishedLinks";
 import QuickActions from "../components/QuickActions";
 import {
@@ -16,6 +17,7 @@ import { api } from "../lib/api";
 import {
   formatCount,
   formatDateTime,
+  formatRate,
   formatWhen,
   titleize,
 } from "../lib/format";
@@ -26,6 +28,11 @@ export default function Dashboard() {
     () => api.reviewQueue(),
     [],
   );
+  // Only the first-run checklist reads this, and it treats null as "not yet".
+  const { data: platforms } = useApi(() => api.platforms(), []);
+  const connectedCount = platforms
+    ? platforms.filter((p) => p.connection?.status === "connected").length
+    : null;
 
   if (loading && !data) {
     return (
@@ -71,19 +78,30 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {/* First-run checklist; for an empty account it stands in for the stats. */}
+      <GettingStarted
+        projectCount={by_project.length}
+        connectedCount={connectedCount}
+        contentCount={totals.content_count}
+        publishedCount={totals.published_count}
+        fallback={
+          nothingYet ? (
+            <Empty
+              title="Nothing written yet"
+              hint="Register a project — the robot drafts the first post."
+              action={
+                <Link to="/projects" className="btn-primary mt-1">
+                  Register a project
+                </Link>
+              }
+            />
+          ) : null
+        }
+      />
+
       {/* Quick stats bar */}
-      {nothingYet ? (
-        <Empty
-          title="Nothing written yet"
-          hint="Register a project — the robot drafts the first post."
-          action={
-            <Link to="/projects" className="btn-primary mt-1">
-              Register a project
-            </Link>
-          }
-        />
-      ) : (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {!nothingYet && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <QuickStat
             label="Projects"
             value={formatCount(by_project.length)}
@@ -104,6 +122,17 @@ export default function Dashboard() {
             label="Scheduled"
             value={formatCount(upcoming.length)}
             icon={<CalendarIcon />}
+          />
+          {/* Reach and response — the two numbers that say whether any of it worked. */}
+          <QuickStat
+            label="Views"
+            value={formatCount(totals.views)}
+            icon={<EyeIcon />}
+          />
+          <QuickStat
+            label="Engagement rate"
+            value={formatRate(totals.engagement_rate)}
+            icon={<SparkIcon />}
           />
         </div>
       )}
@@ -401,6 +430,24 @@ function CalendarIcon() {
     <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <rect x="2" y="3" width="12" height="11" rx="1.5" />
       <path d="M5.5 1.5v2.5M10.5 1.5v2.5M2 7h12" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" />
+      <circle cx="8" cy="8" r="2" />
+    </svg>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1.5 11.5l4-4 3 3 6-6" />
+      <path d="M10.5 4.5h4v4" />
     </svg>
   );
 }
