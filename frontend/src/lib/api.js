@@ -150,7 +150,12 @@ export const api = {
       body: payload,
       headers: version == null ? undefined : { "If-Match": `"${version}"` },
     }),
+  createContent: (payload) => request("/content", { method: "POST", body: payload }),
   deleteContent: (id) => request(`/content/${id}`, { method: "DELETE" }),
+  // Arms the piece for `platforms` at `scheduled_for`, or at the cadence
+  // table's best slot per platform with `optimize: true`.
+  scheduleContent: (id, payload) =>
+    request(`/content/${id}/schedule`, { method: "POST", body: payload }),
   // `force` approves past the SEO preflight's 409 — the human override for
   // checks that are advice about a piece somebody has already read.
   approveContent: (id, { force = false } = {}) =>
@@ -266,6 +271,13 @@ export const api = {
   // Fetches and submits synchronously; `site` is one catalog key, or null for all.
   submitSitemaps: (site = null) =>
     request(`/seo/sitemaps/submit${qs({ site })}`, { method: "POST" }),
+  // SEO posts are ordinary pieces tagged `seo`; these are the parts the
+  // content endpoints do not already cover.
+  seoPosts: () => request("/seo/posts"),
+  seoLinkSuggestions: (draft) =>
+    request("/seo/link-suggestions", { method: "POST", body: draft }),
+  seoOptimalSlots: (platforms) =>
+    request(`/seo/optimal-slots?${new URLSearchParams(platforms.map((p) => ["platforms", p]))}`),
 
   // ---- triggers ----
   triggerKinds: () => request("/triggers/kinds"),

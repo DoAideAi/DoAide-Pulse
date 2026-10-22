@@ -1,12 +1,16 @@
 import { useSearchParams } from "react-router-dom";
 import { SectionBoundary } from "../components/ErrorBoundary";
+import SeoPostsPanel from "../components/seo/SeoPostsPanel";
 import SitemapsPanel from "../components/seo/SitemapsPanel";
 
 /**
  * SEO across every DoAide site. One page, one panel per job, the open one
  * kept in `?tab=` so a link to "the meta audit" lands on the meta audit.
  */
-export const SEO_TABS = [{ key: "sitemaps", label: "Sitemaps", Panel: SitemapsPanel }];
+export const SEO_TABS = [
+  { key: "sitemaps", label: "Sitemaps", Panel: SitemapsPanel },
+  { key: "posts", label: "Posts", Panel: SeoPostsPanel },
+];
 
 export default function Seo() {
   const [params, setParams] = useSearchParams();

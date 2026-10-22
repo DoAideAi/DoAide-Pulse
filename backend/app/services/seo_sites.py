@@ -7,6 +7,11 @@ includes products with no users to speak of yet and leaves out ones that have
 been retired from search. Both are code for the same reason — the list changes
 when a product ships, which is a deploy anyway.
 
+``topics`` are what each site is *about*, in the words a post would use. The
+SEO editor matches a draft against them to suggest which product to link to —
+a post about filing ITR should point at tax.doaide.com without anybody having
+to remember that it exists.
+
 ``sitemap_path`` is where the site serves its sitemap. Every DoAide product
 serves ``/sitemap.xml`` today; the field is there so the one that moves it does
 not need special-casing in the submitter.
@@ -22,6 +27,7 @@ class Site:
     key: str
     name: str
     domain: str
+    topics: tuple[str, ...] = ()
     sitemap_path: str = "/sitemap.xml"
 
     @property
@@ -34,20 +40,34 @@ class Site:
 
 
 SITES: tuple[Site, ...] = (
-    Site("gst", "GST", "gst.doaide.com"),
-    Site("khata", "Khata", "khata.doaide.com"),
-    Site("tax", "Tax", "tax.doaide.com"),
-    Site("insure", "Insure", "insure.doaide.com"),
-    Site("comply", "Comply", "comply.doaide.com"),
-    Site("bizname", "BizName", "bizname.doaide.com"),
-    Site("docs", "Docs", "docs.doaide.com"),
-    Site("resume", "Resume", "resume.doaide.com"),
-    Site("reach", "Reach", "reach.doaide.com"),
-    Site("pulse", "Pulse", "pulse.doaide.com"),
-    Site("desk", "Desk", "desk.doaide.com"),
-    Site("trade", "Trade", "trade.doaide.com"),
-    Site("coach", "Coach", "coach.doaide.com"),
-    Site("cortex", "Cortex", "cortex.doaide.com"),
+    Site("gst", "GST", "gst.doaide.com",
+         ("gst", "gstin", "gst return", "input tax credit", "e-invoice", "hsn")),
+    Site("khata", "Khata", "khata.doaide.com",
+         ("khata", "ledger", "bookkeeping", "udhar", "credit book", "small shop")),
+    Site("tax", "Tax", "tax.doaide.com",
+         ("income tax", "itr", "tax filing", "form 16", "tax regime", "tax saving")),
+    Site("insure", "Insure", "insure.doaide.com",
+         ("insurance", "premium", "health insurance", "term insurance", "policy")),
+    Site("comply", "Comply", "comply.doaide.com",
+         ("compliance", "roc", "mca", "annual filing", "due date", "llp")),
+    Site("bizname", "BizName", "bizname.doaide.com",
+         ("business name", "brand name", "company name", "startup name", "naming")),
+    Site("docs", "Docs", "docs.doaide.com",
+         ("documentation", "api docs", "developer docs", "guide")),
+    Site("resume", "Resume", "resume.doaide.com",
+         ("resume", "cv", "job application", "cover letter", "ats")),
+    Site("reach", "Reach", "reach.doaide.com",
+         ("outreach", "cold email", "lead generation", "prospecting", "sales email")),
+    Site("pulse", "Pulse", "pulse.doaide.com",
+         ("content marketing", "blog", "seo", "social media", "newsletter")),
+    Site("desk", "Desk", "desk.doaide.com",
+         ("helpdesk", "customer support", "support tickets", "live chat")),
+    Site("trade", "Trade", "trade.doaide.com",
+         ("trading", "stock market", "stocks", "portfolio", "nifty", "options")),
+    Site("coach", "Coach", "coach.doaide.com",
+         ("coaching", "mentor", "career growth", "interview prep")),
+    Site("cortex", "Cortex", "cortex.doaide.com",
+         ("ai assistant", "knowledge base", "second brain", "notes", "memory")),
 )
 
 BY_KEY: dict[str, Site] = {s.key: s for s in SITES}

@@ -48,3 +48,78 @@ export function sortSites(sites) {
       rank[sitemapState(a).tone] - rank[sitemapState(b).tone] || a.name.localeCompare(b.name),
   );
 }
+
+/** The meta description length Google shows without truncating. */
+export const META_MIN = 120;
+export const META_MAX = 155;
+
+/** How a meta description's length reads, as a tone and a hint. */
+export function metaLengthHint(text) {
+  const n = (text || "").trim().length;
+  if (n === 0) return { tone: "idle", hint: `Aim for ${META_MIN}–${META_MAX} characters.` };
+  if (n < META_MIN) return { tone: "warn", hint: `${n} characters — a little short.` };
+  if (n > META_MAX) return { tone: "warn", hint: `${n} characters — Google will cut it off.` };
+  return { tone: "good", hint: `${n} characters — good length.` };
+}
+
+/** "gst, input tax credit ,, itr" → ["gst", "input tax credit", "itr"], deduplicated. */
+export function parseKeywords(text) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of (text || "").split(",")) {
+    const k = raw.trim();
+    if (k && !seen.has(k.toLowerCase())) {
+      seen.add(k.toLowerCase());
+      out.push(k);
+    }
+  }
+  return out;
+}
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Add a link to the body. The first plain mention of the anchor text becomes
+ * the link — that is where a reader expects it — and a mention already inside
+ * a link or a heading is left alone. With no mention, it goes at the end
+ * under "Related".
+ */
+export function insertLink(body, anchor, url) {
+  const text = body || "";
+  const lines = text.split("\n");
+  const pattern = new RegExp(`(^|[^\\w\\[/-])(${escapeRegExp(anchor)})(?![\\w\\]-])`, "i");
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.startsWith("#")) continue;
+    const match = pattern.exec(line);
+    if (!match) continue;
+    // Inside an existing [text](url)? Count unclosed brackets before it.
+    const before = line.slice(0, match.index + match[1].length);
+    if ((before.match(/\[/g) || []).length > (before.match(/\]/g) || []).length) continue;
+    if ((before.match(/\(/g) || []).length > (before.match(/\)/g) || []).length) continue;
+    lines[i] =
+      before + `[${match[2]}](${url})` + line.slice(match.index + match[0].length);
+    return lines.join("\n");
+  }
+  const tail = text.trimEnd();
+  const sep = tail ? "\n\n" : "";
+  return `${tail}${sep}Related: [${anchor}](${url})\n`;
+}
+
+/** Badge tone for a post's status in the queue. */
+export function postTone(post) {
+  if (post.published_at || post.status === "published") return "good";
+  if (post.status === "failed") return "bad";
+  if (post.scheduled_for) return "warn";
+  return "idle";
+}
+
+/** "Scheduled", "Published", "Draft"… for the queue. */
+export function postLabel(post) {
+  if (post.published_at || post.status === "published") return "Published";
+  if (post.status === "failed") return "Failed";
+  if (post.scheduled_for) return "Scheduled";
+  return post.status === "draft" ? "Draft" : post.status.charAt(0).toUpperCase() + post.status.slice(1);
+}

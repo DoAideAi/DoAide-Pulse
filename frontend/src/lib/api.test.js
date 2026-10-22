@@ -519,6 +519,11 @@ describe("every endpoint's path and verb", () => {
     ["seoSitemaps", [], "/seo/sitemaps", "GET"],
     ["submitSitemaps", [], "/seo/sitemaps/submit", "POST"],
     ["submitSitemaps", ["gst"], "/seo/sitemaps/submit?site=gst", "POST"],
+    ["seoPosts", [], "/seo/posts", "GET"],
+    ["seoLinkSuggestions", [{ title: "t" }], "/seo/link-suggestions", "POST"],
+    ["seoOptimalSlots", [["devto", "hashnode"]], "/seo/optimal-slots?platforms=devto&platforms=hashnode", "GET"],
+    ["createContent", [{ title: "t" }], "/content", "POST"],
+    ["scheduleContent", [3, { optimize: true }], "/content/3/schedule", "POST"],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],
