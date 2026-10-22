@@ -136,6 +136,9 @@ def test_script_may_only_come_from_this_origin(base_url: str):
     """
     csp = httpx.get(f"{base_url}/index.html").headers["content-security-policy"]
     assert "script-src 'self'" in csp
+    # One named host and no wildcard: Umami's script, and nothing else.
+    sources = csp.split("script-src")[1].split(";")[0].split()
+    assert sources == ["'self'", "https://analytics.doaide.com"]
     assert "'unsafe-inline'" not in csp.split("script-src")[1].split(";")[0]
     assert "'unsafe-eval'" not in csp
 
@@ -150,6 +153,19 @@ def test_the_fonts_the_build_actually_loads_are_allowed(base_url: str):
     csp = httpx.get(f"{base_url}/index.html").headers["content-security-policy"]
     assert "https://fonts.googleapis.com" in csp
     assert "https://fonts.gstatic.com" in csp
+
+
+def test_umami_can_load_and_report(base_url: str):
+    """frontend/index.html loads Umami from analytics.doaide.com.
+
+    With ``'self'`` alone the script was blocked and so was its beacon, and the
+    site's own visits never reached the traffic panel that reports on them.
+    """
+    csp = httpx.get(f"{base_url}/index.html").headers["content-security-policy"]
+    connect = csp.split("connect-src")[1].split(";")[0]
+    assert "https://analytics.doaide.com" in connect
+    index = (_REPO / "frontend" / "index.html").read_text("utf-8")
+    assert 'src="https://analytics.doaide.com/script.js"' in index
 
 
 @pytest.mark.parametrize(

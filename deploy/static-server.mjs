@@ -72,18 +72,25 @@ function cacheControl(pathname) {
 //   font-src            ...and the font files themselves from gstatic.com.
 //   img-src https:      Post previews, lead images and social cards point at
 //                       whatever host the author's image lives on.
-//   connect-src 'self'  The API is same-origin behind Caddy (see
-//                       Caddyfile.pulse), so nothing else needs reaching.
+//   connect-src         The API is same-origin behind Caddy (see
+//                       Caddyfile.pulse). The one other host is Umami.
+//   analytics.doaide.com  index.html loads Umami's script from it and the
+//                       script beacons back to it. Leaving it out of
+//                       script-src and connect-src blocked both silently, so
+//                       Pulse counted zero visits to itself while its own SEO
+//                       traffic panel read those very numbers.
 //
 // frame-ancestors repeats X-Frame-Options because the header is the legacy
 // spelling and the directive is the one modern browsers honour.
+const ANALYTICS = "https://analytics.doaide.com";
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self' ${ANALYTICS}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: https:",
-  "connect-src 'self'",
+  `connect-src 'self' ${ANALYTICS}`,
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",
