@@ -76,7 +76,9 @@ async function draw(path) {
       <App />
     </MemoryRouter>,
   );
-  await act(async () => {});
+  // A macrotask, not a microtask flush: the pages are lazy chunks whose
+  // dynamic imports settle a few ticks after the render that asked for them.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   return result;
 }
 

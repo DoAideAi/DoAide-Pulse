@@ -1,39 +1,53 @@
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorFallback, RouteErrorBoundary } from "./components/ErrorBoundary";
 import InstallPrompt from "./components/InstallPrompt";
 import Shell from "./components/Shell";
 import { useAuth } from "./hooks/useAuth";
 import { trackPageView } from "./lib/activity";
-import Analytics from "./pages/Analytics";
-import Blog from "./pages/Blog";
-import BlogPost from "./pages/BlogPost";
-import Calendar from "./pages/Calendar";
-import ContentEditor from "./pages/ContentEditor";
-import ContentList from "./pages/ContentList";
-import Dashboard from "./pages/Dashboard";
-import Embed from "./pages/Embed";
 import LandingPage from "./pages/LandingPage";
-import Login from "./pages/Login";
-import NewsletterGallery from "./pages/NewsletterGallery";
-import PreviewPage from "./pages/PreviewPage";
-import ProductActivity from "./pages/ProductActivity";
-import Seo from "./pages/Seo";
-import Projects from "./pages/Projects";
-import Publish from "./pages/Publish";
-import Settings from "./pages/Settings";
-import Templates from "./pages/Templates";
-import TemplatesGallery from "./pages/TemplatesGallery";
-import Triggers from "./pages/Triggers";
-import PublicArticle from "./pages/PublicArticle";
-import SubjectLineTester from "./pages/tools/SubjectLineTester";
-import SendTimeOptimizer from "./pages/tools/SendTimeOptimizer";
-import NewsletterRoiCalculator from "./pages/tools/NewsletterRoiCalculator";
-import ContentIdeaGenerator from "./pages/tools/ContentIdeaGenerator";
+import lazyPage from "./lib/lazyPage";
+
+// The landing page is the cold entry for nearly every visit and the place a
+// signed-out redirect lands, so it ships in the entry chunk. Everything else
+// is fetched when its route is first matched.
+const Analytics = lazyPage(() => import("./pages/Analytics"));
+const Blog = lazyPage(() => import("./pages/Blog"));
+const BlogPost = lazyPage(() => import("./pages/BlogPost"));
+const Calendar = lazyPage(() => import("./pages/Calendar"));
+const ContentEditor = lazyPage(() => import("./pages/ContentEditor"));
+const ContentList = lazyPage(() => import("./pages/ContentList"));
+const Dashboard = lazyPage(() => import("./pages/Dashboard"));
+const Embed = lazyPage(() => import("./pages/Embed"));
+const Login = lazyPage(() => import("./pages/Login"));
+const NewsletterGallery = lazyPage(() => import("./pages/NewsletterGallery"));
+const PreviewPage = lazyPage(() => import("./pages/PreviewPage"));
+const ProductActivity = lazyPage(() => import("./pages/ProductActivity"));
+const Seo = lazyPage(() => import("./pages/Seo"));
+const Projects = lazyPage(() => import("./pages/Projects"));
+const Publish = lazyPage(() => import("./pages/Publish"));
+const Settings = lazyPage(() => import("./pages/Settings"));
+const Templates = lazyPage(() => import("./pages/Templates"));
+const TemplatesGallery = lazyPage(() => import("./pages/TemplatesGallery"));
+const Triggers = lazyPage(() => import("./pages/Triggers"));
+const PublicArticle = lazyPage(() => import("./pages/PublicArticle"));
+const SubjectLineTester = lazyPage(() => import("./pages/tools/SubjectLineTester"));
+const SendTimeOptimizer = lazyPage(() => import("./pages/tools/SendTimeOptimizer"));
+const NewsletterRoiCalculator = lazyPage(() => import("./pages/tools/NewsletterRoiCalculator"));
+const ContentIdeaGenerator = lazyPage(() => import("./pages/tools/ContentIdeaGenerator"));
 
 function Loading() {
   return (
     <div className="flex min-h-screen items-center justify-center">
+      <span className="eyebrow animate-pulse">Loading</span>
+    </div>
+  );
+}
+
+/** A page chunk loading inside the Shell: the chrome stays, only the body waits. */
+function PageLoading() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center" role="status">
       <span className="eyebrow animate-pulse">Loading</span>
     </div>
   );
@@ -60,7 +74,7 @@ function Protected({ children }) {
   return (
     <Shell>
       <RouteErrorBoundary title="This page stopped working" section="page">
-        {children}
+        <Suspense fallback={<PageLoading />}>{children}</Suspense>
       </RouteErrorBoundary>
     </Shell>
   );
@@ -85,7 +99,7 @@ function Unshelled({ children, section }) {
         </div>
       )}
     >
-      {children}
+      <Suspense fallback={<Loading />}>{children}</Suspense>
     </RouteErrorBoundary>
   );
 }

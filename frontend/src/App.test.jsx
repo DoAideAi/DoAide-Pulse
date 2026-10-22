@@ -80,9 +80,14 @@ async function draw(path) {
   return result;
 }
 
-/** Let every promise already in flight resolve inside `act`. */
+/**
+ * Let every promise already in flight resolve inside `act`.
+ *
+ * A macrotask rather than a bare microtask flush: the pages are lazy chunks,
+ * and their dynamic imports settle a few ticks after the render that asked.
+ */
 function settle() {
-  return act(async () => {});
+  return act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 }
 
 /** Follow a nav link, then let the refreshed queue counts land. */
