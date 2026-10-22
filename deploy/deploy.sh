@@ -45,9 +45,12 @@ fi
 
 echo "==> syncing to $HOST:$REMOTE"
 # The excludes are also what protects them from --delete: .env, the server's
-# venv and the beat schedule live only on the box and must survive a deploy.
+# venv, the beat schedule, the deploy history and user uploads live only on the
+# box and must survive a deploy. Uploads were safe before only while the local
+# copy happened to hold every file the server did.
 rsync -az --delete \
   --exclude '.git' --exclude '.env' --exclude '.env.*' --exclude 'keys/' \
+  --exclude '.deploy-history' --exclude 'backend/uploads/' \
   --exclude '.venv/' --exclude 'node_modules/' --exclude '__pycache__/' \
   --exclude '*.pyc' --exclude '.pytest_cache/' --exclude '.ruff_cache/' \
   --exclude '*.egg-info/' --exclude 'celerybeat-schedule*' --exclude '.claude/' \
