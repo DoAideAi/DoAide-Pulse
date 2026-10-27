@@ -24,8 +24,17 @@ function setContent(html, attr, key, value) {
   return html.replace(tag, (_, open, close) => `${open}${escapeAttr(value)}${close}`);
 }
 
-export function withPageMeta(html, { title, description, path }) {
+export function withPageMeta(html, { title, description, path, heading }) {
   let out = html;
+  // A crawler that does not run JavaScript otherwise finds an empty #root: no
+  // h1 and no text. createRoot replaces this the moment React mounts.
+  if (heading) {
+    const body = description ? `<p>${escapeAttr(description)}</p>` : "";
+    out = out.replace(
+      '<div id="root"></div>',
+      `<div id="root"><main><h1>${escapeAttr(heading)}</h1>${body}</main></div>`,
+    );
+  }
   if (title) {
     out = out.replace(/<title>[^<]*<\/title>/, `<title>${escapeAttr(title)}</title>`);
     out = setContent(out, "property", "og:title", title);
@@ -50,11 +59,14 @@ export function withPageMeta(html, { title, description, path }) {
 /** Every route to prerender: the static public pages, then one per blog post. */
 export function prerenderRoutes(routeMeta, posts) {
   return [
-    ...Object.values(routeMeta).filter((meta) => meta.path !== "/"),
+    ...Object.values(routeMeta)
+      .filter((meta) => meta.path !== "/")
+      .map((meta) => ({ ...meta, heading: meta.title.replace(/\s*\|\s*DoAide Pulse$/, "") })),
     ...posts.map((post) => ({
       title: `${post.title} | DoAide Pulse`,
       description: post.description,
       path: `/blog/${post.slug}`,
+      heading: post.title,
     })),
   ];
 }

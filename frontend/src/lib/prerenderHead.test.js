@@ -38,6 +38,16 @@ describe("withPageMeta against the real index.html", () => {
   });
 });
 
+describe("withPageMeta with a heading", () => {
+  const html = withPageMeta(INDEX, { ...TOOL, heading: "Subject <Line> Tester" });
+
+  it("gives crawlers an h1 and the description inside #root", () => {
+    expect(html).toContain(
+      `<div id="root"><main><h1>Subject &lt;Line&gt; Tester</h1><p>${escapeAttr(TOOL.description)}</p></main></div>`,
+    );
+  });
+});
+
 describe("escapeAttr", () => {
   it("cannot be broken out of", () => {
     expect(escapeAttr('a "b" <c> & d')).toBe("a &quot;b&quot; &lt;c&gt; &amp; d");
@@ -66,6 +76,13 @@ describe("prerenderRoutes", () => {
     for (const r of routes) {
       expect(r.title).toBeTruthy();
       expect(r.description).toBeTruthy();
+    }
+  });
+
+  it("gives every route an h1 without the site suffix", () => {
+    for (const r of routes) {
+      expect(r.heading).toBeTruthy();
+      expect(r.heading).not.toMatch(/DoAide Pulse$/);
     }
   });
 });
