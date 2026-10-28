@@ -31,7 +31,7 @@ export const PUBLIC_ROUTE_META = {
   "/gallery": {
     title: "Newsletter Gallery | DoAide Pulse",
     description:
-      "Explore AI-generated newsletter examples across industries — technology, startups, design, e-commerce, engineering, and lifestyle. See what DoAide Pulse can create.",
+      "Sample newsletter layouts across industries — technology, startups, design, e-commerce, engineering, and lifestyle. Pick a style and let DoAide Pulse draft your first issue.",
     path: "/gallery",
   },
   "/templates": {

@@ -13,7 +13,6 @@ const NEWSLETTERS = [
     name: "The AI Weekly",
     category: "Technology",
     description: "A curated roundup of the week's most important AI developments, research papers, and industry moves.",
-    stats: { generatedIn: "12s", openRate: "42%" },
     colors: { primary: "#6366F1", secondary: "#818CF8", bg: "#1E1B4B" },
   },
   {
@@ -21,7 +20,6 @@ const NEWSLETTERS = [
     name: "Startup Pulse India",
     category: "Business",
     description: "Weekly coverage of India's startup ecosystem — funding rounds, product launches, and founder interviews.",
-    stats: { generatedIn: "18s", openRate: "38%" },
     colors: { primary: "#F97316", secondary: "#FB923C", bg: "#431407" },
   },
   {
@@ -29,7 +27,6 @@ const NEWSLETTERS = [
     name: "Design Digest",
     category: "Design",
     description: "Handpicked design inspiration, tool reviews, and career advice for UI/UX designers.",
-    stats: { generatedIn: "9s", openRate: "45%" },
     colors: { primary: "#EC4899", secondary: "#F472B6", bg: "#500724" },
   },
   {
@@ -37,7 +34,6 @@ const NEWSLETTERS = [
     name: "E-commerce Insider",
     category: "Retail",
     description: "Trends, tactics, and case studies for online sellers — from D2C brands to marketplace operators.",
-    stats: { generatedIn: "15s", openRate: "35%" },
     colors: { primary: "#10B981", secondary: "#34D399", bg: "#022C22" },
   },
   {
@@ -45,7 +41,6 @@ const NEWSLETTERS = [
     name: "Developer Notes",
     category: "Engineering",
     description: "Technical deep dives, new releases, and battle-tested patterns for software engineers.",
-    stats: { generatedIn: "11s", openRate: "48%" },
     colors: { primary: "#3B82F6", secondary: "#60A5FA", bg: "#172554" },
   },
   {
@@ -53,7 +48,6 @@ const NEWSLETTERS = [
     name: "Wellness Weekly",
     category: "Lifestyle",
     description: "Evidence-based health tips, mindfulness practices, and fitness advice delivered every Monday.",
-    stats: { generatedIn: "10s", openRate: "40%" },
     colors: { primary: "#A78BFA", secondary: "#C4B5FD", bg: "#2E1065" },
   },
 ];
@@ -61,21 +55,24 @@ const NEWSLETTERS = [
 const FAQS = [
   {
     q: "How quickly can AI generate a newsletter?",
-    a: "DoAide Pulse generates complete newsletters in 10-20 seconds. The AI handles research, writing, and formatting — you review and customize before sending.",
+    a: "The AI writes a first draft from your topic and sources, formatted and ready to edit. Nothing goes out until you have reviewed it.",
   },
   {
     q: "Can I create a newsletter similar to these examples?",
-    a: "Yes. Sign up for free and choose a template or describe the newsletter you want. The AI creates a personalized version matching your industry, audience, and brand.",
+    a: "Yes. These are sample layouts, not real publications. Sign up for free and choose a template or describe the newsletter you want, and the AI drafts one for your industry, audience, and brand.",
   },
   {
-    q: "What open rates can I expect with AI-generated newsletters?",
-    a: "Our users see average open rates of 35-48%, significantly above the industry average of 21%. AI-optimized subject lines, send timing, and personalization drive the difference.",
+    q: "Can I publish a newsletter somewhere other than email?",
+    a: "Yes. Pulse publishes the same piece to the platforms you connect, such as Dev.to, Medium, WordPress, Hashnode, Mastodon, Bluesky or your own Git-hosted blog, and to an RSS feed.",
   },
 ];
 
 function NewsletterPreview({ newsletter, colors }) {
+  // A picture of a layout, made of empty bars. Hidden from screen readers,
+  // which otherwise walked a dozen unlabelled boxes and a "READ MORE" that is
+  // not a link. The card's heading and description say what it is.
   return (
-    <div className="rounded-lg overflow-hidden border border-line bg-canvas">
+    <div className="rounded-lg overflow-hidden border border-line bg-canvas" aria-hidden="true">
       <div className="h-16 flex items-center justify-center px-4" style={{ background: `linear-gradient(135deg, ${colors.bg} 0%, transparent 100%)` }}>
         <div className="text-center">
           <div className="text-[11px] font-bold tracking-wider" style={{ color: colors.primary }}>{newsletter.name.toUpperCase()}</div>
@@ -117,22 +114,24 @@ function NewsletterCard({ newsletter, isExpanded, onToggle }) {
         <h3 className="font-display text-lg text-ink-900 mb-1">{newsletter.name}</h3>
         <p className="text-sm text-ink-500 mb-3 leading-relaxed">{newsletter.description}</p>
 
-        <div className="flex items-center gap-4 mb-4 font-mono text-[11px] text-ink-400">
-          <span>Generated in <span className="text-brand-500">{newsletter.stats.generatedIn}</span></span>
-          <span>Open rate <span className="text-brand-500">{newsletter.stats.openRate}</span></span>
-        </div>
+        <p className="mb-4 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-400">Sample layout</p>
 
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={onToggle}
             aria-expanded={isExpanded}
+            aria-controls={`gallery-${newsletter.id}-issue`}
+            aria-label={`${isExpanded ? "Close" : "Expand"} the ${newsletter.name} sample`}
             className="flex-1 rounded-lg border border-line bg-paper px-4 py-2 text-sm text-ink-700 transition hover:border-brand-500/40 hover:text-brand-500"
           >
             {isExpanded ? "Close" : "Expand"}
           </button>
           <Link
-            to="/"
+            to="/login"
             className="flex-1 rounded-lg btn-primary text-center"
+            aria-label={`Create a newsletter like ${newsletter.name}`}
+            onClick={() => trackEvent("cta-click", { source: "gallery-card", template: newsletter.id })}
           >
             Create Similar
           </Link>
@@ -140,8 +139,11 @@ function NewsletterCard({ newsletter, isExpanded, onToggle }) {
       </div>
 
       {isExpanded && (
-        <div className="border-t border-line bg-paper/50 p-5">
-          <div className="rounded-xl border border-line overflow-hidden bg-canvas">
+        <div id={`gallery-${newsletter.id}-issue`} className="border-t border-line bg-paper/50 p-5">
+          <p className="mb-3 text-xs text-ink-500">
+            A full-issue layout for {newsletter.name}. Sign up to have Pulse write one on your own topic.
+          </p>
+          <div className="rounded-xl border border-line overflow-hidden bg-canvas" aria-hidden="true">
             <div className="h-24 flex flex-col items-center justify-center" style={{ background: `linear-gradient(135deg, ${colors.bg} 0%, ${colors.primary}22 100%)` }}>
               <div className="text-lg font-bold tracking-wider" style={{ color: colors.primary }}>{newsletter.name}</div>
               <div className="text-xs text-ink-500 mt-1">Issue #47 · October 8, 2026</div>
@@ -225,7 +227,7 @@ export default function NewsletterGallery() {
           <span className="eyebrow mb-3 block text-brand-500">Gallery</span>
           <h1 className="font-display text-4xl md:text-5xl text-ink-900 mb-4">Newsletters built with AI</h1>
           <p className="text-lg text-ink-500 max-w-2xl mx-auto">
-            See what DoAide Pulse creates. Each newsletter was researched, written, and optimized by AI — then reviewed by a human editor in minutes.
+            Sample layouts for the kinds of newsletters you can make with DoAide Pulse. Pick a style, describe your topic, and the AI writes the first issue for you to review.
           </p>
         </div>
 
@@ -243,9 +245,9 @@ export default function NewsletterGallery() {
         <div className="panel p-8 md:p-12 text-center mb-16">
           <h2 className="font-display text-2xl md:text-3xl text-ink-900 mb-4">Create your own AI newsletter</h2>
           <p className="text-ink-500 mb-6 max-w-lg mx-auto">
-            Tell us your topic and audience. The AI researches, writes, and optimizes — you review and publish. First newsletter in under 5 minutes.
+            Tell us your topic and audience. The AI drafts the issue — you review, edit, and publish.
           </p>
-          <Link to="/" className="btn-primary" onClick={() => trackEvent("cta-click", { source: "gallery" })}>
+          <Link to="/login" className="btn-primary" onClick={() => trackEvent("cta-click", { source: "gallery" })}>
             Start creating free
           </Link>
         </div>
