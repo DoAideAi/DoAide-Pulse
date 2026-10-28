@@ -162,3 +162,62 @@ def test_every_deliberate_override_is_still_there():
         for code in route.responses
     }
     assert live >= DELIBERATE_OVERRIDES, DELIBERATE_OVERRIDES - live
+
+
+# --------------------------------------------------------------------------- #
+# M7: the documented failures are the ones that happen                         #
+# --------------------------------------------------------------------------- #
+
+import inspect as _inspect  # noqa: E402
+import re as _re  # noqa: E402
+
+#: The ownership guards. Each answers 404 for a row that is not the caller's,
+#: so an endpoint that calls one can fail that way whatever its own body says.
+_OWNERSHIP_GUARDS = _re.compile(r"\b(owned_project|_owned|_owned_content)\(")
+_RAISED = _re.compile(r"status_code=status\.HTTP_(\d{3})")
+
+
+def _undeclared(route: APIRoute) -> set[int]:
+    """Statuses *route* can answer with that its schema entry does not name.
+
+    Read from the endpoint's own source: a status it raises, a 404 from an
+    ownership guard it calls, a 429 from a limiter it wears. 422 is declared by
+    FastAPI for any route that takes input, so it is counted as declared there.
+    """
+    source = _inspect.getsource(route.endpoint)
+    raised = {int(code) for code in _RAISED.findall(source)}
+    if _OWNERSHIP_GUARDS.search(source):
+        raised.add(404)
+    if "@limiter.limit" in source:
+        raised.add(429)
+    declared = {int(code) for code in route.responses}
+    takes_input = bool(
+        route.body_field
+        or route.dependant.query_params
+        or route.dependant.path_params
+    )
+    if takes_input:
+        declared.add(422)
+    return {code for code in raised - declared if code not in SUCCESS}
+
+
+@pytest.mark.parametrize("route", ROUTES)
+def test_every_failure_an_endpoint_raises_is_in_its_contract(route):
+    """A client generated from the schema handles the statuses it lists.
+
+    ``POST /tags/rename`` answered 404 for another account's ``project_id``
+    and declared only 401, 413, 422 and 429 — the one route the census found
+    when it was written, by sending every route real and malformed requests.
+    """
+    assert _undeclared(route) == set(), (
+        f"{sorted(route.methods)[0]} {route.path} can answer "
+        f"{sorted(_undeclared(route))} but does not declare it in responses=errors(...)."
+    )
+
+
+def test_the_contract_census_sees_what_it_is_looking_for():
+    """Guard the guard: a census that reads nothing passes everything."""
+    found = [r for r in (p.values[0] for p in ROUTES) if _OWNERSHIP_GUARDS.search(_inspect.getsource(r.endpoint))]
+    limited = [r for r in (p.values[0] for p in ROUTES) if "@limiter.limit" in _inspect.getsource(r.endpoint)]
+    assert len(found) > 40
+    assert len(limited) > 20

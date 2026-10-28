@@ -100,8 +100,10 @@ def tag_tree(
     "/rename",
     response_model=TagRenameOut,
     summary="Rename or merge a tag across every piece that carries it",
+    # OWNED, not AUTHENTICATED: a ``project_id`` that is not the caller's is a
+    # 404 from ``owned_project``, which the schema did not say (M7).
     responses=errors(
-        *AUTHENTICATED,
+        *OWNED,
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         status.HTTP_429_TOO_MANY_REQUESTS,
     ),
