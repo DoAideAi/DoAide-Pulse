@@ -103,3 +103,18 @@ def test_the_response_model_does_not_drop_fields(client, auth, db, user, project
     assert set(answered) == set(produced)
     assert set(answered["series"][0]) == set(produced["series"][0])
     assert set(answered["by_source"][0]) == set(produced["by_source"][0])
+
+
+def test_the_counts_are_one_scan_not_three(client, auth, db, project, sql_log):
+    """Total, last-30 and before-window share their WHERE clause; they were
+    three separate passes over the subscriber table on every page load."""
+    _seed(db, project, days_ago_counts={0: 2, 40: 1, 200: 1})
+
+    sql_log.clear()
+    body = client.get("/api/v1/analytics/subscribers", headers=auth).json()
+
+    assert (body["total"], body["last_30_days"]) == (4, 2)
+    assert body["series"][0]["cumulative"] == 1  # the 200-day-old one
+    scans = [s for s in sql_log if s.startswith("SELECT") and "FROM subscribers" in s]
+    # One for the counts, one for the per-day series, one for the sources.
+    assert len(scans) == 3, "\n".join(s[:160] for s in scans)

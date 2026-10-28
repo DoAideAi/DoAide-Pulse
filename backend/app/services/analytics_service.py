@@ -1510,20 +1510,18 @@ def subscriber_growth(db: Session, user_id: int, *, days: int = 90) -> dict:
     owned = select(Project.id).where(Project.user_id == user_id)
     mine = or_(Subscriber.project_id.is_(None), Subscriber.project_id.in_(owned))
 
-    total = db.execute(select(func.count()).select_from(Subscriber).where(mine)).scalar_one()
-
     since = window_start(days)
-    last_30 = db.execute(
-        select(func.count())
+    # Three counts over the same rows, so one scan: they were three separate
+    # passes over this user's subscribers, on the analytics page's load.
+    total, last_30, before = db.execute(
+        select(
+            func.count(),
+            func.count().filter(Subscriber.created_at >= window_start(30)),
+            func.count().filter(Subscriber.created_at < since),
+        )
         .select_from(Subscriber)
-        .where(mine, Subscriber.created_at >= window_start(30))
-    ).scalar_one()
-
-    before = db.execute(
-        select(func.count())
-        .select_from(Subscriber)
-        .where(mine, Subscriber.created_at < since)
-    ).scalar_one()
+        .where(mine)
+    ).one()
 
     per_day = dict(
         db.execute(
