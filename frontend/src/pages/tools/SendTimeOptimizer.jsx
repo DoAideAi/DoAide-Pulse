@@ -51,10 +51,17 @@ const TZ_OFFSETS = {
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-function adjustHour(baseHour, tz) {
-  const diff = TZ_OFFSETS[tz] - TZ_OFFSETS.IST;
-  const h = ((baseHour + diff) % 24 + 24) % 24;
-  return Math.round(h * 2) / 2;
+// The industry figures are the audience's own clock — "Tuesday 10 AM" means
+// 10 AM where the readers are, whichever zone that is. They used to be shifted
+// as if they were IST, so a PST audience was told to send at 8:30 PM, and a
+// shift past midnight kept the original day. The recommendation now stays in
+// the audience's time; the IST line underneath is when to press send from
+// India, with the day moved when the conversion crosses midnight.
+function inIst(day, hour, tz) {
+  const shifted = hour + (TZ_OFFSETS.IST - TZ_OFFSETS[tz]);
+  const dayShift = Math.floor(shifted / 24);
+  const index = (DAYS.indexOf(day) + dayShift + DAYS.length) % DAYS.length;
+  return { day: DAYS[index], hour: shifted - dayShift * 24 };
 }
 
 function formatHour(h) {
@@ -65,7 +72,7 @@ function formatHour(h) {
   return `${display}:${min} ${ampm}`;
 }
 
-function buildHeatmap(slots, tz) {
+function buildHeatmap(slots) {
   const map = {};
   for (const d of DAYS) map[d] = 0;
   for (const s of slots) map[s.day] = Math.max(map[s.day], 1);
@@ -78,12 +85,8 @@ export default function SendTimeOptimizer() {
 
   usePageMeta(PUBLIC_ROUTE_META["/tools/send-time-optimizer"]);
 
-  const baseSlots = INDUSTRIES[industry];
-  const adjusted = baseSlots.map((s) => ({
-    day: s.day,
-    hour: adjustHour(s.hour, tz),
-  }));
-  const heatmap = buildHeatmap(adjusted, tz);
+  const slots = INDUSTRIES[industry];
+  const heatmap = buildHeatmap(slots);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -130,15 +133,23 @@ export default function SendTimeOptimizer() {
       <div className="mt-6 space-y-4">
         <h2 className="text-sm font-semibold text-ink-900">Recommended send times</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          {adjusted.map((s, i) => (
-            <div key={i} className="panel p-4" data-testid="time-slot">
-              <div className="text-lg font-semibold text-ink-900">{s.day}</div>
-              <div className="text-brand-500 font-medium" data-testid="time-display">
-                {formatHour(s.hour)}
+          {slots.map((s, i) => {
+            const ist = inIst(s.day, s.hour, tz);
+            return (
+              <div key={i} className="panel p-4" data-testid="time-slot">
+                <div className="text-lg font-semibold text-ink-900">{s.day}</div>
+                <div className="text-brand-500 font-medium" data-testid="time-display">
+                  {formatHour(s.hour)}
+                </div>
+                <div className="text-xs text-ink-400">{tz} — your audience's time</div>
+                {tz !== "IST" && (
+                  <div className="mt-1 text-xs text-ink-500" data-testid="ist-display">
+                    {ist.day} {formatHour(ist.hour)} IST
+                  </div>
+                )}
               </div>
-              <div className="text-xs text-ink-400">{tz}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -163,7 +174,7 @@ export default function SendTimeOptimizer() {
 
       <div className="panel mt-10 p-5 text-center">
         <p className="mb-3 text-ink-900">
-          Let AI pick the perfect send time for each subscriber.
+          Let Pulse learn when your own posts do best, and schedule for it.
         </p>
         <Link to="/" className="btn-primary" onClick={() => trackEvent("cta-click", { source: "tool-sendtime" })}>
           Try DoAide Pulse

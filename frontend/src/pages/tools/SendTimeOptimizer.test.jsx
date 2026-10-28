@@ -54,4 +54,21 @@ describe("SendTimeOptimizer", () => {
       expect(d.textContent).toMatch(/^\d{1,2}:\d{2}\s[AP]M$/);
     }
   });
+
+  it("keeps the recommendation in the audience's own time", async () => {
+    wrap();
+    await userEvent.selectOptions(screen.getByLabelText(/audience timezone/i), "PST");
+    // Tech's Tuesday 10 AM is 10 AM for readers in PST, not 8:30 PM.
+    expect(screen.getAllByTestId("time-display")[0].textContent).toBe("10:00 AM");
+  });
+
+  it("moves the day when the IST equivalent crosses midnight", async () => {
+    wrap();
+    await userEvent.selectOptions(screen.getByLabelText(/industry/i), "Media");
+    await userEvent.selectOptions(screen.getByLabelText(/audience timezone/i), "PST");
+    // Monday 6 AM in PST is Monday 7:30 PM in IST; Thursday 4 PM PST is
+    // Friday 5:30 AM IST.
+    const ist = screen.getAllByTestId("ist-display").map((d) => d.textContent);
+    expect(ist).toEqual(["Monday 7:30 PM IST", "Friday 5:30 AM IST"]);
+  });
 });

@@ -111,7 +111,7 @@ const FEATURES = [
   },
   {
     title: "Send Time Optimization",
-    desc: "Delivers to each subscriber when they are most likely to read.",
+    desc: "Schedules each post for the hour your own past posts did best on that platform.",
     icon: (
       <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#0D9488" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
