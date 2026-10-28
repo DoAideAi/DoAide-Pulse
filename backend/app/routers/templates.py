@@ -57,6 +57,32 @@ logger = logging.getLogger(__name__)
 _VALUE_ERROR_PREFIX = "Value error, "
 
 
+#: ``loc`` parts Pydantic adds for a union member it tried — a type, not a
+#: field. Kept in step with ``isTypeTag`` in ``frontend/src/lib/api.js``, which
+#: labels the 422s FastAPI produces the same way this labels the ones the PATCH
+#: below produces itself.
+_TYPE_TAGS = frozenset(
+    {"int", "str", "float", "bool", "bytes", "none", "datetime", "date", "time",
+     "timedelta", "decimal", "uuid", "url", "dict", "list", "set", "tuple"}
+)
+
+
+def _field_label(loc: tuple) -> str:
+    """``("variables", 0, "default")`` → ``"Default"``; ``("tags", 3)`` → ``"Tags (item 4)"``."""
+    item: int | None = None
+    for part in reversed(loc):
+        if isinstance(part, int):
+            if item is None:
+                item = part
+            continue
+        if part in _TYPE_TAGS or "[" in part or part[:1].isupper():
+            continue
+        label = part.replace("_", " ")
+        label = label[:1].upper() + label[1:]
+        return f"{label} (item {item + 1})" if item is not None else label
+    return ""
+
+
 def _validation_detail(exc: ValidationError) -> str:
     """The user-facing messages from a Pydantic ValidationError.
 
@@ -65,13 +91,19 @@ def _validation_detail(exc: ValidationError) -> str:
     The ``.errors()`` list carries a ``msg`` per field that is already
     human-readable; custom validators (``type='value_error'``) add a
     ``"Value error, "`` prefix that is redundant with the message itself.
+
+    Each message leads with the field it is about, the way the frontend labels
+    FastAPI's own 422s. This one is a string the frontend shows verbatim, so a
+    PATCH that failed on one field of eight said only "String should have at
+    most 500 characters".
     """
     parts: list[str] = []
     for err in exc.errors():
         msg = err["msg"]
         if msg.startswith(_VALUE_ERROR_PREFIX):
             msg = msg[len(_VALUE_ERROR_PREFIX) :]
-        parts.append(msg)
+        label = _field_label(tuple(err.get("loc") or ()))
+        parts.append(f"{label}: {msg}" if label else msg)
     return "; ".join(parts) if parts else "Invalid template data."
 
 

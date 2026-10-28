@@ -95,3 +95,45 @@ def test_patch_too_many_variables_error_is_clean(client, auth):
     assert isinstance(detail, str)
     assert "TemplateCreate" not in detail
     assert "pydantic.dev" not in detail
+
+
+def test_a_field_level_message_names_its_field():
+    """The PATCH's own 422 is a string; each message leads with its field."""
+    import pytest
+    from pydantic import ValidationError
+
+    from app.routers.templates import _validation_detail
+    from app.schemas.template import TemplateCreate
+
+    with pytest.raises(ValidationError) as caught:
+        TemplateCreate(
+            name="T",
+            mode="literal",
+            content_type="announcement",
+            description="x" * 501,
+            body_template="Hi",
+            variables=[{"name": "ok", "default": "d" * 2001}],
+        )
+    detail = _validation_detail(caught.value)
+    assert "Description: " in detail
+    assert "Default: " in detail
+    assert "TemplateCreate" not in detail
+
+
+def test_a_model_level_message_has_no_field_to_name(client, auth):
+    """The undeclared-placeholder check is about the whole template."""
+    created = client.post(API, json=_payload(), headers=auth)
+    resp = client.patch(f"{API}/{created.json()['id']}", json={"variables": []}, headers=auth)
+    detail = resp.json()["detail"]
+    assert not detail.startswith(":")
+    assert "headline" in detail
+
+
+def test_field_labels_skip_type_tags_and_count_items_from_one():
+    from app.routers.templates import _field_label
+
+    assert _field_label(("variables", 0, "default")) == "Default"
+    assert _field_label(("tags", 3)) == "Tags (item 4)"
+    assert _field_label(("count", "int")) == "Count"
+    assert _field_label(("items", 0, "TemplateVariable", "name")) == "Name"
+    assert _field_label(()) == ""
