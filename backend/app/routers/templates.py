@@ -549,7 +549,12 @@ def use_template(
             source=source,
         )
 
-    template.use_count = ContentTemplate.use_count + 1
+    # The piece first, the count after. ``commit_new`` rolls the session back
+    # on a slug collision before it retries, and a rollback discards every
+    # staged change — an increment staged ahead of it went with the first
+    # attempt, so a use that lost the race was a draft nobody counted.
     content_store.commit_new(db, content)
+    template.use_count = ContentTemplate.use_count + 1
     db.commit()
+    db.refresh(content)
     return to_detail(content)

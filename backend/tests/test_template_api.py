@@ -430,3 +430,43 @@ def test_the_whole_surface_needs_authentication(client):
     assert client.get(API).status_code == 401
     assert client.post(API, json={"name": "x"}).status_code == 401
     assert client.get(f"{API}/builtins").status_code == 401
+
+
+def test_a_use_that_loses_the_slug_race_is_still_counted(
+    client, auth, db, project, monkeypatch
+):
+    """The retry's rollback took the use_count increment with it.
+
+    ``use_count`` was bumped before ``content_store.commit_new``. A slug
+    collision rolls the session back — every staged change, not only the new
+    piece — so the retry committed the draft and the closing commit had nothing
+    left to write: one draft, zero uses.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    template_id = _create(client, auth, default_project_id=project.id).json()["id"]
+
+    real_commit = db.commit
+    calls = {"n": 0}
+
+    def collide_once(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            db.rollback()
+            raise IntegrityError("INSERT INTO content", {}, Exception("uq_content_project_slug"))
+        return real_commit(*args, **kwargs)
+
+    monkeypatch.setattr(db, "commit", collide_once)
+
+    resp = client.post(
+        f"{API}/{template_id}/use",
+        json={"values": {"summary": "Shipped."}},
+        headers=auth,
+    )
+    assert resp.status_code == 201, resp.text
+    assert calls["n"] >= 2  # the collision happened and was retried
+
+    monkeypatch.setattr(db, "commit", real_commit)
+    db.expire_all()
+    assert db.query(Content).count() == 1
+    assert db.get(ContentTemplate, template_id).use_count == 1

@@ -51,6 +51,12 @@ def commit_new(db: Session, content: Content) -> None:
     Only the slug constraint is retried, at most :data:`MAX_ATTEMPTS` times in
     all, each from the original stem so a retried slug never grows two
     suffixes. Any other integrity error is re-raised on the first attempt.
+
+    **Stage nothing else before calling this.** A retry starts with
+    ``db.rollback()``, which discards every pending change in the session, not
+    only *content* — so anything a caller staged first is silently lost when a
+    collision happens. Make other writes after this returns, and commit them
+    separately (see ``routers.templates.use_template``'s ``use_count``).
     """
     stem = content.slug
     for attempt in range(1, MAX_ATTEMPTS + 1):
