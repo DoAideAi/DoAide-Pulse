@@ -505,8 +505,16 @@ class ContentIdea(Base, TimestampMixin):
     rationale: Mapped[str] = mapped_column(Text, default="", nullable=False)
     source: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     #: Set once the idea has been turned into a piece, so it stops being
-    #: suggested. Not a FK — an idea outlives the draft that a user deletes.
-    used_content_id: Mapped[int | None] = mapped_column(Integer)
+    #: suggested. A FK with ON DELETE SET NULL, so an idea outlives the draft a
+    #: user deletes *and comes back*: every idea list filters on this being
+    #: null, and a dangling id used to hide the idea from all of them.
+    used_content_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "content.id",
+            ondelete="SET NULL",
+            name="fk_content_ideas_used_content_id_content",
+        )
+    )
     #: The day the user plans to write it, set from the content calendar.
     #: Null means the idea sits in the backlog, not on a day.
     planned_date: Mapped[date | None] = mapped_column(Date, index=True)
