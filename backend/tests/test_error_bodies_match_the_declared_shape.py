@@ -102,9 +102,13 @@ def test_the_two_sweeps_are_the_size_they_should_be():
     walk that missed the nested routers would empty both lists and turn the
     file green while checking nothing — the standing failure mode of a test
     that generates its own cases. The only defence is knowing the number.
+
+    134 and 67 since the SEO tooling, cross-product activity, calendar ideas
+    and personal-LLM-key routes landed; every one of them passes the error
+    shape checks below, which is why the pin moved rather than the routes.
     """
-    assert len(AUTHENTICATED) == 110
-    assert len(BY_ID) == 65
+    assert len(AUTHENTICATED) == 134
+    assert len(BY_ID) == 67
 
 
 def _assert_error_shape(resp, url: str) -> None:
