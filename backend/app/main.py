@@ -124,6 +124,16 @@ class BodySizeLimitMiddleware:
             return
 
         req_path = scope.get("path", "")
+        if "\x00" in req_path or b"%00" in scope.get("query_string", b""):
+            # The URL half of the body's ``\u0000`` check: a path or query
+            # parameter reaches ``WHERE slug = ?`` as readily as a body field,
+            # and PostgreSQL refuses NUL there too — so ``/public/articles/a%00``
+            # was a 500 from an unauthenticated route.
+            await _respond(
+                scope, send, 400,
+                "The URL contains a NUL character (%00). Remove it and try again.",
+            )
+            return
         is_upload = any(req_path.startswith(p) for p in _UPLOAD_PATHS)
         limit = MAX_UPLOAD_BODY_BYTES if is_upload else MAX_BODY_BYTES
 
