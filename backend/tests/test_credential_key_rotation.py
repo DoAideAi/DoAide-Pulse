@@ -467,3 +467,55 @@ def test_production_validates_every_key_in_the_list():
 
     with pytest.raises(ValidationError, match="key 2 of TOKEN_ENCRYPTION_KEY"):
         Settings(**base, token_encryption_key=f"{good},not-a-key")
+
+
+# --------------------------------------------------------------------------- #
+# M9: a secret replaced mid-sweep is not put back                              #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_secret_rotated_during_the_sweep_is_not_overwritten_with_the_old_one(
+    db, secrets, old_key, set_keys, monkeypatch
+):
+    """The sweep reads every stale row, then writes them back per table.
+
+    A webhook secret rotated by its owner between those two moments was
+    overwritten by the *old* secret re-encrypted — and the receiver, already
+    verifying against the new one, refused every delivery after that.
+    """
+    from tests.conftest import TestSession
+
+    new_key = Fernet.generate_key().decode()
+    set_keys(new_key, old_key)
+    webhook_id = secrets["webhook"].id
+    original = secrets["webhook"].encrypted_secret
+    real_rewrap = crypto.rewrap
+    rotated: list[str] = []
+
+    def rewrap_while_the_owner_rotates(stored: str) -> str:
+        # On the webhook's own row: after the sweep has read it as stale and
+        # before it writes it back.
+        if not rotated and stored == original:
+            other = TestSession()
+            try:
+                row = other.get(Webhook, webhook_id)
+                row.encrypted_secret = webhooks.store_secret("rotated-by-the-owner")
+                other.commit()
+            finally:
+                other.close()
+            rotated.append("done")
+        return real_rewrap(stored)
+
+    monkeypatch.setattr(crypto, "rewrap", rewrap_while_the_owner_rotates)
+
+    result = credential_rotation.rewrap_all(db)
+
+    db.expire_all()
+    assert rotated
+    assert webhooks.read_secret(db.get(Webhook, webhook_id)) == "rotated-by-the-owner"
+    # The other two tables were still moved; only the row that changed was spared.
+    assert result.by_table.get("webhooks", 0) == 0
+    assert result.rewrapped == 2
+    set_keys(new_key)
+    connection = db.get(PlatformConnection, secrets["connection"].id)
+    assert decrypt_credentials(connection.encrypted_credentials)["api_key"] == API_KEY

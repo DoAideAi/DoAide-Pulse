@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.models.platform_connection import PlatformConnection
@@ -106,7 +106,8 @@ def rewrap_all(db: Session) -> RewrapResult:
 
     The scan is two passes per table: the first reads only the primary key and
     the encrypted column to identify stale rows without loading the full entity;
-    the second loads and updates only the rows that need re-encrypting. On a box
+    the second re-encrypts only those, each written by a compare-and-swap on the
+    ciphertext it read, so a secret replaced mid-sweep is never put back. On a box
     that has never rotated — the common case — the first pass touches every row
     and the second touches none.
     """
@@ -128,20 +129,36 @@ def rewrap_all(db: Session) -> RewrapResult:
             db.rollback()
             continue
 
-        for row in db.scalars(select(model).where(model.id.in_(stale_ids))):
-            stored = getattr(row, attribute) or ""
+        for row_id, stored in db.execute(
+            select(model.id, column).where(model.id.in_(stale_ids))
+        ):
+            stored = stored or ""
             try:
-                setattr(row, attribute, crypto.rewrap(stored))
+                rewrapped = crypto.rewrap(stored)
             except crypto.CredentialEncryptionError as exc:
                 # Never the secret itself, and never the ciphertext: this line
                 # goes to a log file that is not held to the same standard as
                 # the column it describes.
                 logger.warning(
-                    "%s row %s could not be re-encrypted: %s", table, row.id, exc
+                    "%s row %s could not be re-encrypted: %s", table, row_id, exc
                 )
                 result.unreadable += 1
                 continue
-            moved += 1
+            # Compare-and-swap on the ciphertext that was read (M9). The row
+            # was read some time before this table commits, and a user who
+            # saved new credentials, rotated a webhook secret or replaced their
+            # LLM key in between had that write overwritten by the *old* secret
+            # re-encrypted — silently: a rotated webhook secret went back to
+            # the one the receiver no longer accepts. A row that moved is left
+            # alone; whatever wrote it wrote it under the current key.
+            changed = db.execute(
+                update(model)
+                .where(model.id == row_id, column == stored)
+                .values({attribute: rewrapped})
+                .execution_options(synchronize_session=False)
+            ).rowcount
+            if changed:
+                moved += 1
 
         if moved:
             db.commit()
