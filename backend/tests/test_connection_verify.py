@@ -178,3 +178,27 @@ def test_the_task_calls_the_service(db, user, monkeypatch):
 
     assert result["checked"] == 1
     assert result["valid"] == 1
+
+
+def test_an_unreachable_platform_is_named_in_the_log(db, user, monkeypatch, caplog):
+    """C105 M11: the sweep's summary said "1 unreachable" and named nothing.
+
+    The status is left alone on this branch, so the status-change warning never
+    fires; the connection, platform and account are now in a line of their own.
+    """
+    conn = _connection(db, user)
+
+    def _down(self, credentials):
+        raise PublishError("Connection timed out")
+
+    monkeypatch.setattr(
+        "app.services.connection_verify.publishers.get_adapter",
+        lambda _p: type("A", (), {"verify": _down, "credential_fields": []})(),
+    )
+    with caplog.at_level("INFO", logger="app.services.connection_verify"):
+        connection_verify.verify_all(db)
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.services.connection_verify"]
+    assert lines == [
+        f"connection {conn.id} (devto, user {user.id}) could not be verified: Connection timed out"
+    ]

@@ -72,6 +72,16 @@ def verify_all(db: Session) -> dict:
                 redact(str(exc), publishers.secret_values(adapter, credentials))
             )
             unreachable += 1
+            # The status is left alone, so the status-change line below never
+            # fires for this branch and the sweep's summary was the only trace:
+            # "3 unreachable", naming none of them.
+            logger.info(
+                "connection %d (%s, user %d) could not be verified: %s",
+                connection.id,
+                connection.platform.value,
+                connection.user_id,
+                connection.last_error,
+            )
         except Exception:
             logger.exception(
                 "unexpected error verifying connection %d (%s for user %d)",
