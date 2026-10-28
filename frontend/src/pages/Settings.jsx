@@ -598,6 +598,22 @@ function PlatformRow({ platform, onConnect, onChanged }) {
 
 /* ---- Webhooks ---- */
 
+/**
+ * A dialog's options that did not load. Without it the list was simply empty:
+ * no events or scopes to tick, a submit button that stayed disabled (or a
+ * server 422 asking for one), and nothing saying why.
+ */
+function ChoicesFailed({ what, onRetry }) {
+  return (
+    <p role="alert" className="text-xs text-bad">
+      Could not load {what}.{" "}
+      <button type="button" className="underline" onClick={onRetry}>
+        Retry
+      </button>
+    </p>
+  );
+}
+
 function WebhooksSection() {
   const toast = useToast();
   const { data, error, loading, reload } = useApi(() => api.listWebhooks(), []);
@@ -751,7 +767,10 @@ function WebhooksSection() {
 
 function CreateWebhookDialog({ onClose, onDone }) {
   const toast = useToast();
-  const { data: events } = useApi(() => api.webhookEvents(), []);
+  const { data: events, error: eventsError, reload: reloadEvents } = useApi(
+    () => api.webhookEvents(),
+    [],
+  );
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
   const [selected, setSelected] = useState([]);
@@ -817,6 +836,9 @@ function CreateWebhookDialog({ onClose, onDone }) {
       <fieldset>
         <legend className="label mb-2">Events</legend>
         <div className="space-y-2">
+          {eventsError && !events && (
+            <ChoicesFailed what="the event list" onRetry={reloadEvents} />
+          )}
           {(events ?? []).map((ev) => (
             <label key={ev.event} className="flex items-start gap-2.5 text-sm text-ink-700">
               <input
@@ -852,7 +874,10 @@ function CreateWebhookDialog({ onClose, onDone }) {
 
 function EditWebhookDialog({ webhook, onClose, onDone }) {
   const toast = useToast();
-  const { data: events } = useApi(() => api.webhookEvents(), []);
+  const { data: events, error: eventsError, reload: reloadEvents } = useApi(
+    () => api.webhookEvents(),
+    [],
+  );
   const [url, setUrl] = useState(webhook.url);
   const [description, setDescription] = useState(webhook.description || "");
   const [selected, setSelected] = useState(webhook.events);
@@ -909,6 +934,9 @@ function EditWebhookDialog({ webhook, onClose, onDone }) {
       <fieldset>
         <legend className="label mb-2">Events</legend>
         <div className="space-y-2">
+          {eventsError && !events && (
+            <ChoicesFailed what="the event list" onRetry={reloadEvents} />
+          )}
           {(events ?? []).map((ev) => (
             <label key={ev.event} className="flex items-start gap-2.5 text-sm text-ink-700">
               <input
@@ -1039,8 +1067,15 @@ function ApiKeysSection() {
 
 function CreateApiKeyDialog({ onClose, onDone }) {
   const toast = useToast();
-  const { data: projects } = useApi(() => api.listProjects(), []);
-  const { data: scopes } = useApi(() => api.apiKeyScopes(), []);
+  const {
+    data: projects,
+    error: projectsError,
+    reload: reloadProjects,
+  } = useApi(() => api.listProjects(), []);
+  const { data: scopes, error: scopesError, reload: reloadScopes } = useApi(
+    () => api.apiKeyScopes(),
+    [],
+  );
   const [projectId, setProjectId] = useState("");
   const [name, setName] = useState("");
   const [selected, setSelected] = useState([]);
@@ -1093,6 +1128,9 @@ function CreateApiKeyDialog({ onClose, onDone }) {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
+        {projectsError && !projects && (
+          <ChoicesFailed what="your projects" onRetry={reloadProjects} />
+        )}
       </div>
 
       <div>
@@ -1111,6 +1149,9 @@ function CreateApiKeyDialog({ onClose, onDone }) {
       <fieldset>
         <legend className="label mb-2">Scopes</legend>
         <div className="space-y-2">
+          {scopesError && !scopes && (
+            <ChoicesFailed what="the scope list" onRetry={reloadScopes} />
+          )}
           {(scopes ?? []).map((s) => (
             <label key={s.scope} className="flex items-start gap-2.5 text-sm text-ink-700">
               <input

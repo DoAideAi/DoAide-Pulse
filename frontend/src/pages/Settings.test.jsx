@@ -861,6 +861,23 @@ describe("outbound webhooks", () => {
     window.confirm.mockRestore();
   });
 
+  it("says the event list failed to load in the create dialog, with Retry", async () => {
+    api.listWebhooks.mockResolvedValue([]);
+    api.webhookEvents.mockRejectedValueOnce(new Error("offline"));
+    api.webhookEvents.mockResolvedValueOnce([
+      { event: "content_published", description: "A piece went live." },
+    ]);
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Add webhook" }));
+    const dialog = screen.getByRole("dialog");
+
+    expect(await within(dialog).findByText(/Could not load the event list/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Retry" }));
+    expect(await within(dialog).findByText("Content Published")).toBeInTheDocument();
+  });
+
   it("opens the create dialog and submits a new webhook", async () => {
     api.listWebhooks.mockResolvedValue([]);
     api.webhookEvents.mockResolvedValue([
@@ -962,6 +979,19 @@ describe("API keys", () => {
     await waitFor(() => expect(api.revokeApiKey).toHaveBeenCalledWith(1));
     expect(toast.success).toHaveBeenCalledWith("Key revoked");
     window.confirm.mockRestore();
+  });
+
+  it("says the scope list failed to load in the create dialog", async () => {
+    api.listApiKeys.mockResolvedValue([]);
+    api.listProjects.mockResolvedValue([{ id: 1, name: "My Project" }]);
+    api.apiKeyScopes.mockRejectedValue(new Error("offline"));
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Create key" }));
+    const dialog = screen.getByRole("dialog");
+
+    expect(await within(dialog).findByText(/Could not load the scope list/)).toBeInTheDocument();
   });
 
   it("opens the create dialog and mints a key", async () => {
