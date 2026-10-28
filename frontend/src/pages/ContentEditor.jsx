@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { SectionBoundary } from "../components/ErrorBoundary";
 import SocialPreview from "../components/SocialPreview";
@@ -82,6 +82,9 @@ function draftFrom(content) {
  * side-by-side gives you two unreadable columns, and the preview is something
  * you check rather than watch.
  */
+/** How long typing pauses before the recovery buffer is written. */
+const MIRROR_DELAY_MS = 300;
+
 export default function ContentEditor() {
   const { contentId } = useParams();
   const navigate = useNavigate();
@@ -203,18 +206,58 @@ export default function ContentEditor() {
     setRecovered(stored && differs(stored.draft, saved) ? stored : null);
   }, [contentId, saved, locked]);
 
-  // Mirror every edit. Cheap, synchronous, and cleared by `save` itself once
-  // the draft matches the server again.
+  // Mirror every edit — after a short pause in the typing, not on each key.
+  // The write is the whole draft, serialised and stored synchronously: about a
+  // millisecond and a 400 KB string per keystroke on a body near the 200,000-
+  // character limit, more on a phone, on the main thread while someone types.
+  // A pause of MIRROR_DELAY_MS loses nothing worth having, because the pending
+  // write is flushed whenever the text could be lost: the tab hidden or closed,
+  // the editor unmounting, and a save starting (so a failed save still leaves
+  // the buffer behind). A save that succeeds cancels it instead — a stale write
+  // landing after the clear would offer back text the server already has.
   //
   // Suspended while an offer is on screen. On arrival `draft` is initialised to
   // the server's copy, so mirroring it would immediately write "no difference"
   // over the buffer and delete the very work the banner is pointing at —
   // recovery would survive exactly one page load, and opening the editor would
   // be what destroyed it.
+  const mirror = useRef({ timer: null, args: null });
+  const flushMirror = useCallback(() => {
+    const pending = mirror.current;
+    clearTimeout(pending.timer);
+    pending.timer = null;
+    if (pending.args) draftStore.save(...pending.args);
+    pending.args = null;
+  }, []);
+  const cancelMirror = useCallback(() => {
+    clearTimeout(mirror.current.timer);
+    mirror.current = { timer: null, args: null };
+  }, []);
+
   useEffect(() => {
-    if (!draft || !saved || locked || recovered) return;
-    draftStore.save(contentId, draft, saved);
-  }, [contentId, draft, saved, locked, recovered]);
+    if (!draft || !saved || locked || recovered) {
+      cancelMirror();
+      return;
+    }
+    mirror.current.args = [contentId, draft, saved];
+    clearTimeout(mirror.current.timer);
+    // Back to the server's text is a clear, not a write: no reason to wait.
+    if (!differs(draft, saved)) flushMirror();
+    else mirror.current.timer = setTimeout(flushMirror, MIRROR_DELAY_MS);
+  }, [contentId, draft, saved, locked, recovered, flushMirror, cancelMirror]);
+
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flushMirror();
+    };
+    window.addEventListener("pagehide", flushMirror);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flushMirror);
+      document.removeEventListener("visibilitychange", onHide);
+      flushMirror();
+    };
+  }, [flushMirror]);
 
   // Auto-save, debounced from the last keystroke rather than run on a fixed
   // interval — a save then lands in the pause between two sentences instead of
@@ -278,6 +321,12 @@ export default function ContentEditor() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
+  // From a deferred copy of the body: the count splits the whole text into
+  // words, and on a long piece that is work a keystroke should not wait for.
+  // Above the early returns below, as every hook here has to be.
+  const deferredBody = useDeferredValue(draft?.body_markdown ?? "");
+  const stats = useMemo(() => editorStats(deferredBody), [deferredBody]);
+
   if (loading && !data) return <Skeleton rows={6} />;
   // `!data` as well as `error`: the banner takes the whole page only when there
   // is no page to take it over from.
@@ -300,9 +349,7 @@ export default function ContentEditor() {
   const set = (key) => (event) =>
     setDraft((current) => ({ ...current, [key]: event.target.value }));
 
-  // Recomputed per render rather than memoised: it is two passes over a string
-  // that is already being re-rendered into a textarea on the same keystroke.
-  const stats = editorStats(draft.body_markdown);
+
 
   const splitList = (value) =>
     value
@@ -320,6 +367,9 @@ export default function ContentEditor() {
    */
   async function persist() {
     const sent = draft;
+    // Written now, not after the pause: if this request fails, the buffer is
+    // what the author has left.
+    flushMirror();
     const updated = await api.updateContent(
       data.id,
       {
@@ -368,6 +418,7 @@ export default function ContentEditor() {
     // The server now holds this text, so the recovery buffer has nothing left
     // to recover. Dropping it here rather than waiting for the mirror effect
     // keeps a failed save from clearing it.
+    cancelMirror();
     draftStore.clear(data.id);
     setRecovered(null);
   }
