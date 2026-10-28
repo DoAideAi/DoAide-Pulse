@@ -11,18 +11,16 @@ previously imported ``celery_app`` at all.
 """
 from __future__ import annotations
 
-from app.tasks import (  # noqa: F401 -- import registers each module's tasks
-    autopilot_tasks,
-    digest_tasks,
-    headline_tasks,
-    maintenance_tasks,
-    metrics_tasks,
-    publish_tasks,
-    trigger_tasks,
-    webhook_tasks,
-)
+import importlib
+
 from app.tasks import celery_app as celery_module
 from app.tasks.celery_app import celery_app
+
+# Import registers each module's tasks. Every module the worker includes,
+# rather than a list kept by hand here: that list missed seo_tasks, so the
+# beat check below failed on main for a task the worker does register.
+for _module in celery_app.conf.include:
+    importlib.import_module(_module)
 
 PULSE_TASKS = [
     (name, obj)
