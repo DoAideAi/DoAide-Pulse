@@ -361,7 +361,9 @@ def list_deliveries(
     "/{webhook_id}/deliveries/{delivery_id}/redeliver",
     response_model=WebhookDeliveryOut,
     summary="Send a past delivery again",
-    responses=errors(*OWNED, status.HTTP_429_TOO_MANY_REQUESTS),
+    # 409 while the delivery is still being attempted, or while the endpoint
+    # is switched off — see ``webhooks.requeue``.
+    responses=errors(*OWNED, status.HTTP_409_CONFLICT, status.HTTP_429_TOO_MANY_REQUESTS),
 )
 @limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
 def redeliver(

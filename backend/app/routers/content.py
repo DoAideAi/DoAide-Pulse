@@ -1027,7 +1027,11 @@ def bulk_retry_content(
     "/bulk/archive-old",
     response_model=ArchiveOldOut,
     summary="Archive pieces older than a given age",
-    responses=errors(*AUTHENTICATED, status.HTTP_429_TOO_MANY_REQUESTS),
+    # 400 when every status asked for is one the sweep refuses (published,
+    # archived) — nothing left to sweep, said as a refusal rather than a zero.
+    responses=errors(
+        *AUTHENTICATED, status.HTTP_400_BAD_REQUEST, status.HTTP_429_TOO_MANY_REQUESTS
+    ),
 )
 @limiter.limit(settings.rate_limit_health, key_func=account_key)
 def archive_old_content(

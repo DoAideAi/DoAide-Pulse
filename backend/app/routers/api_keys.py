@@ -187,7 +187,9 @@ def create_api_key(
     "/{key_id}/rotate",
     response_model=ApiKeyRotated,
     summary="Replace a key with a new one",
-    responses=errors(*OWNED, status.HTTP_422_UNPROCESSABLE_CONTENT),
+    responses=errors(
+        *OWNED, status.HTTP_409_CONFLICT, status.HTTP_422_UNPROCESSABLE_CONTENT
+    ),
 )
 def rotate_api_key(
     key_id: RowId,
@@ -201,6 +203,9 @@ def rotate_api_key(
     instant this returns. With a grace window, both work until it closes, which
     is what makes rotating a key that is deployed in six places something other
     than a coordinated outage.
+
+    409 when a grace window would leave the project with more live keys than
+    it is allowed — the old key and its replacement both count until it closes.
     """
     key = _owned_key(key_id, db, user)
     if payload.grace_hours > 0:

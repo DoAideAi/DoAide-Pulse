@@ -23,7 +23,7 @@ destinations on a schedule, and tracks which pieces actually got read.
 | **Alerts** | Posts running far under *your own* median for that platform, flagged while a headline swap can still change the outcome. |
 | **Autopilot** | Watch repos, write when something ships, publish without review only when the model is confident and you've said it may. |
 | **Templates** | Your own reusable shapes. A `literal` template fills its variables and produces a finished draft with no model call at all; a `prompt` template hands the rendered text to the generator instead. Preview renders half-filled rather than erroring. |
-| **Triggers** | Fire the pipeline on something other than a commit — RSS, GitHub, a schedule, or an inbound webhook. The inbound URL is the only unauthenticated endpoint in the API: the 256-bit token in the path is the credential, and an HMAC signature can be required on top. |
+| **Triggers** | Fire the pipeline on something other than a commit — RSS, GitHub, a schedule, or an inbound webhook. The inbound URL is the only way to start the pipeline without signing in: the 256-bit token in the path is the credential, and an HMAC signature can be required on top. (The other public endpoints — sign-up, sign-in, password reset, the health probe, published articles, preview links, uploaded images, newsletter sign-up, the free tools and the event, trigger-kind and API-key-scope catalogues — read or collect, and write no content.) |
 | **Webhooks** | Outbound notifications with a delivery log, an on-demand test delivery, and a redeliver button — enough to debug one without server access. |
 | **Digests** | A weekly summary on a calendar schedule rather than an interval, because a report that lands at 03:12 on a Thursday is one nobody opens. |
 

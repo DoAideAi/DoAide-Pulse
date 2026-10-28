@@ -17,7 +17,9 @@ and each failure names the endpoint and what to add:
   generated client gets one error type and not a union of anonymous shapes —
   with one named exemption, below, for the liveness probes;
 * a 401 and a 413 on anything behind ``get_current_user``;
-* a 429 on anything the limiter touches.
+* a 429 on anything the limiter touches;
+* every status the handler raises — read off its source, its same-module
+  helpers and its dependencies — declared in ``responses``.
 
 The last two are derived from the endpoint's own wiring rather than from a
 list kept here, so they cannot go stale: add ``@limiter.limit`` and the schema
@@ -28,6 +30,10 @@ schema, so there is nothing to document. ``/projects/{id}/feed.xml`` is the
 only one, and it serves RSS to feed readers rather than JSON to clients.
 """
 from __future__ import annotations
+
+import inspect
+import re
+import sys
 
 import pytest
 from fastapi.routing import APIRoute
@@ -238,6 +244,78 @@ def test_rate_limited_endpoints_declare_429(route: APIRoute):
     assert 429 in _declared_failures(route), (
         f"{_label(route)} is rate-limited but does not declare 429. Add "
         f"`status.HTTP_429_TOO_MANY_REQUESTS` to its `errors(...)`."
+    )
+
+
+#: ``(handler name, status code)`` that the source scan below finds but the
+#: endpoint cannot answer with. Each is a raise the handler catches or a branch
+#: the route never takes, so declaring it would document a failure that does
+#: not happen.
+_RAISED_BUT_UNREACHABLE = {
+    # ``_assert_publishable`` raises 409 for archived pieces and dead links;
+    # the bulk endpoint catches it per item and reports it in ``failed``.
+    ("bulk_publish_content", 409),
+    # ``require_scope()`` with no scope never refuses on scope — the 403 arm is
+    # for the scoped routes, which declare it.
+    ("machine_whoami", 403),
+}
+
+_RAISED_CODE = re.compile(r"HTTP_(\d{3})|status_code\s*=\s*(\d{3})\b")
+
+
+def _source_with_helpers(fn, *, depth: int, seen: set) -> str:
+    """*fn*'s source plus that of the same-module functions it calls.
+
+    Two levels is where the refusals live in this tree: the handler calls an
+    ``_owned_*`` guard or an ``_assert_*`` check, and that check occasionally
+    calls one more. Crossing modules would pull in services whose exceptions
+    the routers translate, which is noise rather than signal.
+    """
+    if fn in seen:
+        return ""
+    seen.add(fn)
+    try:
+        source = inspect.getsource(fn)
+    except (OSError, TypeError):
+        return ""
+    if depth:
+        module = sys.modules.get(fn.__module__)
+        for name in set(re.findall(r"\b([_a-z][a-z0-9_]*)\(", source)):
+            helper = getattr(module, name, None)
+            if inspect.isfunction(helper) and helper.__module__ == fn.__module__:
+                source += _source_with_helpers(helper, depth=depth - 1, seen=seen)
+    return source
+
+
+def _raised_codes(route: APIRoute) -> set[int]:
+    seen: set = set()
+    source = _source_with_helpers(route.endpoint, depth=2, seen=seen)
+    for dependency in _dependency_calls(route):
+        if inspect.isfunction(dependency):
+            source += _source_with_helpers(dependency, depth=1, seen=seen)
+    codes = {int(a or b) for a, b in _RAISED_CODE.findall(source)}
+    return {code for code in codes if code >= 400 and code not in _FASTAPI_OWNED}
+
+
+@pytest.mark.parametrize("route", ROUTE_CASES)
+def test_every_status_a_handler_raises_is_declared(route: APIRoute):
+    """A refusal the code makes and the schema does not mention.
+
+    Three endpoints were answering with a status their ``responses`` left out
+    — archive-old's 400, redeliver's 409, API-key rotation's 409 — so a client
+    generated from the schema had no branch for them.
+    """
+    name = route.endpoint.__name__
+    missing = sorted(
+        code
+        for code in _raised_codes(route) - set(_declared_failures(route))
+        if (name, code) not in _RAISED_BUT_UNREACHABLE
+    )
+    assert not missing, (
+        f"{_label(route)} raises {missing} but does not declare "
+        f"{'it' if len(missing) == 1 else 'them'}. Add the code to its "
+        f"`errors(...)`, or to _RAISED_BUT_UNREACHABLE with the reason it "
+        f"cannot happen."
     )
 
 
