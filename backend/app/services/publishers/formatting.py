@@ -116,13 +116,102 @@ MASTODON_LINK_COST = 23
 BLUESKY_LIMIT = 300
 
 
+#: Unmatched ``[`` a document may carry before they are escaped. Ordinary
+#: writing has none or a handful; the attack below needs thousands.
+_UNMATCHED_BRACKET_LIMIT = 64
+#: The longest run of backticks left alone. A code fence is three, a fence
+#: around a fence four or five.
+_BACKTICK_RUN_LIMIT = 16
+#: A code fence: three to sixteen backticks or tildes. A longer backtick run is
+#: not a fence anyone writes, and treating it as one skipped exactly the line
+#: that needed defusing.
+_FENCE = re.compile(r"^\s{0,3}(`{3,%d}(?!`)|~{3,})" % _BACKTICK_RUN_LIMIT)
+#: Stand-ins the parser reads as ordinary letters, swapped back after it has
+#: run. Private-use code points: they mean nothing in a post, so any already
+#: present are dropped rather than mistaken for one of these.
+_STAND_INS = {"[": "\ue000", "(": "\ue001", "`": "\ue002"}
+_RESTORE = {ord(v): k for k, v in _STAND_INS.items()}
+_DROP_STAND_INS = {ord(v): None for v in _STAND_INS.values()}
+_LONG_BACKTICK_RUN = re.compile(r"`{%d,}" % (_BACKTICK_RUN_LIMIT + 1))
+
+
+def _defuse(body_markdown: str) -> str:
+    """Escape the two shapes python-markdown takes quadratic time over.
+
+    Its inline link pattern looks for a closing ``]`` from every unmatched
+    ``[``, and its code-span pattern does the same from a long backtick run, so
+    the cost grows with the square of their number: 8,000 ``[`` took six and a
+    half seconds to render, and a body at the 200,000-character limit would
+    have held a worker for about an hour on every publish, preview and
+    plain-text conversion. Escaping them is invisible in the output — an
+    unmatched ``[`` renders as ``[`` either way — and the
+    pass itself is linear. Fenced code is left untouched, and nothing changes
+    below the thresholds, so ordinary documents are byte-for-byte as before.
+    """
+    if "[" not in body_markdown and "`" * (_BACKTICK_RUN_LIMIT + 1) not in body_markdown:
+        return body_markdown
+
+    lines = body_markdown.translate(_DROP_STAND_INS).split("\n")
+    fenced = [False] * len(lines)
+    fence: str | None = None
+    for i, line in enumerate(lines):
+        match = _FENCE.match(line)
+        if fence is None and match:
+            fence = match.group(1)[0] * 3
+            fenced[i] = True
+        elif fence is not None:
+            fenced[i] = True
+            if line.lstrip().startswith(fence):
+                fence = None
+
+    # Which ``[`` never find a ``]``, and which ``](`` never find a ``)`` —
+    # one linear stack pass each, outside fences.
+    brackets: list[tuple[int, int]] = []
+    parens: list[tuple[int, int]] = []
+    for i, line in enumerate(lines):
+        if fenced[i]:
+            continue
+        for j, ch in enumerate(line):
+            if ch == "[" and (j == 0 or line[j - 1] != "\\"):
+                brackets.append((i, j))
+            elif ch == "]" and brackets:
+                brackets.pop()
+            elif ch == "(" and j and line[j - 1] == "]":
+                parens.append((i, j))
+            elif ch == ")" and parens:
+                parens.pop()
+
+    # Stand-ins rather than backslashes or entities: an escaped character is
+    # still something the inline patterns scan past, and the parser stashes
+    # every entity behind a placeholder with a cost of its own that grows with
+    # their number. A private-use letter is just text.
+    replace_at: dict[int, dict[int, str]] = {}
+    for found, char in ((brackets, "["), (parens, "(")):
+        if len(found) > _UNMATCHED_BRACKET_LIMIT:
+            for i, j in found:
+                replace_at.setdefault(i, {})[j] = _STAND_INS[char]
+
+    out = []
+    for i, line in enumerate(lines):
+        if fenced[i]:
+            out.append(line)
+            continue
+        positions = replace_at.get(i)
+        if positions:
+            line = "".join(positions.get(j, ch) for j, ch in enumerate(line))
+        line = _LONG_BACKTICK_RUN.sub(lambda m: _STAND_INS["`"] * len(m.group(0)), line)
+        out.append(line)
+    return "\n".join(out)
+
+
 def to_html(body_markdown: str) -> str:
     """Render Markdown to the HTML subset every blogging platform accepts.
 
     Sanitised on the way out — see :func:`sanitize_html` for why the renderer's
     raw-HTML passthrough is not something to hand to a publisher unfiltered.
     """
-    return sanitize_html(markdown_lib.markdown(body_markdown, extensions=_MD_EXTENSIONS))
+    rendered = markdown_lib.markdown(_defuse(body_markdown), extensions=_MD_EXTENSIONS)
+    return sanitize_html(rendered.translate(_RESTORE))
 
 
 def to_plain_text(body_markdown: str) -> str:
