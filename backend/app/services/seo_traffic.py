@@ -159,7 +159,11 @@ def traffic(
         raw = {key: f.result() for key, f in futures.items()}
 
     index = content_index(db, user_id)
-    sites, everything = [], []
+    sites: list[dict] = []
+    # Keyed by (site, normalised path): Umami counts "/blog/x" and "/blog/x/"
+    # as two pages, and a ranking that lists one article twice with its views
+    # split between the copies ranks it below pieces it outperformed.
+    everything: dict[tuple[str, str], dict] = {}
     totals = {"pageviews": 0, "visitors": 0, "search_visits": 0}
     for site in SITES:
         r = raw[site.key]
@@ -180,7 +184,13 @@ def traffic(
             }
             pages.append(page)
             if page["is_content"]:
-                everything.append({**page, "site_key": site.key, "domain": site.domain})
+                seen = everything.get((site.key, normal))
+                if seen is None:
+                    everything[(site.key, normal)] = {
+                        **page, "site_key": site.key, "domain": site.domain
+                    }
+                else:
+                    seen["views"] += views
         referrers = [
             {"referrer": name, "visits": n, "search": is_search_engine(name)}
             for name, n in r["referrers"]
@@ -205,7 +215,7 @@ def traffic(
         totals["search_visits"] += search_visits
 
     sites.sort(key=lambda s: (s["status"] != "ok", -s.get("pageviews", 0), s["name"]))
-    everything.sort(key=lambda p: -p["views"])
+    ranked = sorted(everything.values(), key=lambda p: -p["views"])
     return {
         "days": days,
         "generated_at": utcnow(),
@@ -213,5 +223,5 @@ def traffic(
         "umami_error": umami_error,
         "totals": totals,
         "sites": sites,
-        "top_content": everything[:TOP_CONTENT],
+        "top_content": ranked[:TOP_CONTENT],
     }

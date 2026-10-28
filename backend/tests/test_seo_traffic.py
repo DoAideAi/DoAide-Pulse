@@ -201,3 +201,23 @@ def test_unconfigured_umami_says_so(client, auth, monkeypatch):
 def test_traffic_is_for_product_admins(client, auth, monkeypatch):
     monkeypatch.setattr(settings, "product_activity_admin_emails", "boss@example.com")
     assert client.get(URL, headers=auth).status_code == 403
+
+
+class SlashSplitUmami(FakeUmami):
+    """Umami reports the same article with and without its trailing slash."""
+
+    def metrics(self, website_id, start_ms, end_ms, *, type, limit=10):
+        if type == "url":
+            return [("/blog/a", 50), ("/blog/b", 70), ("/blog/a/", 40)]
+        return []
+
+
+def test_one_article_under_two_spellings_is_ranked_once(client, auth, monkeypatch):
+    umami = SlashSplitUmami(sites=SITES[:1])
+    monkeypatch.setattr(seo_traffic, "get_client", lambda: umami)
+    body = client.get(URL, headers=auth).json()
+    tax_content = [p for p in body["top_content"] if p["site_key"] == "tax"]
+    assert [(p["path"], p["views"]) for p in tax_content] == [("/blog/a", 90), ("/blog/b", 70)]
+    # The per-site page list still shows what Umami reported, row for row.
+    tax = next(s for s in body["sites"] if s["key"] == "tax")
+    assert [p["views"] for p in tax["top_pages"]] == [50, 70, 40]
