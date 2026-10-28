@@ -175,11 +175,24 @@ function useNavCounts(pathname) {
         })
         .catch(() => {});
 
+    // Only while somebody can see the badges. A tab left open in the
+    // background polled twice a minute all night for numbers nobody read;
+    // instead it catches up the moment it is looked at again.
+    const hidden = () => typeof document !== "undefined" && document.visibilityState === "hidden";
+    const tick = () => {
+      if (!hidden()) fetchCounts();
+    };
+    const onVisible = () => {
+      if (!hidden()) fetchCounts();
+    };
+
     fetchCounts();
-    const timer = setInterval(fetchCounts, 60000);
+    const timer = setInterval(tick, 60000);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [pathname]);
 

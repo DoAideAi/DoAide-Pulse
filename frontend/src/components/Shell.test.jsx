@@ -179,6 +179,29 @@ describe("the badges", () => {
     expect(screen.getByLabelText("3 awaiting review")).toBeInTheDocument();
   });
 
+  it("does not poll while the tab is hidden, and catches up when shown", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await draw();
+      expect(api.queueCounts).toHaveBeenCalledTimes(1);
+
+      const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      await act(async () => {
+        vi.advanceTimersByTime(180000);
+      });
+      expect(api.queueCounts).toHaveBeenCalledTimes(1);
+
+      visibility.mockReturnValue("visible");
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(api.queueCounts).toHaveBeenCalledTimes(2);
+      visibility.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps the chrome up when both queue requests fail", async () => {
     api.queueCounts.mockRejectedValue(new Error("500"));
 
