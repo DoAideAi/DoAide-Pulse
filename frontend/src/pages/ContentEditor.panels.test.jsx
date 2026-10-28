@@ -1354,3 +1354,23 @@ describe("a publication on its way", () => {
     }
   });
 });
+
+describe("a piece autopilot published by itself", () => {
+  it("says nobody reviewed it, with what the checks measured", async () => {
+    await open({
+      status: "published",
+      source: { kind: "autopilot", routing: { mode: "auto", candidate: true, auto: true }, quality_score: 82, seo_score: 91 },
+    });
+
+    expect(
+      screen.getByText(/published by autopilot — it passed every check, so nobody reviewed it first \(quality 82, SEO 91\)/),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing of the kind for a piece a person approved", async () => {
+    await open({ status: "published", source: { kind: "manual" } });
+
+    expect(screen.queryByText(/published by autopilot/)).not.toBeInTheDocument();
+  });
+});
+

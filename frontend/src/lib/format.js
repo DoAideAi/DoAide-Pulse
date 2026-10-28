@@ -137,3 +137,17 @@ export function localDayKey(value) {
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
 }
+
+/** Who wrote a piece, when it was not the user: the `source.kind` values the
+ *  autopilot, triggers and release notes write. */
+const AUTOMATIC_KINDS = new Set(["autopilot", "trigger", "release", "manual_refresh"]);
+
+/** How a piece came to be, for the one case worth labelling: written
+ *  automatically. `"auto-published"` when it also went out with nobody
+ *  reviewing it (the pipeline records that decision in `source.routing`),
+ *  `"autopilot"` when it was written automatically and held for review,
+ *  `null` for anything a person wrote. */
+export function automaticOrigin(source) {
+  if (!source || !AUTOMATIC_KINDS.has(source.kind)) return null;
+  return source.routing?.auto ? "auto-published" : "autopilot";
+}

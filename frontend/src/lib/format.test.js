@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  automaticOrigin,
   formatCount,
   formatDateTime,
   formatDuration,
@@ -162,5 +163,20 @@ describe("localDayKey", () => {
 
   it("zero-pads month and day", () => {
     expect(localDayKey(new Date(2026, 0, 5))).toBe("2026-01-05");
+  });
+});
+
+describe("automaticOrigin", () => {
+  it("labels what autopilot wrote, and what it also published unreviewed", () => {
+    expect(automaticOrigin({ kind: "autopilot", routing: { auto: true } })).toBe("auto-published");
+    expect(automaticOrigin({ kind: "trigger", routing: { auto: false } })).toBe("autopilot");
+    expect(automaticOrigin({ kind: "release" })).toBe("autopilot");
+  });
+
+  it("leaves what a person wrote unlabelled", () => {
+    expect(automaticOrigin({ kind: "manual" })).toBeNull();
+    expect(automaticOrigin({ kind: "manual", routing: { auto: true } })).toBeNull();
+    expect(automaticOrigin({})).toBeNull();
+    expect(automaticOrigin(null)).toBeNull();
   });
 });

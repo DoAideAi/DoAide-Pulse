@@ -209,6 +209,20 @@ describe("the list", () => {
     expect(screen.getByText("4 min read")).toBeInTheDocument();
   });
 
+  it("labels what autopilot wrote, and what it published unreviewed", async () => {
+    api.listContent.mockResolvedValue([
+      item({ id: 1, title: "Mine", source: { kind: "manual" } }),
+      item({ id: 2, title: "Held", source: { kind: "autopilot", routing: { auto: false } } }),
+      item({ id: 3, title: "Went out", source: { kind: "trigger", routing: { auto: true } } }),
+    ]);
+    draw();
+
+    await screen.findByText("Went out");
+    expect(screen.getByText("Auto-published")).toBeInTheDocument();
+    expect(screen.getByText("Autopilot")).toBeInTheDocument();
+    expect(screen.getAllByText(/^(Auto-published|Autopilot)$/)).toHaveLength(2);
+  });
+
   it("shows a chip per publication", async () => {
     api.listContent.mockResolvedValue([
       item({

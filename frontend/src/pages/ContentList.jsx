@@ -11,7 +11,7 @@ import Dialog from "../components/ui/Dialog";
 import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
-import { formatWhen, titleize } from "../lib/format";
+import { automaticOrigin, formatWhen, titleize } from "../lib/format";
 import trackEvent from "../lib/trackEvent";
 
 const STATUSES = ["draft", "review", "approved", "published", "failed", "archived"];
@@ -600,6 +600,10 @@ function ContentRow({ item, onChanged }) {
     }
   }
 
+  // Autopilot's work, labelled: after turning it on, "what did it publish?" is
+  // the first question, and nothing in the list distinguished its pieces.
+  const origin = automaticOrigin(item.source);
+
   return (
     <li className="flex items-start justify-between gap-4 px-5 py-4 transition-colors hover:bg-canvas">
       <Link to={`/content/${item.id}`} className="min-w-0 flex-1">
@@ -610,6 +614,18 @@ function ContentRow({ item, onChanged }) {
           <span>{item.word_count} words</span>
           <span>{item.read_minutes} min read</span>
           <span>{formatWhen(item.created_at)}</span>
+          {origin && (
+            <span
+              className="chip"
+              title={
+                origin === "auto-published"
+                  ? "Written and published by autopilot without review"
+                  : "Written by autopilot"
+              }
+            >
+              {origin === "auto-published" ? "Auto-published" : "Autopilot"}
+            </span>
+          )}
           {item.seo_score != null && <SeoScoreBadge score={item.seo_score} />}
           {item.confidence !== null && <Confidence value={item.confidence} />}
         </p>

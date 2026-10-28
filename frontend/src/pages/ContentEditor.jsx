@@ -11,6 +11,7 @@ import * as draftStore from "../lib/draftStore";
 import { differs } from "../lib/draftStore";
 import { editorStats } from "../lib/editorStats";
 import {
+  automaticOrigin,
   formatCount,
   formatDateTime,
   formatReadLength,
@@ -679,6 +680,9 @@ export default function ContentEditor() {
             )}
             <Confidence value={data.confidence} />
           </p>
+          {automaticOrigin(data.source) === "auto-published" && (
+            <AutoPublishedNote source={data.source} />
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={data.status} />
@@ -1597,6 +1601,24 @@ function PreviewLinksPanel({ contentId }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/** The review an auto-published piece skipped is the reader's now: say so,
+ *  with what the gates measured, rather than leaving it looking like a piece
+ *  the user approved themselves. */
+function AutoPublishedNote({ source }) {
+  const scores = [
+    source.quality_score != null && `quality ${source.quality_score}`,
+    source.seo_score != null && `SEO ${source.seo_score}`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  return (
+    <p className="mt-2 text-xs text-ink-500">
+      Written and published by autopilot — it passed every check, so nobody reviewed it
+      first{scores && ` (${scores})`}.
+    </p>
   );
 }
 
