@@ -129,6 +129,24 @@ describe("service health", () => {
     expect(screen.getByText("off")).toBeInTheDocument();
   });
 
+  it("says it could not check, rather than reporting a broken server, when the read fails", async () => {
+    api.healthDetail.mockRejectedValue(new Error("Service Unavailable"));
+    draw();
+
+    expect(
+      await screen.findByText(/Could not check service health: Service Unavailable/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("none configured")).toBeNull();
+    expect(screen.queryByText("anonymous")).toBeNull();
+
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+    });
+    await userEvent.click(screen.getAllByRole("button", { name: /Retry|Try again/ })[0]);
+    expect(await screen.findByText("openrouter")).toBeInTheDocument();
+  });
+
   it("names the providers being skipped while their cool-down runs", async () => {
     api.healthDetail.mockResolvedValue({
       status: "ok",

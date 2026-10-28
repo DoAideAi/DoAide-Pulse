@@ -128,6 +128,15 @@ export default function Settings() {
         />
         {health.loading && !health.data ? (
           <Skeleton rows={1} />
+        ) : health.error && !health.data ? (
+          // Without this a failed read rendered every row from ``undefined``:
+          // "AI providers: none", "Credential encryption: off", each marked as
+          // failing — a broken install reported by a page that only failed to
+          // ask.
+          <ErrorBanner
+            message={`Could not check service health: ${health.error}`}
+            onRetry={health.reload}
+          />
         ) : (
           <dl className="panel divide-y divide-line">
             <HealthRow
