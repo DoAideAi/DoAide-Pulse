@@ -472,7 +472,7 @@ def _to_out(content: Content) -> ContentOut:
             for key in (
                 "id", "project_id", "content_type", "status", "title", "slug",
                 "excerpt", "meta_description", "keywords", "tags", "canonical_url",
-                "cover_image_url", "focus_keyword", "version",
+                "cover_image_url", "marketing_images", "focus_keyword", "version",
                 "confidence", "generated_by_provider", "generated_by_model",
                 "source", "scheduled_for", "published_at", "created_at", "updated_at",
             )
@@ -1938,6 +1938,7 @@ def create_content(
         focus_keyword=payload.focus_keyword or (keywords[0] if keywords else ""),
         canonical_url=payload.canonical_url,
         cover_image_url=payload.cover_image_url,
+        marketing_images=payload.marketing_images,
         source=_manual_source(user, payload.campaign_key),
     )
     _commit_content(db, content)
