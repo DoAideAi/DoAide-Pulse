@@ -34,6 +34,10 @@ _KNOWN_ENVIRONMENTS = frozenset(
 )
 
 
+#: The algorithms ``JWT_SECRET`` — a shared secret — can sign with.
+_JWT_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
+
+
 def _is_loopback(origin: str) -> bool:
     """Whether *origin*'s host is this machine.
 
@@ -989,6 +993,27 @@ class Settings(BaseSettings):
                 "must be the public address people open."
             )
         return v
+
+    @field_validator("jwt_algorithm")
+    @classmethod
+    def _jwt_algorithm_is_hmac(cls, v: str) -> str:
+        """An HMAC algorithm, in every environment.
+
+        The value went straight to ``jwt.encode`` and to ``jwt.decode``'s
+        ``algorithms=[...]``, unchecked. ``JWT_ALGORITHM=none`` would have Pulse
+        sign tokens with no signature and *accept* unsigned ones — anybody could
+        write a token for any user id — and an RS/ES name, which needs a key
+        pair rather than the shared ``JWT_SECRET`` string, failed only at the
+        first sign-in. ``JWT_SECRET`` is a shared secret, so HS256/384/512 are
+        the algorithms it can drive.
+        """
+        cleaned = v.strip().upper()
+        if cleaned not in _JWT_ALGORITHMS:
+            raise ValueError(
+                f"JWT_ALGORITHM must be one of {', '.join(sorted(_JWT_ALGORITHMS))} "
+                f"(an HMAC algorithm for the shared JWT_SECRET), got {v!r}"
+            )
+        return cleaned
 
     @field_validator("jwt_secret")
     @classmethod

@@ -99,3 +99,16 @@ def test_the_edges_of_each_range_are_accepted():
     assert ok.digest_send_hour == 23
     assert ok.digest_window_days == 1
     assert ok.db_pool_timeout_seconds == 0.001
+
+
+# ``JWT_ALGORITHM`` went to ``jwt.decode(algorithms=[...])`` unchecked, so
+# ``none`` would have accepted unsigned tokens for any user id.
+@pytest.mark.parametrize("value", ["none", "None", "RS256", "ES256", "", "HS1"])
+def test_jwt_algorithm_must_be_hmac(value):
+    with pytest.raises(ValidationError, match="JWT_ALGORITHM"):
+        _settings(jwt_algorithm=value)
+
+
+@pytest.mark.parametrize("value,expected", [("HS256", "HS256"), ("hs512", "HS512")])
+def test_an_hmac_algorithm_is_accepted(value, expected):
+    assert _settings(jwt_algorithm=value).jwt_algorithm == expected
