@@ -35,6 +35,7 @@ from app.models.template import TemplateMode
 from app.schemas.limits import BoundedId
 from app.services.templates import (
     BUILTINS,
+    malformed_placeholders,
     reserved_names,
     unknown_placeholders,
 )
@@ -119,6 +120,16 @@ class TemplateBase(BaseModel):
             raise ValueError(
                 f"{', '.join(shadowed)} clashes with a built-in Pulse fills in "
                 f"for you ({', '.join(sorted(BUILTINS))}). Pick another name."
+            )
+
+        malformed = malformed_placeholders(self.title_template, self.body_template)
+        if malformed:
+            shown = ", ".join(repr(span) for span in malformed[:3])
+            raise ValueError(
+                f"{shown} {'is' if len(malformed) == 1 else 'are'} not a placeholder "
+                "Pulse can fill. A placeholder is {{name}} or {{project.name}} — "
+                "letters, digits and underscores, starting with a letter, and "
+                "closed with }}. Fix it, or remove the braces."
             )
 
         unknown = unknown_placeholders(

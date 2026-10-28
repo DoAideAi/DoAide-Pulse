@@ -140,6 +140,39 @@ def unknown_placeholders(declared: list[str], *texts: str) -> list[str]:
     return sorted({name for name in placeholders(*texts) if name not in known})
 
 
+#: Anything that opens like a placeholder: ``{{`` up to the next ``}}`` on the
+#: same line. Non-greedy, so ``{{a}} {{b}}`` is two spans.
+_BRACED = re.compile(r"\{\{(.*?)\}\}")
+
+
+def malformed_placeholders(*texts: str) -> list[str]:
+    """``{{…}}`` spans that are not placeholders, and ``{{``/``}}`` unpaired.
+
+    :data:`PLACEHOLDER` simply does not match ``{{name|upper}}``, ``{{1abc}}``,
+    ``{{}}``, ``{{{name}}}`` or an unclosed ``{{name`` — so none of them was an
+    unknown placeholder, none was refused, and each went out in the published
+    post braces and all. Returned as written, in order, deduplicated, so the
+    message can quote exactly what to fix.
+    """
+    found: list[str] = []
+    for text in texts:
+        for line in (text or "").splitlines():
+            for match in _BRACED.finditer(line):
+                span = match.group(0)
+                if not PLACEHOLDER.fullmatch(span):
+                    found.append(span)
+            # Whatever is left once every closed span is gone: an opener with
+            # no closer on its line.
+            rest = _BRACED.sub("", line)
+            if "{{" in rest:
+                found.append(rest[rest.index("{{") :][:40])
+            # ...and a closer with no opener, which is the same typo from the
+            # other side ("name}}").
+            elif "}}" in rest:
+                found.append(rest[: rest.index("}}") + 2][-40:].lstrip())
+    return list(dict.fromkeys(found))
+
+
 def reserved_names(declared: list[str]) -> list[str]:
     """Declared names that collide with a built-in namespace.
 
