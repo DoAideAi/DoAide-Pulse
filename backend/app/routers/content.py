@@ -1116,21 +1116,13 @@ def get_public_preview(
     every other anonymous read in the API: a token is unguessable, but "no
     token required" and "free to hammer" are different claims.
     """
-    content = preview_links.resolve(db, token)
-    if content is None:
+    view = preview_links.resolve(db, token)
+    if view is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Preview link not found — it may have been revoked or expired.",
         )
-    return PublicPreviewOut(
-        title=content.title,
-        body_markdown=content.body_markdown,
-        excerpt=content.excerpt,
-        cover_image_url=content.cover_image_url,
-        word_count=content.word_count,
-        read_minutes=content.read_minutes,
-        project_name=content.project.name if content.project else None,
-    )
+    return PublicPreviewOut.model_validate(view)
 
 
 @router.get(

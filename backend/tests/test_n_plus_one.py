@@ -721,3 +721,39 @@ def test_a_public_article_is_one_query(client, db, user, sql_log):
     assert resp.json()["project_name"] == "Shared"
     selects = [s for s in sql_log if s.startswith("SELECT")]
     assert len(selects) == 1, "\n".join(s[:200] for s in selects)
+
+
+def test_opening_a_preview_link_reads_the_draft_once(client, db, user, sql_log):
+    """Recording the view commits, and the commit expired what the response
+    then read: the link, the draft, its publications and its project came back
+    one SELECT at a time — five for a page that needs one."""
+    from app.services import preview_links
+
+    project = Project(
+        user_id=user.id, name="Reviewed", slug="reviewed", description="d", tone=Tone.TECHNICAL
+    )
+    db.add(project)
+    db.flush()
+    content = Content(
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        title="Draft for review",
+        slug="draft-for-review",
+        body_markdown="Body.",
+    )
+    db.add(content)
+    db.commit()
+    link, raw_token = preview_links.issue(db, content)
+    db.expire_all()
+
+    sql_log.clear()
+    resp = client.get(f"/api/v1/content/preview/{raw_token}")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["title"] == "Draft for review"
+    assert resp.json()["project_name"] == "Reviewed"
+    selects = [s for s in sql_log if s.startswith("SELECT")]
+    assert len(selects) == 1, "\n".join(s[:200] for s in selects)
+    # And the view is still recorded.
+    db.refresh(link)
+    assert link.view_count == 1

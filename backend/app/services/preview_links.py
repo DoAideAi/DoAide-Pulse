@@ -14,10 +14,11 @@ from __future__ import annotations
 
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import timedelta
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from app.config import settings
 from app.models.content import Content
@@ -113,7 +114,27 @@ def revoke(db: Session, link: PreviewLink) -> None:
         db.commit()
 
 
-def resolve(db: Session, raw_token: str) -> Content | None:
+@dataclass(frozen=True)
+class PreviewView:
+    """What a reviewer is shown, read before the view is recorded.
+
+    Plain data rather than the ``Content`` row because recording the view
+    commits, and a commit expires every instance in the session: handing back
+    the row meant the response re-read the link, the draft, its
+    ``lazy="selectin"`` publications and its project one SELECT at a time —
+    five round trips for a page that needs one.
+    """
+
+    title: str
+    body_markdown: str
+    excerpt: str
+    cover_image_url: str | None
+    word_count: int
+    read_minutes: int
+    project_name: str | None
+
+
+def resolve(db: Session, raw_token: str) -> PreviewView | None:
     """The draft a token points at, or ``None`` if the link isn't usable.
 
     Unusable covers unknown, revoked, expired and *belonging to a deactivated
@@ -136,6 +157,13 @@ def resolve(db: Session, raw_token: str) -> Content | None:
         .join(Content, Content.id == PreviewLink.content_id)
         .join(Project, Project.id == Content.project_id)
         .join(User, User.id == Project.user_id)
+        # The joins are already there for the account check; populating from
+        # them costs nothing and saves the two lazy loads below.
+        .options(
+            contains_eager(PreviewLink.content)
+            .lazyload(Content.publications),
+            contains_eager(PreviewLink.content).contains_eager(Content.project),
+        )
         .where(
             PreviewLink.token_hash == hash_token(raw_token),
             User.is_active.is_(True),
@@ -148,14 +176,26 @@ def resolve(db: Session, raw_token: str) -> Content | None:
     if as_aware(row.expires_at) <= utcnow():
         return None
 
+    content = row.content
+    view = PreviewView(
+        title=content.title,
+        body_markdown=content.body_markdown,
+        excerpt=content.excerpt,
+        cover_image_url=content.cover_image_url,
+        word_count=content.word_count,
+        read_minutes=content.read_minutes,
+        project_name=content.project.name if content.project else None,
+    )
+
     row.view_count = PreviewLink.view_count + 1
     row.last_viewed_at = utcnow()
     db.commit()
 
-    return row.content
+    return view
 
 
 __all__ = [
+    "PreviewView",
     "count_for_content",
     "hash_token",
     "issue",
