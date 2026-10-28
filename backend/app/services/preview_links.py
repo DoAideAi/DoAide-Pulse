@@ -13,6 +13,7 @@ shared rather than personal:
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -26,6 +27,8 @@ from app.models.mixins import as_aware, utcnow
 from app.models.preview_link import PreviewLink
 from app.models.project import Project
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 #: 32 bytes ≈ 43 URL-safe characters — the same budget as a password reset
 #: token, for the same reason: no low-entropy guess for a hash lookup to defend
@@ -58,6 +61,14 @@ def issue(
     db.add(row)
     db.commit()
     db.refresh(row)
+    # A preview link is a bearer credential for an unpublished draft, the same
+    # class of thing as an API key — whose issue is logged (M4). Without this
+    # line "who shared this draft, and when" had no answer outside the row.
+    # The id and the expiry, never the token.
+    logger.info(
+        "preview link %s issued for content %s (expires %s)",
+        row.id, content.id, as_aware(row.expires_at).isoformat(),
+    )
     return row, raw_token
 
 
@@ -112,6 +123,10 @@ def revoke(db: Session, link: PreviewLink) -> None:
     if link.revoked_at is None:
         link.revoked_at = utcnow()
         db.commit()
+        logger.info(
+            "preview link %s revoked for content %s (%d view(s))",
+            link.id, link.content_id, link.view_count or 0,
+        )
 
 
 @dataclass(frozen=True)

@@ -92,3 +92,38 @@ def test_removing_an_llm_key_that_is_not_there_logs_nothing(client, auth, caplog
     caplog.set_level(logging.INFO)
     assert client.delete("/api/v1/settings/llm-key", headers=auth).status_code == 204
     assert not [line for line in _lines(caplog) if "LLM key" in line]
+
+
+def test_issuing_and_revoking_a_preview_link(client, auth, db, project, caplog):
+    """M4: a preview link is a bearer credential for an unpublished draft.
+
+    Issuing an API key is logged and this was not, so "who shared this draft,
+    and when" had no answer outside the row. The token never appears.
+    """
+    from app.models.content import Content, ContentStatus, ContentType
+
+    piece = Content(
+        project_id=project.id, content_type=ContentType.ANNOUNCEMENT,
+        status=ContentStatus.DRAFT, title="Draft", slug="draft", body_markdown="Body.",
+    )
+    db.add(piece)
+    db.commit()
+    caplog.set_level(logging.INFO)
+
+    made = client.post(f"/api/v1/content/{piece.id}/preview-links", json={}, headers=auth)
+    assert made.status_code in (200, 201), made.text
+    link = made.json()
+    token = link["url"].rsplit("/", 1)[-1]
+    issued = [line for line in _lines(caplog) if "preview link" in line and "issued" in line]
+    assert issued and str(link["id"]) in issued[0] and str(piece.id) in issued[0]
+    assert not any(token in line for line in _lines(caplog))
+
+    caplog.clear()
+    gone = client.delete(f"/api/v1/content/{piece.id}/preview-links/{link['id']}", headers=auth)
+    assert gone.status_code in (200, 204), gone.text
+    assert any("preview link" in line and "revoked" in line for line in _lines(caplog))
+
+    caplog.clear()
+    again = client.delete(f"/api/v1/content/{piece.id}/preview-links/{link['id']}", headers=auth)
+    assert again.status_code in (200, 204), again.text
+    assert not any("revoked" in line for line in _lines(caplog))
