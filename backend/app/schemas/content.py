@@ -5,6 +5,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.config import settings
+
 from app.models.content import (
     BODY_MARKDOWN_MAX_LENGTH,
     CANONICAL_URL_MAX_LENGTH,
@@ -957,6 +959,26 @@ class CalendarIdeasOut(BaseModel):
     )
 
 
+def _plannable(value: date | None) -> date | None:
+    """A planned day the calendar can still show, or nothing.
+
+    A planned idea leaves the backlog and is drawn only on its day, and the
+    calendar reads at most a year at a time — so 2999-01-01 for 2026-01-01
+    filed the idea where nobody would ever page to it. Held to the same horizon
+    a scheduled publication is (``schedule_max_horizon_days``), either side of
+    today: a day just gone is fine, an overdue idea is still an idea.
+    """
+    if value is None:
+        return value
+    horizon = settings.schedule_max_horizon_days
+    today = date.today()
+    if abs((value - today).days) > horizon:
+        raise ValueError(
+            f"{value.isoformat()} is more than {horizon} days from today — check the year."
+        )
+    return value
+
+
 class CalendarIdeaCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -964,6 +986,8 @@ class CalendarIdeaCreate(BaseModel):
     headline: str = Field(min_length=3, max_length=300)
     content_type: ContentType = ContentType.TUTORIAL
     planned_date: date | None = None
+
+    _plannable = field_validator("planned_date")(_plannable)
 
     @field_validator("headline")
     @classmethod
@@ -985,6 +1009,8 @@ class CalendarIdeaPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     planned_date: date | None = None
+
+    _plannable = field_validator("planned_date")(_plannable)
 
 
 class PreviewLinkCreate(BaseModel):
