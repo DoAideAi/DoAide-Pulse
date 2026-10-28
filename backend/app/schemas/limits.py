@@ -26,7 +26,7 @@ from typing import Annotated
 
 from pydantic import Field, StringConstraints
 
-from app.deps import ROW_ID_MAX
+from app.deps import ROW_ID_MAX, ROW_ID_MIN
 from app.models.content import TAG_MAX_LENGTH
 from app.services.scheduling import TIMEZONE_MAX_LENGTH
 from app.services.seo import KEYWORD_MAX_LENGTH
@@ -108,9 +108,10 @@ FieldName = Annotated[str, StringConstraints(max_length=50)]
 #: A user-supplied row id (project, content, trigger, …). PostgreSQL ``int4``
 #: tops out at 2^31-1; anything higher lands as a ``NumericValueOutOfRange``
 #: inside the driver, which surfaces as a 500 instead of the 422 a caller can
-#: act on. The same constant lives in :data:`app.deps.ROW_ID_MAX` for path and
-#: query parameters; this annotation covers request-body fields.
-BoundedId = Annotated[int, Field(le=ROW_ID_MAX)]
+#: act on, and so does anything below -2^31. The same constants live in
+#: :mod:`app.deps` for path and query parameters; this annotation covers
+#: request-body fields.
+BoundedId = Annotated[int, Field(ge=ROW_ID_MIN, le=ROW_ID_MAX)]
 
 __all__ = [
     "BoundedId",

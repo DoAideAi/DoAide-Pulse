@@ -44,13 +44,19 @@ oauth2_scheme = OAuth2PasswordBearer(
 #: each query would not be.
 ROW_ID_MAX = 2**31 - 1
 
+#: The other end of the same ``integer`` column. Below it is the same overflow
+#: from the other side: ``-2147483649`` passed validation and the driver
+#: refused to compare it, a 500 where every id the database *can* be asked
+#: about answers 404.
+ROW_ID_MIN = -(2**31)
+
 #: A path parameter naming a row by its primary key.
 #:
-#: Only an upper bound. Zero and negatives are left to 404 the way any other
-#: absent id does — they are ids that do not exist, not ids the database cannot
-#: be asked about, and turning them into a 422 would tell an enumerating caller
-#: something the 404 deliberately does not.
-RowId = Annotated[int, Path(le=ROW_ID_MAX)]
+#: Bounded only by what the column can hold. Zero and negatives inside that are
+#: left to 404 the way any other absent id does — they are ids that do not
+#: exist, not ids the database cannot be asked about, and turning them into a
+#: 422 would tell an enumerating caller something the 404 deliberately does not.
+RowId = Annotated[int, Path(ge=ROW_ID_MIN, le=ROW_ID_MAX)]
 
 #: A query parameter naming a row by its primary key.
 #:
@@ -61,7 +67,7 @@ RowId = Annotated[int, Path(le=ROW_ID_MAX)]
 #: parameters, and every one of them ends up in a ``WHERE`` against an
 #: ``Integer`` column. ``RowId`` does not cover these because it is built on
 #: :class:`Path`; this is the ``Query`` counterpart.
-QueryRowId = Annotated[int, Query(le=ROW_ID_MAX)]
+QueryRowId = Annotated[int, Query(ge=ROW_ID_MIN, le=ROW_ID_MAX)]
 
 #: How far a listing may be paged into.
 #:

@@ -17,11 +17,14 @@ from __future__ import annotations
 
 import pytest
 
-from app.deps import ROW_ID_MAX
+from app.deps import ROW_ID_MAX, ROW_ID_MIN
 from app.main import app
 
 #: One past the widest id the database can be asked about.
 _TOO_WIDE = ROW_ID_MAX + 1
+
+#: The same, off the other end of the column (M1).
+_TOO_LOW = ROW_ID_MIN - 1
 
 #: A representative by-id endpoint from each router that has one.
 _BY_ID = [
@@ -75,6 +78,32 @@ def test_an_id_wider_than_the_column_is_refused_not_crashed(
 
 
 @pytest.mark.parametrize("method,template", _BY_ID)
+def test_an_id_below_the_column_is_refused_not_crashed(client, auth, method, template):
+    resp = _call(client, auth, method, template.format(_TOO_LOW))
+    assert resp.status_code == 422, resp.text
+    assert any(
+        "greater than or equal to" in (err.get("msg") or "")
+        for err in resp.json()["detail"]
+    ), resp.text
+
+
+@pytest.mark.parametrize("method,template", _BY_ID)
+def test_the_lowest_askable_id_still_reaches_the_lookup(client, auth, method, template):
+    resp = _call(client, auth, method, template.format(ROW_ID_MIN))
+    assert resp.status_code == 404, resp.text
+
+
+@pytest.mark.parametrize("project_id", [_TOO_LOW, -(2**80)])
+def test_a_body_id_below_the_column_is_refused_not_crashed(client, auth, project_id):
+    resp = client.post(
+        "/api/v1/content/bulk/archive-old",
+        headers=auth,
+        json={"older_than_days": 30, "project_id": project_id},
+    )
+    assert resp.status_code == 422, resp.text
+
+
+@pytest.mark.parametrize("method,template", _BY_ID)
 def test_the_widest_valid_id_still_reaches_the_lookup(client, auth, method, template):
     """``ROW_ID_MAX`` itself is a real id the database can hold.
 
@@ -88,7 +117,7 @@ def test_the_widest_valid_id_still_reaches_the_lookup(client, auth, method, temp
 
 @pytest.mark.parametrize("absent", [0, -1, 999999])
 def test_an_absent_id_still_404s_rather_than_422ing(client, auth, absent):
-    """Only an upper bound was added, deliberately.
+    """The floor is the column's, not 1, deliberately.
 
     Zero and negatives cannot be primary keys, but they are *absent* ids rather
     than unaskable ones, and the 404 they already got is what keeps "no such
@@ -147,10 +176,10 @@ def test_every_integer_path_param_declares_its_ceiling():
                 schema = parameter.get("schema", {})
                 if schema.get("type") != "integer":
                     continue
-                if schema.get("maximum") != ROW_ID_MAX:
+                if schema.get("maximum") != ROW_ID_MAX or schema.get("minimum") != ROW_ID_MIN:
                     unbounded.append(f"{method.upper()} {path} — {parameter['name']}")
     assert not unbounded, (
-        "integer path parameters with no ceiling (annotate with "
+        "integer path parameters not bounded to the column (annotate with "
         "app.deps.RowId):\n" + "\n".join(unbounded)
     )
 
