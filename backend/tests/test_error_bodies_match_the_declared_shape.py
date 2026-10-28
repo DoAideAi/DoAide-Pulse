@@ -107,9 +107,11 @@ def test_the_two_sweeps_are_the_size_they_should_be():
     and personal-LLM-key routes landed; every one of them passes the error
     shape checks below, which is why the pin moved rather than the routes.
     136 with the feedback list and its feature-area options, the two
-    operator-only reads behind the feedback widget.
+    operator-only reads behind the feedback widget. 139 with M15's feature
+    usage, content funnel and autopilot reports, which landed without moving
+    the pin and left this failing on main.
     """
-    assert len(AUTHENTICATED) == 136
+    assert len(AUTHENTICATED) == 139
     assert len(BY_ID) == 67
 
 
