@@ -16,7 +16,8 @@ import pytest
 
 from app.services.breaker import CircuitBreaker
 from app.services.publishers import breaker as pub_breaker
-from app.services.publishers.base import _capped, _MAX_RESPONSE_BYTES
+from app.services.publishers import base as publisher_base
+from app.services.publishers.base import _MAX_RESPONSE_BYTES, _exchange
 
 
 # -- CircuitBreaker --------------------------------------------------------- #
@@ -116,27 +117,37 @@ class TestPublisherBreakerIntegration:
 # -- Response capping under stress ------------------------------------------ #
 
 
-def test_capped_preserves_json_on_normal_response():
+def _serve(monkeypatch, status_code: int, body: bytes) -> None:
+    """Answer the next ``_exchange`` with *body*, streamed in 64 KB chunks."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def fake_stream(method, url, **kwargs):
+        chunks = (body[i : i + 65536] for i in range(0, len(body), 65536))
+        yield httpx.Response(
+            status_code, content=chunks, request=httpx.Request(method, url)
+        )
+
+    monkeypatch.setattr(publisher_base.httpx, "stream", fake_stream)
+
+
+def test_capped_preserves_json_on_normal_response(monkeypatch):
     """A normal API response is fully readable after capping."""
-    body = b'{"id": 42, "url": "https://dev.to/p/42"}'
-    resp = httpx.Response(200, content=body, request=httpx.Request("PUT", "https://api.test"))
-    capped = _capped(resp)
-    assert capped.json() == {"id": 42, "url": "https://dev.to/p/42"}
+    _serve(monkeypatch, 200, b'{"id": 42, "url": "https://dev.to/p/42"}')
+    resp = _exchange("PUT", "https://api.test", timeout=10, follow_redirects=False)
+    assert resp.json() == {"id": 42, "url": "https://dev.to/p/42"}
 
 
-def test_capped_truncates_huge_error_page():
+def test_capped_truncates_huge_error_page(monkeypatch):
     """A multi-MB HTML error page is truncated to the cap."""
-    huge = b"<html>" + b"X" * (_MAX_RESPONSE_BYTES * 3) + b"</html>"
-    resp = httpx.Response(502, content=huge, request=httpx.Request("GET", "https://api.test"))
-    capped = _capped(resp)
-    assert len(capped.content) == _MAX_RESPONSE_BYTES
+    _serve(monkeypatch, 502, b"<html>" + b"X" * (_MAX_RESPONSE_BYTES * 3) + b"</html>")
+    resp = _exchange("GET", "https://api.test", timeout=10, follow_redirects=False)
+    assert resp.status_code == 502
+    assert len(resp.content) == _MAX_RESPONSE_BYTES
 
 
-def test_capped_idempotent_on_small_body():
-    """Calling _capped on a body that's already under the limit is a no-op."""
-    body = b"small"
-    resp = httpx.Response(200, content=body, request=httpx.Request("GET", "https://api.test"))
-    capped = _capped(resp)
-    assert capped.content == body
-    capped2 = _capped(capped)
-    assert capped2.content == body
+def test_capped_leaves_a_small_body_alone(monkeypatch):
+    """A body under the limit comes back byte for byte."""
+    _serve(monkeypatch, 200, b"small")
+    resp = _exchange("GET", "https://api.test", timeout=10, follow_redirects=False)
+    assert resp.content == b"small"

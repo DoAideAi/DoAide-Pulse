@@ -2,7 +2,7 @@
 
 Three integration points now cap response bodies:
 - webhooks.py streams and caps at 4 KB (only needs status + 200-char excerpt)
-- publishers/base.py truncates at 1 MB (needs status + short error text)
+- publishers/base.py streams and caps at 1 MB (needs status + short error text)
 - github_client.py truncates at 1 MB (JSON payloads, bounded by GitHub)
 """
 from __future__ import annotations
@@ -55,18 +55,28 @@ def test_webhook_small_response_is_fully_read():
 # -- publishers/base -------------------------------------------------------- #
 
 
-def test_publisher_response_body_is_capped():
-    """An oversized platform response is truncated after read."""
-    huge = b"Z" * (base._MAX_RESPONSE_BYTES * 2)
-    resp = httpx.Response(502, content=huge, request=httpx.Request("GET", "https://api.test"))
-    capped = base._capped(resp)
-    assert len(capped.content) == base._MAX_RESPONSE_BYTES
+def _serve(monkeypatch, status: int, body: bytes) -> None:
+    import contextlib
+
+    @contextlib.contextmanager
+    def fake_stream(method, url, **kwargs):
+        with httpx.Client(transport=_OversizedTransport(body, status=status)) as client:
+            with client.stream(method, url) as response:
+                yield response
+
+    monkeypatch.setattr(base.httpx, "stream", fake_stream)
 
 
-def test_publisher_normal_response_is_untouched():
+def test_publisher_response_body_is_capped(monkeypatch):
+    """An oversized platform response is cut off at the cap while streaming."""
+    _serve(monkeypatch, 502, b"Z" * (base._MAX_RESPONSE_BYTES * 2))
+    resp = base._exchange("GET", "https://api.test", timeout=10, follow_redirects=False)
+    assert len(resp.content) == base._MAX_RESPONSE_BYTES
+
+
+def test_publisher_normal_response_is_untouched(monkeypatch):
     """A normal-sized response is returned as-is."""
-    body = b'{"ok": true}'
-    resp = httpx.Response(200, content=body, request=httpx.Request("GET", "https://api.test"))
-    capped = base._capped(resp)
-    assert capped.content == body
-    assert capped.json() == {"ok": True}
+    _serve(monkeypatch, 200, b'{"ok": true}')
+    resp = base._exchange("GET", "https://api.test", timeout=10, follow_redirects=False)
+    assert resp.content == b'{"ok": true}'
+    assert resp.json() == {"ok": True}
