@@ -4,7 +4,7 @@
 
 Pulse is marketing automation for developers who ship more than they write
 about. It watches your project repos, drafts blog posts and social copy when
-something meaningful lands, runs them past you, publishes them across seven
+something meaningful lands, runs them past you, publishes them across eight
 destinations on a schedule, and tracks which pieces actually got read.
 
 ---
@@ -16,7 +16,7 @@ destinations on a schedule, and tracks which pieces actually got read.
 | **Project registry** | Register what you ship — description, stack, audience, tone, repo. Pulse reads the repo for what's changed since it last looked. |
 | **Content engine** | Five content types (tutorial, announcement, feature spotlight, comparison, how-to) × three tones, generated from the project record plus real commit and release data. |
 | **SEO** | Meta description, keywords, tags and a heading-outline audit, applied deterministically rather than spent as a second model call. |
-| **Publishing** | Adapters per platform. Seven publish today — including a commit to your own blog repo — and two need an auth flow nobody can complete on a free tier (see [Platform support](#platform-support)). |
+| **Publishing** | Adapters per platform. Eight publish today — including a commit to your own blog repo and a Buttondown newsletter — and two need an auth flow nobody can complete on a free tier (see [Platform support](#platform-support)). |
 | **Calendar** | Month grid with drag-to-reschedule, plus per-platform cadence guidance — learned from your own first-day views once there are enough of them, and the published guidance until then. |
 | **Analytics** | Views and engagement per post, per platform, per content type, per project — plus reader-minutes over time and whether the long pieces earn their length. |
 | **Velocity** | How fast each piece found its audience, read from the whole snapshot series rather than the latest number, and which posts have stopped growing. |
@@ -24,7 +24,7 @@ destinations on a schedule, and tracks which pieces actually got read.
 | **Autopilot** | Watch repos, write when something ships, publish without review only when the model is confident and you've said it may. |
 | **Templates** | Your own reusable shapes. A `literal` template fills its variables and produces a finished draft with no model call at all; a `prompt` template hands the rendered text to the generator instead. Preview renders half-filled rather than erroring. |
 | **Triggers** | Fire the pipeline on something other than a commit — RSS, GitHub, a schedule, or an inbound webhook. The inbound URL is the only way to start the pipeline without signing in: the 256-bit token in the path is the credential, and an HMAC signature can be required on top. (The other public endpoints — sign-up, sign-in, password reset, the health probe, published articles, preview links, uploaded images, newsletter sign-up, the free tools and the event, trigger-kind and API-key-scope catalogues — read or collect, and write no content.) |
-| **Webhooks** | Outbound notifications with a delivery log, an on-demand test delivery, and a redeliver button — enough to debug one without server access. |
+| **Webhooks** | Outbound notifications, signed, with retries and backoff. Settings has an on-demand test delivery; the delivery log and redelivery are API-only for now (`GET /webhooks/{id}/deliveries`, `POST …/redeliver`). |
 | **Digests** | A weekly summary on a calendar schedule rather than an interval, because a report that lands at 03:12 on a Thursday is one nobody opens. |
 
 ## Stack
@@ -98,16 +98,13 @@ cd backend  && .venv/bin/python -m pytest && .venv/bin/ruff check app tests
 cd frontend && npm test && npm run build
 ```
 
-The Python suite is 3571 tests across two roots — 3511 under `backend/tests` and
-60 under `marketing/tests` — and needs no external services. It runs in about a
-minute. The root `pytest.ini` is what makes one command cover both;
-`backend/pyproject.toml` still configures a run started from `backend/`, so that
-keeps working as it did. Two of the 3511 skip themselves: the tenant-isolation
-sweep walks every route that takes an object id, and two `/settings/connections`
-routes are keyed by platform instead, so there is no other tenant's id to try.
-
-The frontend suite is 501 tests over 28 files under `frontend/src`, run by
-Vitest against jsdom.
+The Python suite covers `backend/tests` and `marketing/tests`, needs no
+external services, and runs from the repo root because the root `pytest.ini`
+names both; `backend/pyproject.toml` still configures a run started from
+`backend/`. The frontend suite is Vitest against jsdom, one test file beside
+each page, component and library module under `frontend/src`.
+`pytest --collect-only -q` and `npx vitest list` give the current counts —
+they are not written down here because they change with nearly every commit.
 
 #### Coverage
 
@@ -121,11 +118,10 @@ the bare `--cov` above is the whole gate. It is deliberately not in `addopts`:
 the tracer costs about a third again on top of the bare run, and that is a
 price worth paying on the gate rather than on every ordinary one.
 
-Coverage is **100.00%** — 8848 statements and 2020 branches, none missed. The
-floor is `fail_under = 99.9` rather than 100 so a work-in-progress commit is not
-blocked by a single uncovered line; that slack is roughly ten statements, and it
-is not budget to spend. Raise the floor when the real number moves up; never
-lower it to make a red run green.
+The floor is `fail_under = 99.9` in `backend/pyproject.toml`, deliberately just
+under 100 so a work-in-progress commit is not blocked by a single uncovered
+line; that slack is not budget to spend. Raise the floor when the real number
+moves up; never lower it to make a red run green.
 
 ---
 
@@ -172,13 +168,14 @@ averages down.
 
 | Platform | Status | Notes |
 |---|---|---|
-| **Git repo** | ✅ Publishes | Commits Markdown + front matter to the repo your blog is built from. No OAuth, no rate tier, nobody who can revoke it. Normally the right canonical platform. |
+| **Git repository** | ✅ Publishes | Commits Markdown + front matter to the repo your blog is built from. No OAuth, no rate tier, nobody who can revoke it. Normally the right canonical platform. |
 | **Dev.to** | ✅ Publishes, reports metrics | One API key. The reference adapter — read this one first. |
 | **Mastodon** | ✅ Publishes, reports metrics | Bearer token from any instance. Four clicks to get one. No draft state, so `as_draft` is refused rather than posted live. |
 | **Bluesky** | ✅ Publishes, reports metrics | App password, not the account password. Links need byte-offset facets — see the adapter. No draft state. |
 | **Hashnode** | ✅ Publishes | GraphQL. Needs the publication id of the blog to post to; connecting the account lists the ones your token can see. |
 | **WordPress** | ✅ Publishes | Self-hosted, REST API at `/wp-json`, application password. WordPress.com is a different API. |
 | **Medium** | ✅ Publishes | ⚠️ Medium stopped issuing new integration tokens in 2023. Works with a token created before then; a new account cannot get one. No stats API. |
+| **Buttondown** | ✅ Publishes | Newsletter. One API key. Sending to the list is irreversible, so a send whose outcome is unknown (timeout, gateway error, unreadable answer) fails terminally with "check before retrying" instead of being retried into a second email. |
 | LinkedIn | 🔨 Scaffolded | Needs a registered app and 3-legged OAuth (`w_member_social`) — an auth flow, not an adapter. |
 | Twitter/X | 🔨 Scaffolded | Thread splitting is done and tested. Needs OAuth 1.0a signing and a paid tier for writes. |
 
@@ -212,8 +209,8 @@ what happens if you leave it blank. The ones that matter:
 | `JWT_SECRET` | Change it. |
 | `REGISTRATION_ENABLED` | Off by default. `POST /auth/register` answers 403 — Pulse is single-user and the account comes from `python -m app.seed`. |
 | `REGISTRATION_INVITE_TOKEN` | Required alongside the flag in production. Enabled-but-tokenless registration is refused there rather than served open. |
-| `RATE_LIMIT_STORAGE_URI` | Blank counts per uvicorn worker. Point it at Redis for one shared budget. |
-| `SMTP_HOST` | Blank means the password reset link is written to the log instead of emailed. Fine for a single-user install; it does put the link in the logs. |
+| `RATE_LIMIT_STORAGE_URI` | Where limit counters live. Blank uses `REDIS_URL` in production (one budget shared by every worker) and process memory in development. |
+| `SMTP_HOST` | Blank means no email is sent: a password reset logs only that a message was dropped (its subject, never the link — the link is a credential). `/health` shows whether mail is configured. |
 | `AUTOPILOT_AUTO_PUBLISH_CONFIDENCE` | The bar for publishing without review. Default 0.8. |
 
 `GET /api/v1/health` reports which of these are set, and the Settings page shows
@@ -260,14 +257,14 @@ backend/
     database.py          engine, session, Base
     security.py deps.py  JWT, password hashing, current-user
     models/              user, project, content, publication, connection, metrics
-    ratelimit.py         slowapi limiter for /auth/*
+    ratelimit.py         slowapi limiter, plus the per-account sign-in limit
     routers/             auth, projects, content, calendar, analytics, settings,
                          templates, triggers, webhooks, misc
     schemas/             pydantic request/response models
     services/
       llm_router.py      provider chain + circuit breaker
       password_reset.py  single-use reset tokens (hashed at rest)
-      mailer.py          SMTP; logs the link when unconfigured
+      mailer.py          SMTP; recipients masked in every log line
       ai.py              the single entry point every AI feature calls
       content_generator.py
       github_client.py   repo activity since a watermark
@@ -283,7 +280,7 @@ backend/
                          digest, webhook, trigger, maintenance
     seed.py
   alembic/               migrations
-  tests/                 3511 tests, no external services
+  tests/                 the backend suite; no external services
 marketing/               standalone campaign scripts + 60 tests
 frontend/
   src/
