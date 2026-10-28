@@ -118,6 +118,13 @@ and 10 MB for uploads. It counts chunked bodies as they arrive, so leaving out
 `Content-Length` doesn't get around it. `File too large (max N MB)` and the
 inbound trigger's `Payload larger than N KB` are the route-level versions.
 
+### 415: the body isn't labelled as JSON
+
+`Send the body as JSON, with the header 'Content-Type: application/json'.`
+means the body arrived under another content type — `text/plain`, a form, or
+no header at all — so it was never parsed. The body may be fine; set the header
+and send it again. A JSON body that *is* the wrong shape is a 422, below.
+
 ### 422: the body didn't validate
 
 FastAPI's 422 lists each invalid field. A 422 raised by a route carries one

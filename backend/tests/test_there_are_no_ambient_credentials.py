@@ -56,6 +56,11 @@ _ANONYMOUS_WRITES = {
     ("POST", "/triggers/inbound/{token}"): "the trigger's own inbound token",
     ("POST", "/subscribers"): "an email in the body, rate-limited",
     ("POST", "/tools/content-ideas"): "a niche in the body, rate-limited",
+    # Three that landed while ``/openapi.json`` was a 500 and this test could
+    # not run, each reviewed when it came back:
+    ("POST", "/feedback"): "free text from the public widget, 5 an hour",
+    ("POST", "/subscribers/unsubscribe"): "an email in the body, rate-limited",
+    ("POST", "/products/events"): "the shared X-Pulse-Ingest-Token header",
 }
 
 

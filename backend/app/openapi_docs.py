@@ -69,9 +69,25 @@ def declare_media_type_refusal(openapi: dict[str, Any]) -> dict[str, Any]:
     from any one route, so it is declared here rather than at forty
     ``responses=errors(...)`` calls that would each have to remember it.
     """
-    from app.schemas.errors import errors
+    from app.schemas.errors import ErrorOut, errors
 
-    entry = errors(415)[415]
+    # A schema entry, not the ``responses=`` one ``errors()`` builds. That shape
+    # (``{"model": ErrorOut, ...}``) is what a route decorator takes, and FastAPI
+    # turns it into a ``$ref`` while generating; added here, after generation,
+    # it went into the finished document as the class itself. The schema could
+    # not be serialised, ``/openapi.json`` answered 500 wherever docs are on,
+    # and every test that reads the schema to find the API's operations — the
+    # audit that each one refuses a bad token and another account's ids among
+    # them — failed before checking anything.
+    entry = {
+        "description": errors(415)[415]["description"],
+        "content": {
+            "application/json": {"schema": {"$ref": "#/components/schemas/ErrorOut"}}
+        },
+    }
+    openapi.setdefault("components", {}).setdefault("schemas", {}).setdefault(
+        "ErrorOut", ErrorOut.model_json_schema(ref_template="#/components/schemas/{model}")
+    )
     for operations in openapi.get("paths", {}).values():
         for operation in operations.values():
             if not isinstance(operation, dict):
