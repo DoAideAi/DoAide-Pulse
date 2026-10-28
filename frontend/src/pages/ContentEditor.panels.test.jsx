@@ -1024,4 +1024,44 @@ describe("a side panel whose load fails", () => {
 
     expect(await screen.findByText("No translations yet.")).toBeInTheDocument();
   });
+
+  describe("a translation that did not succeed", () => {
+    const row = (over) => ({
+      language: "fr",
+      name: "French",
+      status: "ready",
+      stale: false,
+      quality_issues: [],
+      ...over,
+    });
+
+    it.each([
+      ["failed", row({ status: "failed" }), "Retry"],
+      ["stuck pending", row({ status: "pending" }), "Retry"],
+      ["stale", row({ stale: true }), "Update"],
+    ])("can be re-run in place when %s", async (_label, item, label) => {
+      api.listTranslations
+        .mockResolvedValueOnce({ items: [item], source_language: "en" })
+        .mockResolvedValue({ items: [row({})], source_language: "en" });
+      api.translateContent.mockResolvedValue({});
+      const user = userEvent.setup();
+      await open();
+
+      const panel = (await screen.findByRole("heading", { name: "Translations" })).closest(".panel");
+      await user.click(await within(panel).findByRole("button", { name: label }));
+
+      expect(api.translateContent).toHaveBeenCalledWith(expect.anything(), "fr");
+      expect(await within(panel).findByText("Ready")).toBeInTheDocument();
+    });
+
+    it("offers no re-run for a translation that is fine", async () => {
+      api.listTranslations.mockResolvedValue({ items: [row({})], source_language: "en" });
+      await open();
+
+      const panel = (await screen.findByRole("heading", { name: "Translations" })).closest(".panel");
+      await within(panel).findByText("Ready");
+      expect(within(panel).queryByRole("button", { name: /^(Retry|Update)$/ })).not.toBeInTheDocument();
+      expect(within(panel).getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    });
+  });
 });

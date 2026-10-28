@@ -1660,9 +1660,23 @@ function TranslationsPanel({ contentId }) {
                   {t.quality_issues.length > 0 && ` · ${t.quality_issues.length} issue${t.quality_issues.length !== 1 ? "s" : ""}`}
                 </span>
               </div>
-              <button className="btn-quiet shrink-0 text-bad" onClick={() => remove(t.language)}>
-                Remove
-              </button>
+              <div className="flex shrink-0 gap-1">
+                {/* A failed, stuck or stale translation used to offer only
+                    Remove: its language left the buttons below once a row
+                    existed, so re-running it meant deleting it first. */}
+                {(t.stale || t.status === "failed" || t.status === "pending") && (
+                  <button
+                    className="btn-quiet"
+                    onClick={() => translate(t.language)}
+                    disabled={translating !== null}
+                  >
+                    {translating === t.language ? "Translating…" : t.stale ? "Update" : "Retry"}
+                  </button>
+                )}
+                <button className="btn-quiet text-bad" onClick={() => remove(t.language)}>
+                  Remove
+                </button>
+              </div>
             </li>
           ))}
         </ul>
