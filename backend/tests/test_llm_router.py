@@ -682,3 +682,86 @@ def test_a_nonsense_attempt_budget_still_makes_one_pass(
 
     assert calls["n"] == 3
     assert no_sleeping == []
+
+
+# --------------------------------------------------------------------------- #
+# M5: one completion has one deadline                                          #
+# --------------------------------------------------------------------------- #
+
+
+class _Clock:
+    """A ``time`` stand-in whose clock moves only when a call spends it."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def monotonic(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.now += seconds
+
+
+def test_a_hanging_upstream_cannot_hold_a_completion_past_its_budget(all_keys, monkeypatch):
+    """Every call timing out used to cost the full timeout per model, per provider.
+
+    Three providers at 90s each was four and a half minutes inside a request
+    thread before the caller heard anything. The budget now bounds the sum,
+    and the last call is shortened to fit rather than overrunning it.
+    """
+    clock = _Clock()
+    monkeypatch.setattr(llm_router, "time", clock)
+    monkeypatch.setattr(settings, "llm_total_timeout_seconds", 150.0)
+    monkeypatch.setattr(settings, "gemini_fallback_models", "")
+    monkeypatch.setattr(settings, "groq_fallback_models", "")
+    given: list[float] = []
+
+    def hangs(url, *, json, headers, timeout):
+        given.append(timeout)
+        clock.now += timeout
+        raise httpx.ReadTimeout("upstream hung")
+
+    monkeypatch.setattr(llm_router, "_post", hangs)
+    started = clock.now
+
+    with pytest.raises(llm_router.AllProvidersFailed) as excinfo:
+        llm_router.complete([{"role": "user", "content": "hi"}], timeout=90.0)
+
+    assert clock.now - started <= 150.0
+    assert given == [90.0, 60.0]
+    assert "budget for one completion was spent" in str(excinfo.value)
+
+
+def test_a_rate_limit_pause_is_not_taken_when_it_would_end_past_the_budget(
+    all_keys, monkeypatch
+):
+    """A nap that ends after the deadline buys a sweep that cannot start."""
+    clock = _Clock()
+    monkeypatch.setattr(llm_router, "time", clock)
+    monkeypatch.setattr(llm_router, "_sleep", clock.sleep)
+    monkeypatch.setattr(settings, "llm_total_timeout_seconds", 20.0)
+    monkeypatch.setattr(settings, "llm_retry_max_backoff_seconds", 30.0)
+
+    def limited(url, *, json, headers, timeout):
+        clock.now += 1
+        return _FakeResponse({}, status_code=429, headers={"Retry-After": "25"})
+
+    monkeypatch.setattr(llm_router, "_post", limited)
+    started = clock.now
+
+    with pytest.raises(llm_router.AllProvidersFailed):
+        llm_router.complete([{"role": "user", "content": "hi"}])
+
+    assert clock.now - started <= 20.0
+
+
+def test_a_fast_answer_is_untouched_by_the_budget(all_keys, monkeypatch):
+    seen: list[float] = []
+
+    def answers(url, *, json, headers, timeout):
+        seen.append(timeout)
+        return _FakeResponse(_completion("hello"))
+
+    monkeypatch.setattr(llm_router, "_post", answers)
+    assert llm_router.complete([{"role": "user", "content": "hi"}], timeout=45.0).text == "hello"
+    assert seen == [45.0]

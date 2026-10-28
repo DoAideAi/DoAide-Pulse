@@ -535,6 +535,11 @@ def _short(text: str, limit: int = 200) -> str:
     return collapsed[:limit] + ("…" if len(collapsed) > limit else "")
 
 
+#: Below this much budget a call is not started: no provider answers a
+#: completion in under a second, so it could only spend the time and fail.
+_MIN_CALL_SECONDS = 1.0
+
+
 def _sleep(seconds: float) -> None:
     """Indirection so tests can exercise the backoff without waiting for it."""
     time.sleep(seconds)
@@ -831,6 +836,7 @@ def _sweep(
     max_tokens: int,
     timeout: float,
     purpose: str = "",
+    deadline: float | None = None,
 ) -> Completion | _Pass:
     """One pass over every provider and every model. No sleeping."""
     outcome = _Pass()
@@ -847,6 +853,18 @@ def _sweep(
         tried = 0
         missing_models = 0
         for candidate in _model_chain(provider, model, fallback_models):
+            # The completion's whole budget, not this call's. Checked before
+            # every call and handed down as the call's own timeout, so the
+            # last attempt is shortened to fit rather than overrunning it.
+            remaining = None if deadline is None else deadline - time.monotonic()
+            if remaining is not None and remaining < _MIN_CALL_SECONDS:
+                outcome.errors.append(
+                    f"stopped before {provider.name} ({candidate}): the "
+                    f"{settings.llm_total_timeout_seconds:.0f}s budget for one "
+                    "completion was spent"
+                )
+                outcome.other_failure = True
+                return outcome
             tried += 1
             started = time.monotonic()
             try:
@@ -856,7 +874,7 @@ def _sweep(
                     model=candidate,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    timeout=timeout,
+                    timeout=timeout if remaining is None else min(timeout, remaining),
                 )
             except LLMError as exc:
                 # Recorded before the classification below, and with no tokens:
@@ -1013,6 +1031,7 @@ def complete(
     # has to stay — reaching the bound by falling out of the loop would mean
     # pricing and sleeping off a pause after the last sweep, delaying the
     # caller's fallback by up to the rate-limit window for nothing.
+    deadline = time.monotonic() + float(settings.llm_total_timeout_seconds)
     sweep = 0
     while True:
         sweep += 1
@@ -1025,6 +1044,7 @@ def complete(
             max_tokens=max_tokens,
             timeout=timeout,
             purpose=purpose,
+            deadline=deadline,
         )
         if isinstance(outcome, Completion):
             return outcome
@@ -1034,6 +1054,9 @@ def complete(
             break
         pause = _pause_before_retrying(outcome, providers)
         if pause is None:
+            break
+        # A nap that ends past the deadline buys a sweep that cannot start.
+        if time.monotonic() + pause + _MIN_CALL_SECONDS > deadline:
             break
         logger.info(
             "every llm provider is rate-limited; sweeping again in %.1fs "

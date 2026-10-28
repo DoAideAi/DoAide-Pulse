@@ -378,6 +378,13 @@ class Settings(BaseSettings):
     # down": a provider asking for longer than this is treated as having spent
     # a daily quota rather than a per-minute one.
     llm_retry_max_backoff_seconds: float = 30.0
+    # The longest one completion may take across *every* provider, model and
+    # sweep together. Each call has its own timeout, but nothing bounded the
+    # sum: a hanging upstream made each of its fallback models wait the full
+    # timeout in turn, then the next provider did the same, inside a request
+    # thread for translations, inline edits and headlines. Room for one full
+    # attempt at the default 90s timeout plus a quick fallback.
+    llm_total_timeout_seconds: float = 150.0
     # How long the per-completion accounting rows are kept before the daily
     # maintenance sweep prunes them. Bounded by age rather than by row count —
     # see `app.models.llm_usage`: the window is what /api/v1/metrics reports
@@ -784,6 +791,8 @@ class Settings(BaseSettings):
         # which deletes the rows the metrics endpoint is about the moment they
         # are written.
         "llm_usage_retention_days",
+        # Zero would refuse every completion before the first call.
+        "llm_total_timeout_seconds",
         "activity_retention_days",
         "product_event_retention_days",
         "feedback_retention_days",
