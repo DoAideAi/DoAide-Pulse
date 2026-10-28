@@ -15,7 +15,7 @@ import pytest
 from celery.exceptions import SoftTimeLimitExceeded
 
 from app.config import settings
-from app.models.content import ContentIdea, ContentType
+from app.models.content import Content, ContentIdea, ContentType
 from app.models.mixins import utcnow
 from app.models.project import AutopilotMode, Project
 from app.services import github_client
@@ -166,13 +166,25 @@ def test_a_project_whose_owner_was_deactivated_is_not_scanned(
 
 def _bank(db, project, count, *, used=False, start_days_ago=100):
     """*count* unused ideas, oldest first."""
+    piece = None
+    if used:
+        # A real piece: ``used_content_id`` is a foreign key, and the suite
+        # enforces them.
+        piece = Content(
+            project_id=project.id,
+            content_type=ContentType.TUTORIAL,
+            title="Written up",
+            slug=f"written-up-{start_days_ago}",
+        )
+        db.add(piece)
+        db.flush()
     rows = [
         ContentIdea(
             project_id=project.id,
             content_type=ContentType.TUTORIAL,
             headline=f"Idea {i}",
             rationale="r",
-            used_content_id=1 if used else None,
+            used_content_id=piece.id if piece else None,
             created_at=utcnow() - timedelta(days=start_days_ago - i),
         )
         for i in range(count)

@@ -7,6 +7,7 @@ from app.models.content import Content
 from app.models.mixins import utcnow
 from app.models.project import AutopilotMode, Project
 from app.models.trigger import Trigger, TriggerKind
+from app.models.user import User
 from app.security import hash_password
 from app.services import triggers as trigger_service
 from app.services import webhooks
@@ -95,9 +96,10 @@ def test_an_unknown_content_type_is_refused(client, auth, project):
 
 
 def test_a_trigger_on_someone_elses_project_is_not_found(client, auth, db, user):
-    stranger = Project(
-        user_id=user.id + 999, name="Theirs", slug="theirs", description=""
-    )
+    owner = User(email="stranger@example.com", hashed_password=hash_password("x" * 12))
+    db.add(owner)
+    db.flush()
+    stranger = Project(user_id=owner.id, name="Theirs", slug="theirs", description="")
     db.add(stranger)
     db.commit()
 

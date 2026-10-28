@@ -17,7 +17,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only, selectinload
 from starlette.concurrency import run_in_threadpool
@@ -478,7 +478,17 @@ def delete_project(
         pieces or 0,
         publications or 0,
     )
-    db.delete(project)
+    # One DELETE, and the foreign keys do the rest — the same way
+    # ``accounts.erase`` removes a whole account. ``db.delete(project)`` walked
+    # the ORM cascade instead: it loaded every piece with its body, then each
+    # piece's revisions, translations and preview links one query at a time,
+    # and deleted them row by row — about four statements a piece, so a project
+    # with a few years of autopilot output became tens of thousands of round
+    # trips in one request. Every table under a project is ``ON DELETE
+    # CASCADE`` (or ``SET NULL`` for what outlives it: templates, subscribers,
+    # an idea's link to a piece), pinned with foreign keys enforced by
+    # tests/test_journey_repo_to_publish_to_project_delete.py.
+    db.execute(delete(Project).where(Project.id == project.id))
     db.commit()
 
 

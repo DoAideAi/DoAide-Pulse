@@ -3,10 +3,10 @@ publish it — with a trigger and an outbound webhook along for the ride — and
 then delete the project and check that nothing it owned is left behind.
 
 The other journeys stop at "published". This one carries on to the one call in
-Pulse that really deletes, and runs it with SQLite's foreign keys switched on.
-The rest of the suite runs with them off, which means every ``ondelete=`` in
-the models — the ideas table has no ORM relationship to the project at all and
-relies on the database cascade alone — is never exercised by a test. Here it is.
+Pulse that really deletes. The delete is a single ``DELETE FROM projects`` and
+the database cascades do the rest, so this is where every ``ondelete=`` under a
+project is exercised — conftest switches SQLite's foreign keys on so they are
+enforced here the way Postgres enforces them in production.
 """
 from __future__ import annotations
 
@@ -29,16 +29,6 @@ from tests.conftest import repo_activity
 EMAIL = "repo.owner@example.com"
 PASSWORD = "a-long-first-password"
 HOOK = "https://hooks.example.test/pulse"
-
-
-@pytest.fixture
-def foreign_keys(db):
-    """Enforce ``ondelete=`` for this test, as Postgres does in production."""
-    db.connection().exec_driver_sql("PRAGMA foreign_keys=ON")
-    yield
-    db.rollback()
-    db.connection().exec_driver_sql("PRAGMA foreign_keys=OFF")
-    db.commit()
 
 
 @pytest.fixture
@@ -85,7 +75,7 @@ def _count(db, model, *where) -> int:
 
 
 def test_repo_to_published_piece_then_the_project_goes_and_takes_its_rows(
-    client, db, foreign_keys, outside_world, stub_github
+    client, db, outside_world, stub_github
 ):
     # 1. Sign up and sign in.
     resp = client.post("/api/v1/auth/register", json={"email": EMAIL, "password": PASSWORD})

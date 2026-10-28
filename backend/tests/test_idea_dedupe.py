@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models.content import ContentIdea, ContentType
+from app.models.content import Content, ContentIdea, ContentType
 from app.services import content_generator
 from app.services.content_generator import Idea
 
@@ -193,13 +193,21 @@ def test_an_idea_already_written_up_does_not_block_a_new_one(db, project):
     Whether to cover it again is an editorial judgement about repetition, and
     not one a headline comparison should make on its own.
     """
+    piece = Content(
+        project_id=project.id,
+        content_type=ContentType.FEATURE_SPOTLIGHT,
+        title="What's new in Pulse",
+        slug="whats-new-in-pulse",
+    )
+    db.add(piece)
+    db.flush()
     used = ContentIdea(
         project_id=project.id,
         content_type=ContentType.FEATURE_SPOTLIGHT,
         headline="What's new in Pulse",
         rationale="",
         source={},
-        used_content_id=4242,
+        used_content_id=piece.id,
     )
     db.add(used)
     db.commit()

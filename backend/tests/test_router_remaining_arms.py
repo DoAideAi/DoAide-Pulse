@@ -18,6 +18,7 @@ from app.models.content import Content, ContentStatus, ContentType
 from app.models.project import Project, Tone
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.trigger import Trigger, TriggerKind
+from app.models.user import User
 from app.routers import auth as auth_router
 
 API = "/api/v1"
@@ -297,8 +298,11 @@ def test_the_velocity_curve_finds_a_publication_that_is_not_the_first(
 
 
 def test_a_velocity_curve_for_something_that_is_not_ours_is_a_404(client, auth, db):
+    stranger = User(email="stranger@example.com", hashed_password="x")
+    db.add(stranger)
+    db.flush()
     other = Project(
-        user_id=999,
+        user_id=stranger.id,
         name="Theirs",
         slug="theirs",
         description="Not ours.",

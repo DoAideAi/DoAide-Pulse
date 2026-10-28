@@ -119,6 +119,19 @@ engine = create_engine(
     poolclass=StaticPool,
     future=True,
 )
+
+
+@event.listens_for(engine, "connect")
+def _enforce_foreign_keys(dbapi_conn, _record):
+    """Make SQLite honour ``ondelete=`` the way Postgres does in production.
+
+    Off by default in SQLite, and it was off here: every cascade the models
+    declare went untested, and a delete that relied on the database to remove
+    a project's rows passed the suite while leaving them all behind.
+    """
+    dbapi_conn.execute("PRAGMA foreign_keys=ON")
+
+
 TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 
 # The LLM chain looks up the acting user's own key on a session it opens itself

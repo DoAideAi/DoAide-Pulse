@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 
 from app.config import settings
-from app.models.content import ContentIdea, ContentType
+from app.models.content import Content, ContentIdea, ContentType
 from app.models.mixins import utcnow
 from app.models.seo import MetaAudit, SeoHealthSnapshot, SitemapRun, SitemapStatus
 from app.services import seo_history
@@ -212,12 +212,20 @@ class TestCalendarIdeas:
         assert [i["id"] for i in body["backlog"]] == [idea.id]
 
     def test_a_written_idea_leaves_the_calendar(self, client, auth, db, project):
+        piece = Content(
+            project_id=project.id,
+            content_type=ContentType.TUTORIAL,
+            title="Already written",
+            slug="already-written",
+        )
+        db.add(piece)
+        db.flush()
         idea = ContentIdea(
             project_id=project.id,
             content_type=ContentType.TUTORIAL,
             headline="Already written",
             planned_date=utcnow().date(),
-            used_content_id=123,
+            used_content_id=piece.id,
         )
         db.add(idea)
         db.commit()
