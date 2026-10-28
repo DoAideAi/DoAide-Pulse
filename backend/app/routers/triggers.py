@@ -80,6 +80,31 @@ MAX_TRIGGERS_PER_PROJECT = 20
 MAX_INBOUND_BYTES = 128 * 1024
 
 
+#: How deep an inbound JSON body may nest and still be read as JSON. Real
+#: payloads — GitHub's, Linear's, a status page's — are under a dozen levels.
+#: The same number as ``app.main.MAX_JSON_DEPTH``, which only guards a body that
+#: declares ``application/json``; this endpoint parses whatever it is sent.
+MAX_INBOUND_DEPTH = 32
+
+
+def _nesting_exceeds(value: object, limit: int) -> bool:
+    """Whether *value* nests containers more than *limit* deep. Iterative, so it
+    cannot itself be the thing that runs out of stack."""
+    stack = [(value, 1)]
+    while stack:
+        node, depth = stack.pop()
+        if isinstance(node, dict):
+            children = node.values()
+        elif isinstance(node, list):
+            children = node
+        else:
+            continue
+        if depth > limit:
+            return True
+        stack.extend((child, depth + 1) for child in children)
+    return False
+
+
 def _owned(trigger_id: RowId, db: Session, user: User) -> Trigger:
     """Fetch a trigger, 404ing if its project isn't this user's."""
     trigger = db.get(Trigger, trigger_id)
@@ -705,7 +730,15 @@ def _ingest(db: Session, token: str, raw: bytes, headers: _InboundHeaders) -> di
     body_text = raw.decode("utf-8", errors="replace")
     try:
         payload = json.loads(body_text) if body_text.strip() else {}
-    except json.JSONDecodeError:
+        # ``RecursionError`` as well as a decode error: ``[[[[`` a thousand deep
+        # is a 2 KB body, and the parser gives up on it with an exception that
+        # is not a ``JSONDecodeError``. A body that parses but nests past
+        # ``MAX_INBOUND_DEPTH`` goes the same way, because everything after this
+        # — the field digging, the summary, the JSON column — walks it
+        # recursively, and the first of those to run out of stack was a 500.
+        if _nesting_exceeds(payload, MAX_INBOUND_DEPTH):
+            raise ValueError("payload nested too deeply")
+    except (ValueError, RecursionError):
         # Not every sender speaks JSON, and a form post or a plain-text alert is
         # still news. It becomes the summary rather than being refused.
         payload = {"text": body_text[:10000]}
