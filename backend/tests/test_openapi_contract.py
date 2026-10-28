@@ -83,8 +83,10 @@ def test_the_surface_is_the_size_this_file_thinks_it_is():
 
     154 since the SEO tooling, cross-product activity, calendar ideas and
     personal LLM key routes landed (H082 brought them up to the checks below
-    first, rather than raising the number over routes that failed them)."""
-    assert len(ROUTES) == 154
+    first, rather than raising the number over routes that failed them).
+    157 with the feedback widget's three (submit, list, features), which pass
+    every check below as they stand."""
+    assert len(ROUTES) == 157
 
 
 @pytest.mark.parametrize("route", ROUTES)
