@@ -18,7 +18,7 @@ from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.requests import Request
+from starlette.requests import ClientDisconnect, Request
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -204,7 +204,18 @@ class BodySizeLimitMiddleware:
                 started = True
             await send(message)
 
-        await self.app(scope, _counted_receive, _guarded_send)
+        try:
+            await self.app(scope, _counted_receive, _guarded_send)
+        except ClientDisconnect:
+            # The disconnect is this middleware's own doing — it is how the body
+            # stops. A route that parses a model never sees it (FastAPI handles
+            # it); one that reads the raw body itself, as the inbound trigger
+            # does to check a signature over the exact bytes, gets it raised
+            # from ``request.body()``. It escaped from here as an exception, so
+            # the 400 or 413 below was never sent and the caller got a 500
+            # instead (C104 M6). Only swallowed when we caused it.
+            if rejection is None:
+                raise
 
         if rejection is not None and not started:
             await _respond(scope, send, *rejection)
