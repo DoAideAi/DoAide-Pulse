@@ -425,35 +425,51 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
             f"No provider could translate this piece into {entry.name} right now."
         ) from exc
 
-    title = ai.as_str(payload.get("title"))[:300]
-    translated_body = ai.as_str(payload.get("body_markdown"))
-    excerpt = ai.as_str(payload.get("excerpt"))
-    meta_description = ai.as_str(payload.get("meta_description"))[:320]
+    # Everything from here to the commit is local work on an answer that has
+    # already arrived, and none of it is expected to fail. If it does, the row
+    # must not stay ``PENDING``: nothing is working on it any more, and the
+    # language list would show "Waiting" for a translation that never comes.
+    try:
+        title = ai.as_str(payload.get("title"))[:300]
+        translated_body = ai.as_str(payload.get("body_markdown"))
+        excerpt = ai.as_str(payload.get("excerpt"))
+        meta_description = ai.as_str(payload.get("meta_description"))[:320]
 
-    issues = validate(
-        source=content,
-        language=code,
-        title=title,
-        body_markdown=translated_body,
-        excerpt=excerpt,
-    )
+        issues = validate(
+            source=content,
+            language=code,
+            title=title,
+            body_markdown=translated_body,
+            excerpt=excerpt,
+        )
 
-    row.title = title
-    row.body_markdown = translated_body
-    row.excerpt = excerpt
-    row.meta_description = meta_description
-    # The version the *body* came from, read before the call rather than after.
-    # `content.version` may have moved while the model was working, and pinning
-    # the later number would mark this translation current for text it has never
-    # seen — the exact confusion `source_version` exists to prevent.
-    row.source_version = source_version
-    row.quality_issues = [issue.as_dict() for issue in issues]
-    row.status = TranslationStatus.NEEDS_REVIEW if issues else TranslationStatus.READY
-    row.error = ""
-    row.generated_by_provider = completion.provider
-    row.generated_by_model = completion.model
-    row.translated_at = utcnow()
-    db.commit()
+        row.title = title
+        row.body_markdown = translated_body
+        row.excerpt = excerpt
+        row.meta_description = meta_description
+        # The version the *body* came from, read before the call rather than after.
+        # `content.version` may have moved while the model was working, and pinning
+        # the later number would mark this translation current for text it has never
+        # seen — the exact confusion `source_version` exists to prevent.
+        row.source_version = source_version
+        row.quality_issues = [issue.as_dict() for issue in issues]
+        row.status = TranslationStatus.NEEDS_REVIEW if issues else TranslationStatus.READY
+        row.error = ""
+        row.generated_by_provider = completion.provider
+        row.generated_by_model = completion.model
+        row.translated_at = utcnow()
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        row.status = TranslationStatus.FAILED
+        row.error = sanitize_unexpected_error(exc)
+        db.commit()
+        logger.exception(
+            "translation of content %s into %s failed after the model answered",
+            content.id,
+            code,
+        )
+        raise
     db.refresh(row)
 
     logger.info(
