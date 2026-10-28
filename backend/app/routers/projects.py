@@ -196,12 +196,23 @@ def list_projects(
     ]
 
 
+#: How many projects one account may register. Every other per-account
+#: resource already had a ceiling (20 webhooks, 100 templates, 20 triggers per
+#: project); projects did not, and they are what the automatic budgets are
+#: counted per — autopilot writes up to ``AUTOPILOT_DAILY_CONTENT_LIMIT`` pieces a
+#: day *per project* and each project may carry 20 triggers with their own
+#: daily allowance. Unbounded projects therefore meant unbounded model calls
+#: from one account, against a quota the whole install shares. Fifty is far
+#: past anyone's real portfolio.
+MAX_PROJECTS_PER_USER = 50
+
+
 @router.post(
     "",
     response_model=ProjectOut,
     status_code=status.HTTP_201_CREATED,
     summary="Register a project",
-    responses=errors(*AUTHENTICATED),
+    responses=errors(*AUTHENTICATED, status.HTTP_409_CONFLICT),
 )
 def create_project(
     payload: ProjectCreate,
@@ -218,6 +229,13 @@ def create_project(
     keywords, the autopilot settings — sharpens what gets written and can be
     filled in later.
     """
+    owned = db.scalar(select(func.count(Project.id)).where(Project.user_id == user.id)) or 0
+    if owned >= MAX_PROJECTS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"At most {MAX_PROJECTS_PER_USER} projects per account. "
+            "Delete one you no longer write about to add another.",
+        )
     base_slug = _unique_slug(db, user.id, payload.name)
     project = Project(
         user_id=user.id,
