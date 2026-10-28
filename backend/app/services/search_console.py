@@ -116,11 +116,21 @@ class SearchConsoleClient:
                 raise SearchConsoleError(f"Google unreachable: {type(exc).__name__}") from exc
             if resp.status_code != 200:
                 raise SearchConsoleError(f"Google refused the service account ({resp.status_code})")
-            body = resp.json() if resp.content else {}
-            token = body.get("access_token")
-            if not token:
+            # Every caller catches ``SearchConsoleError`` and nothing else, so a
+            # body that is not a JSON object, or an ``expires_in`` that is not
+            # a number, has to become one rather than a 500.
+            try:
+                body = resp.json() if resp.content else {}
+            except ValueError as exc:
+                raise SearchConsoleError("Google's token answer was not JSON") from exc
+            token = body.get("access_token") if isinstance(body, dict) else None
+            if not token or not isinstance(token, str):
                 raise SearchConsoleError("Google returned no access token")
-            self._token = (token, time.time() + int(body.get("expires_in", 3600)))
+            try:
+                lifetime = int(body.get("expires_in", 3600))
+            except (TypeError, ValueError):
+                lifetime = 3600
+            self._token = (token, time.time() + lifetime)
             return token
 
     def _call(self, method: str, path: str) -> Any:

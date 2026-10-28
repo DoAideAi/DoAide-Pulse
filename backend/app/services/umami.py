@@ -90,8 +90,15 @@ class UmamiClient:
             raise UmamiError(f"Umami unreachable: {type(exc).__name__}") from exc
         if resp.status_code != 200:
             raise UmamiError(f"Umami login refused ({resp.status_code})")
-        token = (resp.json() or {}).get("token")
-        if not token:
+        # Parsed defensively: every caller catches ``UmamiError`` and nothing
+        # else, so a 200 that is a proxy's HTML page (``ValueError``) or a JSON
+        # list (``AttributeError`` on ``.get``) used to escape as a 500.
+        try:
+            body = resp.json()
+        except ValueError as exc:
+            raise UmamiError("Umami login returned non-JSON") from exc
+        token = body.get("token") if isinstance(body, dict) else None
+        if not token or not isinstance(token, str):
             raise UmamiError("Umami login returned no token")
         return token
 
