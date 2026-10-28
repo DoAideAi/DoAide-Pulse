@@ -1,18 +1,8 @@
-export const staticPosts = [
-  {
-    slug: "how-to-start-email-newsletter-2026",
-    title: "How to Start an Email Newsletter in 2026: From Zero to First Issue",
-    description:
-      "A step-by-step guide to starting an email newsletter in 2026 — picking a niche and format, choosing a platform, setting up your list legally, writing the first issue, and getting your first 100 subscribers.",
-    published: "2026-10-23",
-    keywords: [
-      "how to start an email newsletter",
-      "start a newsletter 2026",
-      "newsletter for beginners",
-      "email newsletter guide",
-      "grow newsletter subscribers",
-      "newsletter platform setup",
-    ],
+import { blogPostIndex } from "./blogPostIndex.js";
+
+/** Each post's body and FAQs, keyed by slug. Listings live in blogPostIndex.js. */
+export const POST_CONTENT = {
+  "how-to-start-email-newsletter-2026": {
     faqs: [
       {
         question: "How do I start an email newsletter with no audience?",
@@ -46,19 +36,7 @@ export const staticPosts = [
       "Measure two numbers and ignore the rest for six months: open rate (above 40% means the niche and subject lines work; below 25% means one of them does not) and replies per issue (the strongest signal that you are useful rather than merely tolerated). When an issue earns replies, write more like that issue. After six months of consistent publishing you will have the three assets that compound: a predictable content pipeline, a deliverability reputation, and a few hundred people who open on sight. That is the foundation everything else — sponsorships, products, paid tiers — gets built on. Start this week: pick the niche tonight, set up the platform tomorrow, and send issue #1 to yourself by Sunday.",
     ],
   },
-  {
-    slug: "free-seo-tools-india-2026",
-    title: "Free SEO Tools for India in 2026: The Complete Toolkit",
-    description:
-      "The best free SEO tools for Indian websites in 2026 — keyword research, technical audits, rank tracking, backlink analysis, and content optimisation, with what each tool actually does well.",
-    published: "2026-10-22",
-    keywords: [
-      "free SEO tools India",
-      "SEO tools 2026",
-      "keyword research tools free",
-      "website SEO audit free",
-      "SEO for Indian websites",
-    ],
+  "free-seo-tools-india-2026": {
     faqs: [
       {
         question: "What are the best free SEO tools in India for 2026?",
@@ -92,19 +70,7 @@ export const staticPosts = [
       "Put it together as a monthly routine: week one, check Search Console for indexing errors and new query opportunities; week two, run PageSpeed Insights on your top five pages and fix the slowest; week three, research one new keyword cluster and publish a page for it; week four, review what ranked, what did not, and why. That loop, run for twelve months with entirely free tools, is how small Indian sites reach page one. And if you publish a newsletter alongside your site — the single best way to turn one-time search visitors into a returning audience — DoAide Pulse at pulse.doaide.com automates the writing, publishing, and SEO tracking in one place, free to start.",
     ],
   },
-  {
-    slug: "how-to-improve-website-seo",
-    title: "How to Improve Website SEO: A Practical Step-by-Step Guide",
-    description:
-      "A practical guide to improving your website's SEO — technical foundations, keyword targeting, on-page optimisation, content strategy, internal linking, and how to measure what is working.",
-    published: "2026-10-22",
-    keywords: [
-      "how to improve website SEO",
-      "SEO guide for beginners",
-      "on-page SEO checklist",
-      "improve Google ranking",
-      "website SEO tips 2026",
-    ],
+  "how-to-improve-website-seo": {
     faqs: [
       {
         question: "How can I improve my website's SEO quickly?",
@@ -138,19 +104,7 @@ export const staticPosts = [
       "Step seven: measure, and let the data pick your next move. Check Search Console weekly: the Performance report shows queries where you rank on page two — those are your cheapest wins, since a small content improvement moves position eleven to position six far more easily than position fifty to page one. Track indexing health over time, not just as a snapshot; a slow decline in indexed pages is an early warning that something broke. We follow the same loop across all fourteen DoAide product sites — automated sitemap submission, nightly meta tag audits, and health-over-time charts in DoAide Pulse — because SEO is not a project you finish, it is a loop you run. Run it monthly for a year and you will outrank most competitors, because most of them never run the loop at all. And when search visitors arrive, give them a reason to return: a newsletter converts one-time readers into a durable audience, and DoAide Pulse at pulse.doaide.com makes publishing one nearly automatic.",
     ],
   },
-  {
-    slug: "best-ai-newsletter-platforms-2026",
-    title: "Best AI Newsletter Platforms in 2026: Automate, Personalise, and Grow",
-    description:
-      "A comprehensive comparison of AI-powered newsletter platforms in 2026 — features, pricing, automation capabilities, and which platform fits creators, startups, and enterprises.",
-    published: "2026-10-10",
-    keywords: [
-      "AI newsletter platform",
-      "best newsletter tools 2026",
-      "AI email marketing",
-      "automated newsletter",
-      "newsletter platform comparison",
-    ],
+  "best-ai-newsletter-platforms-2026": {
     faqs: [
       {
         question: "What is an AI newsletter platform?",
@@ -185,19 +139,7 @@ export const staticPosts = [
       "The bottom line: AI newsletter platforms have moved from novelty to necessity. The creators and businesses thriving in 2026 are not the best writers — they are the best editors, curating AI-researched content, refining AI-drafted sections, and letting AI handle the delivery optimisation that no human can do at scale. Start with a free tier, test the AI features against your actual workflow, and measure the time savings. For Indian creators and businesses, DoAide Pulse at pulse.doaide.com offers the most complete AI newsletter platform with regional language support and a free tier that does not gatekeep the AI behind a paywall.",
     ],
   },
-  {
-    slug: "email-marketing-india-complete-guide-2026",
-    title: "Email Marketing in India: The Complete Guide for 2026",
-    description:
-      "Everything Indian businesses need to know about email marketing in 2026 — regulations, regional strategies, mobile-first design, festival campaigns, WhatsApp integration, and platform selection.",
-    published: "2026-10-10",
-    keywords: [
-      "email marketing India",
-      "email marketing guide India 2026",
-      "Indian email campaign",
-      "newsletter India",
-      "digital marketing India",
-    ],
+  "email-marketing-india-complete-guide-2026": {
     faqs: [
       {
         question: "Is email marketing effective in India?",
@@ -232,19 +174,7 @@ export const staticPosts = [
       "Choosing the right email marketing platform for an Indian business comes down to three factors: regional language support, IST-optimised send times, and pricing in rupees. DoAide Pulse scores highest on all three — it is the only platform built specifically for the Indian market, with AI content generation in six Indian languages, send-time optimisation trained on Indian engagement patterns, festival campaign templates, and pricing designed for Indian businesses. Zoho Campaigns offers India-based servers and Zoho ecosystem integration. Mailchimp and Brevo work for businesses with primarily English-speaking audiences who need global reach. Start with the free tier of any platform, send your first campaign this week, and measure what your specific audience responds to — the best strategy is the one informed by your own data, not by generic best practices written for a different market. Begin your email marketing journey at pulse.doaide.com.",
     ],
   },
-  {
-    slug: "content-curation-tools-newsletters-2026",
-    title: "Top Content Curation Tools for Newsletters in 2026",
-    description:
-      "A detailed guide to the best content curation tools for newsletter creators — AI-powered research, RSS aggregation, social listening, and workflow automation to cut curation time by 80%.",
-    published: "2026-10-10",
-    keywords: [
-      "content curation tools",
-      "newsletter curation",
-      "AI content research",
-      "curated newsletter",
-      "content aggregation tools",
-    ],
+  "content-curation-tools-newsletters-2026": {
     faqs: [
       {
         question: "What is content curation for newsletters?",
@@ -279,19 +209,7 @@ export const staticPosts = [
       "For Indian newsletter creators, content curation presents a unique opportunity because the Indian content ecosystem is fragmented across languages, platforms, and formats. A curated newsletter that monitors Hindi Twitter, English industry blogs, regional news sites, and YouTube creators in a specific niche provides genuine value that no single source offers. The language barrier means most Indian professionals miss content published in languages they do not read — a Tamil business insight never reaches Hindi-speaking entrepreneurs, and vice versa. AI-powered curation tools that monitor multilingual sources and generate cross-language summaries are uniquely valuable in this market. DoAide Pulse is the only curation-to-publishing platform that monitors Indian language sources and generates summaries in multiple languages, making it the natural choice for Indian newsletter creators who want to serve a multilingual audience. Start curating at pulse.doaide.com — the AI does the research so you can focus on the editorial voice that makes your newsletter worth subscribing to.",
     ],
   },
-  {
-    slug: "subject-lines-40-percent-open-rates",
-    title: "How to Write Subject Lines That Get 40%+ Open Rates",
-    description:
-      "Proven subject line strategies with real examples for Indian businesses — festival hooks, regional language tricks, and data-backed formulas that consistently break 40% open rates.",
-    published: "2026-10-08",
-    keywords: [
-      "email subject lines",
-      "40% open rate",
-      "Indian email marketing",
-      "newsletter subject lines",
-      "email open rates India",
-    ],
+  "subject-lines-40-percent-open-rates": {
     body: [
       "Most newsletters in India hover between 15% and 22% open rates. The top 10% consistently break 40%. The difference is almost always the subject line — the 60 characters that decide whether your carefully written email gets read or archived without a glance. After studying over 200,000 email campaigns sent to Indian audiences, we found patterns that separate the openers from the ignorers, and they are surprisingly specific to how Indian professionals and consumers interact with their inboxes.",
       "The festival hook is the most powerful subject line tool in the Indian marketer's arsenal, and most businesses use it wrong. Sending 'Happy Diwali from [Brand]' is what every other business does — it blends into a wall of identical greetings and gets ignored. Instead, tie the festival to genuine value: 'Your Diwali Bonus: 3 Tax Savings Moves Before March' or 'Navratri Sale Math: Why 50% Off Is Not Always the Best Deal'. The festival creates the context and urgency; the value proposition earns the open. Our data shows festival-tied value subject lines hit 45-52% open rates compared to 18-24% for generic festival greetings.",
@@ -302,19 +220,7 @@ export const staticPosts = [
       "A/B testing is non-negotiable if you want to consistently hit 40%. Send variant A to 15% of your list, variant B to another 15%, wait 90 minutes, and send the winner to the remaining 70%. This single practice lifts average campaign open rates by 5-8 percentage points over time because you accumulate data about what your specific audience responds to. Generic best practices get you to 25%; testing your own audience gets you past 40%. DoAide Pulse includes built-in A/B testing with AI-powered variant generation — the AI suggests subject lines based on your past winners and your audience's demonstrated preferences, then the data picks the winner.",
     ],
   },
-  {
-    slug: "newsletter-0-to-10000-indian-creator-playbook",
-    title: "Building a Newsletter from 0 to 10,000 Subscribers: Indian Creator Playbook",
-    description:
-      "A phase-by-phase playbook for Indian creators to grow a newsletter from zero to 10,000 subscribers — leveraging WhatsApp, regional content, community building, and monetization strategies unique to the Indian market.",
-    published: "2026-10-08",
-    keywords: [
-      "newsletter growth India",
-      "10000 subscribers",
-      "Indian creator economy",
-      "newsletter monetization India",
-      "email list building India",
-    ],
+  "newsletter-0-to-10000-indian-creator-playbook": {
     body: [
       "The Indian creator economy is booming — over 80 million Indians identify as content creators, and the market is projected to hit $25 billion by 2027. Yet most Indian creators are trapped on platforms they do not own. Instagram changes its algorithm and reach drops 40% overnight. YouTube tweaks monetization thresholds and income disappears. A newsletter is the one audience asset no platform can take away from you, and in a market where WhatsApp has 500 million users and mobile internet penetration is still climbing, the growth playbook for Indian creators looks nothing like the Western templates that dominate the internet.",
       "Phase 1: 0 to 500 subscribers (weeks 1-8). Start with your existing audience, however small. If you have 200 Instagram followers, 150 LinkedIn connections, and a WhatsApp group of 50 people — that is your launch list. Create a simple landing page with a single clear promise: 'One actionable [topic] tip every Tuesday, in Hindi and English.' The bilingual promise is critical for Indian creators — it signals accessibility and immediately differentiates you from English-only newsletters. Personally message your top 50 contacts with a direct ask: 'I am starting a newsletter about [topic]. Would you subscribe?' In India, personal asks through WhatsApp convert at 40-60% — far higher than social media posts. Aim for 200 subscribers from personal outreach and 300 from a lead magnet promoted on social media.",
@@ -325,19 +231,7 @@ export const staticPosts = [
       "The tools matter more than Indian creators realize. Most start with Substack because it is free, but Substack's lack of automation, segmentation, and multilingual support becomes a ceiling around 3,000 subscribers. Indian creators who switch to a platform with AI-powered content assistance, regional language support, and WhatsApp integration see 20-30% faster growth because they spend less time on production and more time on strategy. DoAide Pulse is built for exactly this transition — free to start, with AI that drafts in Hindi, Tamil, Telugu, Bengali, and Marathi alongside English, send-time optimization tuned for IST, and analytics that show which content drives the most subscriptions. Start at pulse.doaide.com and put this playbook to work.",
     ],
   },
-  {
-    slug: "email-deliverability-guide-avoid-spam-2026",
-    title: "Email Deliverability Guide: Avoid the Spam Folder in 2026",
-    description:
-      "A comprehensive guide to email deliverability in 2026 — DNS authentication, sender reputation, content signals, inbox placement testing, and the new rules from Google and Yahoo that every newsletter sender must follow.",
-    published: "2026-10-08",
-    keywords: [
-      "email deliverability",
-      "avoid spam folder",
-      "DKIM SPF DMARC",
-      "email authentication",
-      "inbox placement 2026",
-    ],
+  "email-deliverability-guide-avoid-spam-2026": {
     body: [
       "You can write the perfect newsletter — brilliant content, compelling subject line, beautiful design — and none of it matters if the email lands in the spam folder. Email deliverability is the invisible infrastructure that determines whether your message reaches the inbox, the promotions tab, or the spam graveyard. In 2026, the rules have gotten stricter, the algorithms smarter, and the margin for error smaller. This guide covers everything you need to know to keep your emails where they belong: in front of your subscribers.",
       "DNS authentication is now mandatory, not optional. Google and Yahoo made DKIM, SPF, and DMARC requirements official in February 2024, and by 2026 every major inbox provider enforces them strictly. SPF (Sender Policy Framework) tells receiving servers which IP addresses are authorized to send email on your behalf — without it, your email looks like it could be spoofed. DKIM (DomainKeys Identified Mail) attaches a cryptographic signature to every email, proving it was not tampered with in transit. DMARC (Domain-based Message Authentication, Reporting, and Conformance) ties SPF and DKIM together and tells providers what to do with emails that fail authentication — quarantine them or reject them outright. If you have not set up all three, stop reading and do it now. Every email you send without proper authentication is damaging your sender reputation.",
@@ -349,19 +243,7 @@ export const staticPosts = [
       "DoAide Pulse handles the technical side of deliverability so you can focus on content. DNS authentication is configured during setup with step-by-step guidance for every domain registrar. Automatic list hygiene removes bounces and processes unsubscribes in real time. Send-time optimization distributes your sends to avoid volume spikes that trigger provider scrutiny. And inbox placement previews show you exactly how your email will render across Gmail, Outlook, Yahoo, and Apple Mail — both light and dark mode — before you hit send. Start your newsletter at pulse.doaide.com and never worry about the spam folder again.",
     ],
   },
-  {
-    slug: "free-ai-gst-compliance-tool-indian-businesses",
-    title: "Free AI GST Compliance Tool for Indian Businesses",
-    description:
-      "Meet GSTBot — a free WhatsApp-based AI assistant that handles GST queries, HSN code lookups, and compliance checks without login or downloads.",
-    published: "2026-10-08",
-    keywords: [
-      "GST compliance",
-      "WhatsApp bot",
-      "Indian business",
-      "GST filing",
-      "free GST tool",
-    ],
+  "free-ai-gst-compliance-tool-indian-businesses": {
     body: [
       "GST compliance is the single biggest administrative burden for small and medium Indian businesses. Between monthly returns, quarterly filings, HSN code lookups, and ever-changing slab rates, most business owners either hire a CA they cannot afford or spend hours on the GST portal trying to get things right. GSTBot changes this equation entirely — it is a free AI-powered GST assistant that works right inside WhatsApp, the app every Indian business owner already uses.",
       "The core idea is radical simplicity. There is no app to download, no account to create, no login to remember. You send a WhatsApp message to GSTBot describing your product or service, and it instantly tells you the correct HSN or SAC code, the applicable GST rate, and whether any exemptions apply. Ask it about reverse charge, input tax credit eligibility, or the due date for your next GSTR-3B filing — it answers in seconds, in plain language, not in the legalese that makes the GST Act unreadable.",
@@ -372,19 +254,7 @@ export const staticPosts = [
       "GSTBot is part of the DoAide family of free business tools built for the Indian market. Whether you need to generate GST invoices with DoAide Invoicer, file your ITR with TaxFile, or create professional documents with DoAide Docs, the entire suite works together to handle the paperwork so you can focus on growing your business. Try GSTBot today at gst.doaide.com — your first GST query is a WhatsApp message away.",
     ],
   },
-  {
-    slug: "digital-toolkit-every-lic-agent-needs",
-    title: "Digital Toolkit Every LIC Agent Needs in 2026",
-    description:
-      "InsureKit gives LIC agents plan comparisons, premium calculators, portfolio management, and client presentation tools — all in one free platform.",
-    published: "2026-10-07",
-    keywords: [
-      "LIC agent tools",
-      "insurance calculator",
-      "InsureKit",
-      "LIC plan comparison",
-      "insurance portfolio",
-    ],
+  "digital-toolkit-every-lic-agent-needs": {
     body: [
       "The Indian insurance industry has 2.8 million agents, and most of them are still running their business from a notebook and a basic phone. Meanwhile, their prospects are comparing policies on aggregator websites, reading Reddit threads about term insurance, and asking ChatGPT which LIC plan offers the best returns. The information asymmetry that once gave agents their edge has flipped — and the agents who do not digitize their practice are losing clients to online platforms that offer instant comparisons and zero pressure.",
       "InsureKit is built to put that edge back in the agent's hands. It is a free digital toolkit that gives LIC agents the same capabilities that aggregator platforms use — plan comparisons, premium calculators, maturity projections, and portfolio tracking — but designed for the agent-client relationship rather than the self-service model. When you sit across the table from a prospect, InsureKit turns your phone or laptop into a professional presentation tool.",
@@ -395,20 +265,7 @@ export const staticPosts = [
       "InsureKit is free because it is part of the DoAide ecosystem of tools designed for Indian professionals. Whether you need to generate invoices with DoAide Invoicer, manage your own taxes with TaxFile, or build a professional resume to recruit sub-agents, the tools work together. For LIC agents ready to compete in 2026, InsureKit is the starting point — visit insure.doaide.com and set up your digital practice in under five minutes.",
     ],
   },
-  {
-    slug: "file-itr-minutes-with-ai",
-    title: "File Your ITR in Minutes with AI — Old vs New Regime Compared",
-    description:
-      "TaxFile uses AI to compare old and new tax regimes, maximize Section 80C deductions, and guide you through ITR filing — free for salaried individuals.",
-    published: "2026-10-06",
-    keywords: [
-      "ITR filing",
-      "income tax India",
-      "old vs new regime",
-      "Section 80C",
-      "TaxFile",
-      "AI tax filing",
-    ],
+  "file-itr-minutes-with-ai": {
     body: [
       "Every July, millions of Indian salaried employees face the same stressful question: old regime or new regime? The answer depends on your specific deductions — HRA, 80C investments, home loan interest, NPS contributions, medical insurance — and most people either guess wrong or pay a CA to figure it out. TaxFile eliminates the guesswork. Enter your salary details and deductions, and the AI instantly calculates your tax liability under both regimes, showing you exactly how much you save with each option.",
       "The old versus new regime comparison is the feature that saves the most money. Under the old regime, you can claim deductions under Section 80C (up to 1.5 lakh for PPF, ELSS, life insurance premiums), Section 80D (medical insurance), HRA exemption, and home loan interest under Section 24. The new regime offers lower slab rates but removes most deductions. TaxFile models both scenarios with your actual numbers — not hypothetical examples — so you see your real tax saving down to the rupee.",
@@ -419,19 +276,7 @@ export const staticPosts = [
       "TaxFile is completely free for individual taxpayers — no premium tier, no hidden charges, no upsell to a CA service. It is built by DoAide, the same team behind GSTBot for business compliance, DoAide Docs for document generation, and DoAide Resume for job seekers. Together, these tools handle the paperwork side of professional life so you can focus on earning, not filing. Start your ITR at tax.doaide.com — the comparison takes 30 seconds, and it might save you thousands.",
     ],
   },
-  {
-    slug: "generate-professional-documents-instantly",
-    title: "Generate Professional Documents Instantly with DoAide Docs",
-    description:
-      "DoAide Docs lets you generate rent receipts, salary slips, experience letters, and more — free, instant, and no sign-up required.",
-    published: "2026-10-05",
-    keywords: [
-      "rent receipt generator",
-      "salary slip generator",
-      "document generator",
-      "DoAide Docs",
-      "free document tools",
-    ],
+  "generate-professional-documents-instantly": {
     body: [
       "Every working professional in India needs a stack of documents they dread creating — rent receipts for HRA claims, salary slips for loan applications, experience letters for job changes, offer letters for new hires, and NOC letters for a dozen different purposes. Most people either beg their HR department, pay a typist, or spend an hour wrestling with a Word template that never quite looks right. DoAide Docs generates all of these in seconds, formatted professionally, ready to download and print.",
       "Rent receipts are the most requested document on DoAide Docs, and for good reason. Every salaried employee claiming HRA exemption needs monthly rent receipts, and landlords — especially those renting out a single flat — rarely provide them proactively. DoAide Docs generates rent receipts with the landlord's name, tenant's name, property address, rent amount, payment period, and a revenue stamp placeholder. Generate one month or twelve months at once, and download them as a consolidated PDF ready for your employer's HR portal.",
@@ -442,19 +287,7 @@ export const staticPosts = [
       "DoAide Docs is part of a suite of free professional tools by DoAide. Need to file your taxes? TaxFile compares old and new regimes and walks you through ITR filing. Need a GST invoice? DoAide Invoicer generates them in seconds. Need a professional resume? DoAide Resume builds ATS-optimized resumes with AI suggestions. The whole ecosystem is designed for Indian professionals who want things done quickly, correctly, and without paying for something that should be free. Start at docs.doaide.com.",
     ],
   },
-  {
-    slug: "build-ats-optimized-resumes-free",
-    title: "Build ATS-Optimized Resumes for Free with DoAide Resume",
-    description:
-      "DoAide Resume offers professional templates, AI-powered content suggestions, and ATS optimization — completely free, no watermarks, no premium gates.",
-    published: "2026-10-04",
-    keywords: [
-      "ATS resume",
-      "resume builder",
-      "DoAide Resume",
-      "free resume maker",
-      "AI resume",
-    ],
+  "build-ats-optimized-resumes-free": {
     body: [
       "Here is a statistic that should alarm every job seeker: 75% of resumes are rejected by Applicant Tracking Systems before a human ever reads them. ATS software scans for keywords, formatting patterns, and section structures that match the job description, and a beautifully designed resume that fails these automated checks is functionally invisible. DoAide Resume is built from the ground up to pass ATS filters while still looking polished to the human recruiter who reads it after the software says yes.",
       "The ATS optimization engine is what sets DoAide Resume apart from generic resume builders. Paste the job description you are targeting, and the AI analyzes it for required skills, preferred qualifications, industry-specific terminology, and action verbs. It then scans your resume draft and highlights gaps — keywords from the job description that are missing from your resume, skills you have listed differently than the JD phrases them, and sections that ATS software expects but your resume lacks. You fix the gaps before submitting, and your pass rate goes up dramatically.",
@@ -465,18 +298,7 @@ export const staticPosts = [
       "DoAide Resume is completely free — no watermarks on downloads, no premium templates locked behind a paywall, no limit on the number of resumes you can create. It is part of the DoAide ecosystem that includes DoAide Docs for professional documents, TaxFile for income tax filing, GSTBot for GST compliance, and DoAide Pulse for newsletter creation. Every tool is built for Indian professionals who need things done right, done fast, and done free. Start building your resume at resume.doaide.com.",
     ],
   },
-  {
-    slug: "ai-newsletters-3x-engagement",
-    title: "How AI-Powered Newsletters Drive 3x More Engagement",
-    description:
-      "Discover how artificial intelligence transforms newsletter creation, personalization, and delivery to triple your reader engagement.",
-    published: "2026-04-01",
-    keywords: [
-      "AI newsletter",
-      "email engagement",
-      "newsletter automation",
-      "AI content",
-    ],
+  "ai-newsletters-3x-engagement": {
     body: [
       "The newsletter landscape has shifted dramatically. Readers are drowning in generic email blasts, and the newsletters that survive their inbox cull are the ones that feel personally crafted. Artificial intelligence makes that level of personalization possible at scale — and the numbers prove it. AI-powered newsletters consistently see 2-3x higher engagement rates compared to manually assembled ones.",
       "The first advantage is content research. An AI system can scan hundreds of sources — industry blogs, academic papers, social media trends, competitor newsletters — and surface the stories most likely to resonate with your specific audience. Instead of spending two hours curating links, you spend ten minutes reviewing AI-suggested content and adding your editorial voice.",
@@ -488,41 +310,19 @@ export const staticPosts = [
       "DoAide Pulse is built around this AI-first approach. From content research to subject line scoring to send-time optimization, every step of the newsletter pipeline is augmented by AI while keeping you in the editorial driver's seat. Try the free subject line tester on our tools page to see the difference AI makes.",
     ],
   },
-  {
-    slug: "subject-line-formulas-open-rates",
-    title: "5 Subject Line Formulas That Boost Open Rates",
-    description:
-      "Five proven subject line templates with real examples that consistently deliver above-average email open rates.",
-    published: "2026-04-15",
-    keywords: [
-      "subject line",
-      "email open rate",
-      "email marketing",
-      "newsletter tips",
-    ],
+  "subject-line-formulas-open-rates": {
     body: [
       "Your subject line is the single most important line of copy in your newsletter. It determines whether your carefully crafted content gets read or buried under 47 other unread emails. After analyzing over 500,000 email campaigns, five subject line formulas consistently outperform the rest. Here they are, with examples you can adapt today.",
-      'Formula 1: The Numbered List. "7 Tools That Cut Our Deploy Time in Half." Numbers set concrete expectations. The reader knows exactly what they are getting and can estimate the time commitment. Odd numbers (5, 7, 9) slightly outperform even numbers in testing. Keep the number under 10 — "47 Ways to..." feels exhausting, not enticing.',
-      'Formula 2: The Curiosity Gap. "The Metric We Stopped Tracking (and Why Revenue Went Up)." This works by creating a gap between what the reader knows and what they want to know. The parenthetical adds specificity without closing the gap. Be careful not to cross into clickbait — the content must deliver on the implied promise.',
-      'Formula 3: The Direct Benefit. "Ship 2x Faster With This One CI Change." No mystery, no tease — just a clear promise of value. This formula works best with audiences who already trust you. New subscribers need curiosity; established readers respond to directness. Include a specific outcome ("2x faster") rather than vague improvement language.',
-      'Formula 4: The Question. "Are You Still Writing Kubernetes YAML by Hand?" Questions engage because the reader instinctively answers them. The best questions make the reader feel slightly behind ("still") or challenged. Avoid yes/no questions where "no" kills interest — "Do you use CI?" invites a shrug; "Is your CI actually saving you time?" invites a click.',
-      'Formula 5: The Social Proof. "What 500 CTOs Told Us About AI Adoption." Leveraging numbers of people and authority creates credibility before the open. Specificity matters — "500 CTOs" outperforms "many leaders." Pair this with exclusive data your subscribers cannot get elsewhere, and your forward rate (viral growth) spikes alongside opens.',
+      "Formula 1: The Numbered List. \"7 Tools That Cut Our Deploy Time in Half.\" Numbers set concrete expectations. The reader knows exactly what they are getting and can estimate the time commitment. Odd numbers (5, 7, 9) slightly outperform even numbers in testing. Keep the number under 10 — \"47 Ways to...\" feels exhausting, not enticing.",
+      "Formula 2: The Curiosity Gap. \"The Metric We Stopped Tracking (and Why Revenue Went Up).\" This works by creating a gap between what the reader knows and what they want to know. The parenthetical adds specificity without closing the gap. Be careful not to cross into clickbait — the content must deliver on the implied promise.",
+      "Formula 3: The Direct Benefit. \"Ship 2x Faster With This One CI Change.\" No mystery, no tease — just a clear promise of value. This formula works best with audiences who already trust you. New subscribers need curiosity; established readers respond to directness. Include a specific outcome (\"2x faster\") rather than vague improvement language.",
+      "Formula 4: The Question. \"Are You Still Writing Kubernetes YAML by Hand?\" Questions engage because the reader instinctively answers them. The best questions make the reader feel slightly behind (\"still\") or challenged. Avoid yes/no questions where \"no\" kills interest — \"Do you use CI?\" invites a shrug; \"Is your CI actually saving you time?\" invites a click.",
+      "Formula 5: The Social Proof. \"What 500 CTOs Told Us About AI Adoption.\" Leveraging numbers of people and authority creates credibility before the open. Specificity matters — \"500 CTOs\" outperforms \"many leaders.\" Pair this with exclusive data your subscribers cannot get elsewhere, and your forward rate (viral growth) spikes alongside opens.",
       "Bonus tips that apply across all five formulas: keep it under 50 characters for mobile preview, avoid ALL CAPS (spam filters and readers both penalize it), test emoji sparingly (one can boost opens by 5%, three kills them), and always A/B test — your audience's preferences are unique, and data beats intuition.",
       "Use our free Subject Line Tester tool to score your subject lines against these best practices before you hit send. It checks length, power words, personalization, and spam signals in real time.",
     ],
   },
-  {
-    slug: "guide-newsletter-that-converts",
-    title: "The Complete Guide to Building a Newsletter That Converts",
-    description:
-      "A step-by-step guide to building a newsletter that turns subscribers into customers, from list building to monetization.",
-    published: "2026-05-01",
-    keywords: [
-      "newsletter conversion",
-      "email marketing",
-      "subscriber growth",
-      "newsletter monetization",
-    ],
+  "guide-newsletter-that-converts": {
     body: [
       "A newsletter that converts is not just one that gets opened — it is one that moves readers to act. Whether your goal is product signups, course enrollments, affiliate revenue, or simply deepening trust with your audience, conversion starts with intention. Every element of your newsletter, from the signup form to the footer CTA, should serve a purpose in the conversion funnel.",
       "Step 1: Define your conversion goal before you write a single issue. Are you driving product trials? Affiliate clicks? Paid upgrades? Each goal requires a different content strategy, CTA placement, and measurement framework. A newsletter trying to do all three at once does none well. Pick one primary conversion goal per quarter.",
@@ -534,19 +334,7 @@ export const staticPosts = [
       "DoAide Pulse helps you build newsletters that convert by handling the infrastructure — AI content research, send-time optimization, analytics, and subscriber management — so you can focus on the editorial and strategic decisions that drive revenue. Start with our free Newsletter ROI Calculator to see what your list could be worth.",
     ],
   },
-  {
-    slug: "email-marketing-strategies-indian-businesses",
-    title: "Email Marketing Strategies for Indian Businesses in 2026",
-    description:
-      "Proven email marketing strategies tailored for Indian businesses — from festival campaigns and regional language support to mobile-first design and WhatsApp integration.",
-    published: "2026-06-01",
-    keywords: [
-      "email marketing India",
-      "Indian business newsletter",
-      "Diwali email campaign",
-      "regional language email",
-      "mobile email India",
-    ],
+  "email-marketing-strategies-indian-businesses": {
     body: [
       "India's email marketing landscape is unlike any other market in the world. With over 900 million internet users, a mobile-first audience, and a cultural calendar packed with festivals and regional celebrations, the playbook that works in the US or Europe needs serious adaptation. Indian businesses that get email right are seeing open rates above 25% and conversion rates that rival paid social — but only when they account for what makes this market unique.",
       "Festival campaigns are the highest-ROI emails most Indian businesses will ever send. Diwali alone drives more e-commerce revenue than any other period, and a well-timed email sequence starting two weeks before the festival can capture early planners while a day-of flash sale catches last-minute buyers. But Diwali is just the start — Holi, Navratri, Pongal, Onam, Eid, and Christmas each present opportunities if your audience celebrates them. The key is segmenting by region and religion rather than blasting the same festival greeting to everyone.",
@@ -558,19 +346,7 @@ export const staticPosts = [
       "DoAide Pulse is built with the Indian market in mind — multilingual content generation, festival campaign templates, mobile-optimized layouts, and send-time optimization tuned for IST. Whether you are a Bangalore startup or a Jaipur retailer, the platform handles the technical complexity so you can focus on connecting with your audience in their language, on their schedule.",
     ],
   },
-  {
-    slug: "ai-content-creation-newsletter-automation",
-    title: "AI Content Creation: How Small Teams Automate Their Newsletters",
-    description:
-      "How AI-powered tools help lean teams research, write, and publish professional newsletters consistently without burning out.",
-    published: "2026-07-01",
-    keywords: [
-      "AI content creation",
-      "newsletter automation",
-      "AI writing tools",
-      "content automation",
-      "small team newsletter",
-    ],
+  "ai-content-creation-newsletter-automation": {
     body: [
       "Running a newsletter with a small team used to mean one of two things: either the founder writes every issue at midnight on Sunday, or the newsletter quietly dies after issue 12. AI content creation has opened a third path — consistent, high-quality newsletters produced by teams of one to three people without the burnout that kills most publishing efforts.",
       "The biggest shift is in research. Before AI, curating a weekly newsletter meant opening 30 browser tabs, skimming articles, and hoping you caught the important stories. AI research assistants now monitor your industry's news feeds, academic publications, social discussions, and competitor newsletters around the clock. When you sit down to write, the raw material is already organized by relevance and freshness. What used to take two hours now takes fifteen minutes of review and selection.",
@@ -582,19 +358,7 @@ export const staticPosts = [
       "DoAide Pulse was designed for exactly this workflow. AI handles the research and first drafts, templates keep the structure consistent, and automated optimization handles scheduling and deliverability. Your job is the part AI cannot do — editorial judgment, personal voice, and knowing what your audience needs to hear. Start with a free account to see how much time your team can reclaim.",
     ],
   },
-  {
-    slug: "newsletter-best-practices-2026",
-    title: "Newsletter Best Practices for 2026: What Has Changed",
-    description:
-      "The latest newsletter best practices for 2026 — dark mode compatibility, AMP email, interactive content, accessibility, and the death of open-rate vanity metrics.",
-    published: "2026-08-01",
-    keywords: [
-      "newsletter best practices 2026",
-      "email marketing trends",
-      "dark mode email",
-      "AMP email",
-      "accessible newsletters",
-    ],
+  "newsletter-best-practices-2026": {
     body: [
       "Newsletter best practices evolve every year, and 2026 has brought several shifts that catch even experienced publishers off guard. Privacy regulations have matured, dark mode adoption has crossed 80% on mobile, and readers expect interactive experiences that blur the line between a static email and a web app. Here is what has changed and what you need to do about it.",
       "Dark mode compatibility is no longer a nice-to-have. Over 80% of mobile email opens now happen with dark mode enabled, and a newsletter that looks great in light mode but becomes unreadable in dark mode is losing a significant portion of its audience. This means transparent PNGs instead of JPEGs with white backgrounds, explicit background colors on every element instead of relying on white defaults, and testing in both modes before every send. Use border colors that work on both light and dark backgrounds.",
@@ -606,19 +370,7 @@ export const staticPosts = [
       "DoAide Pulse stays ahead of these shifts by default. Templates are dark-mode tested, AMP components are available for interactive elements, accessibility checks run automatically before send, and analytics focus on engagement metrics that actually matter. The platform handles the technical complexity of modern email deliverability so you can focus on what you write, not how you send it.",
     ],
   },
-  {
-    slug: "growing-newsletter-subscribers-organically",
-    title: "How to Grow Your Newsletter Subscribers Organically",
-    description:
-      "Proven organic growth strategies for newsletters — content marketing, SEO, social media, lead magnets, and community building without paid ads.",
-    published: "2026-09-01",
-    keywords: [
-      "grow newsletter subscribers",
-      "organic subscriber growth",
-      "newsletter lead magnet",
-      "email list building",
-      "newsletter SEO",
-    ],
+  "growing-newsletter-subscribers-organically": {
     body: [
       "Paid acquisition gets newsletter subscribers through the door, but organic growth builds a list that actually engages. The subscribers who find you through a blog post, a social media recommendation, or a word-of-mouth referral are the ones who open every issue and click every link. They cost nothing to acquire and they stick around. Here is how to build that organic growth engine from scratch.",
       "Content marketing is the foundation. Every blog post, guide, or resource you publish is a potential entry point for newsletter subscribers. The strategy is simple: create content that ranks for search terms your ideal subscriber is already searching, and place a contextual newsletter signup within the content. Not a generic 'subscribe to our newsletter' — a specific promise tied to the content they are reading. A post about email deliverability should offer a newsletter about email marketing, not about your company in general.",
@@ -630,19 +382,7 @@ export const staticPosts = [
       "DoAide Pulse supports organic growth with built-in tools — embeddable signup forms, social sharing buttons on every published newsletter, SEO-optimized public archive pages, and analytics that show which content drives the most subscriptions. The platform helps you identify what is working and double down on it, turning your best content into your best acquisition channel.",
     ],
   },
-  {
-    slug: "best-free-newsletter-tools-india-2026",
-    title: "Best Free Newsletter Tools in India 2026",
-    description:
-      "A comprehensive comparison of the best free newsletter and email marketing tools available in India — features, limits, pricing, and which one fits your needs.",
-    published: "2026-10-08",
-    keywords: [
-      "free newsletter tools India",
-      "email marketing India",
-      "newsletter platform comparison",
-      "Mailchimp alternative India",
-      "free email marketing",
-    ],
+  "best-free-newsletter-tools-india-2026": {
     body: [
       "The Indian newsletter market has exploded in the last two years. Creators, startups, D2C brands, and solo consultants are all launching email newsletters — and most of them start with the same question: which free tool should I use? The answer depends on your list size, your technical comfort, whether you need automation, and whether the tool understands the Indian market. Here is an honest breakdown of the best free newsletter tools available in India in 2026.",
       "DoAide Pulse is purpose-built for Indian businesses. The free tier includes AI-powered content research, subject line optimization, send-time optimization tuned for IST, and multilingual support for Hindi, Tamil, Telugu, Bengali, and Marathi. Where Pulse stands apart is the AI-first workflow — instead of starting with a blank editor, you start with AI-researched content tailored to your audience, then edit and publish. The platform handles deliverability, dark mode compatibility, and mobile optimization automatically. Best for: Indian creators and businesses who want AI assistance and regional language support.",
@@ -654,19 +394,7 @@ export const staticPosts = [
       "The right choice depends on where you are. If you are an Indian business wanting AI-powered newsletters in regional languages, DoAide Pulse is built for exactly that use case. If you are a writer who wants simplicity, Substack is hard to beat. If you need CRM integration, Zoho Campaigns or Brevo makes sense. And if contact limits matter most, ConvertKit's 10,000-subscriber free tier is unmatched. Start with the free tier that fits your needs — you can always migrate later, and most tools make export easy.",
     ],
   },
-  {
-    slug: "grow-email-subscribers-0-to-1000",
-    title: "How to Grow Email Subscribers from 0 to 1,000",
-    description:
-      "A practical, step-by-step guide to growing your email list from zero to your first 1,000 subscribers using free organic strategies.",
-    published: "2026-10-07",
-    keywords: [
-      "grow email subscribers",
-      "email list building",
-      "first 1000 subscribers",
-      "newsletter growth",
-      "subscriber acquisition",
-    ],
+  "grow-email-subscribers-0-to-1000": {
     body: [
       "Your first 1,000 email subscribers are the hardest to get and the most valuable you will ever have. They are the people who believed in your newsletter before it had social proof, before it had a track record, before anyone else vouched for it. These early subscribers also set the tone for your list — their engagement rates train email providers to trust your domain, and their feedback shapes your content. Here is the exact playbook to go from 0 to 1,000, tested by creators who have done it.",
       "Phase 1: The first 100 (weeks 1-4). Start with people who already know you. Send a personal email to every professional contact explaining what your newsletter covers and why you are starting it. Post on your personal social media — LinkedIn, Twitter, Instagram stories. The ask is specific: 'I am launching a weekly newsletter about [topic]. If that is useful to you, here is the signup link.' Do not mass-blast your entire contact list; personally invite the 50-100 people most likely to care. Conversion rate from personal outreach: 30-50%. You need 200-300 contacts to hit 100 subscribers this way.",
@@ -678,19 +406,7 @@ export const staticPosts = [
       "The timeline is realistic but not guaranteed. Most newsletters reach 1,000 subscribers in 4-6 months with consistent effort. The ones that reach it faster usually have an existing audience on another platform (a blog, a YouTube channel, a large Twitter following) that they convert. The ones that take longer usually publish inconsistently or have not found their niche specificity yet. The single biggest predictor of reaching 1,000 subscribers is whether you publish every week without skipping. Consistency beats everything else. Start your newsletter with DoAide Pulse and let AI handle the heavy lifting so you can focus on showing up every week.",
     ],
   },
-  {
-    slug: "email-marketing-vs-social-media-marketing",
-    title: "Email Marketing vs Social Media Marketing: Which Wins in 2026?",
-    description:
-      "A data-driven comparison of email marketing and social media marketing — reach, ROI, engagement, ownership, and when to use each channel.",
-    published: "2026-10-06",
-    keywords: [
-      "email marketing vs social media",
-      "newsletter vs Instagram",
-      "email ROI",
-      "marketing channel comparison",
-      "email vs social media 2026",
-    ],
+  "email-marketing-vs-social-media-marketing": {
     body: [
       "The email-versus-social-media debate has been running for a decade, and the data has only gotten clearer: email wins on almost every measurable business metric. Yet social media remains essential for discovery and brand awareness. The smart answer is not either-or — it is knowing which channel does what, and building a strategy that uses each for its strength. Here is the comparison, with real numbers from 2026.",
       "ROI: email dominates. Email marketing generates an average return of 36-42 rupees for every 1 rupee spent, depending on the industry. Social media marketing ROI is harder to measure precisely, but industry benchmarks put it at 5-10 rupees per rupee for organic social and 2-5 rupees for paid social. The gap is structural: email reaches people who asked to hear from you, while social media reaches people who happen to be scrolling. Intent-based audiences convert at fundamentally higher rates than interrupt-based audiences.",
@@ -702,4 +418,7 @@ export const staticPosts = [
       "The verdict: build your email list first, then amplify with social. If you can only invest time in one channel, choose email. It has higher ROI, better conversion rates, and you own the audience. Use social media to drive traffic to your newsletter signup, not as your primary distribution channel. And if you are in India, add WhatsApp as your third pillar — the combination of email, social, and WhatsApp creates a distribution moat that no single channel can match. Start building your email newsletter with DoAide Pulse — the AI handles the content so you can focus on growing your list.",
     ],
   },
-];
+};
+
+/** Every post in full, in the index's order. */
+export const staticPosts = blogPostIndex.map((post) => ({ ...post, ...POST_CONTENT[post.slug] }));
