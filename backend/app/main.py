@@ -499,7 +499,19 @@ def create_app() -> FastAPI:
     # traceback_responses_enabled() for why DEBUG must not reach Starlette here.
     async def _unhandled_exception(request: Request, exc: Exception) -> JSONResponse:
         request_id = getattr(request.state, "request_id", "unknown")
-        logger.exception("unhandled exception [request_id=%s]", request_id)
+        # The route and the account, not just the id. This handler runs outside
+        # every user middleware, so neither the request-id log line nor the
+        # acting-user context is still around to say which endpoint failed for
+        # whom — and the access log that would is off on some boxes and has
+        # its credential segments redacted on all of them. The path is redacted
+        # the same way; the user is read from the token, never from the body.
+        logger.exception(
+            "unhandled exception in %s %s [request_id=%s user=%s]",
+            request.method,
+            redact_path(request.url.path),
+            request_id,
+            _bearer_subject(request.headers.get("authorization", "")) or "-",
+        )
         # Set the header here rather than leaving it to RequestIDMiddleware:
         # Starlette installs ServerErrorMiddleware *outside* the whole user
         # middleware stack, so a raising route unwinds past RequestIDMiddleware
@@ -527,7 +539,11 @@ def create_app() -> FastAPI:
             return await _unhandled_exception(request, exc)
         request_id = getattr(request.state, "request_id", "unknown")
         logger.warning(
-            "database unavailable [request_id=%s]: %s", request_id, type(exc).__name__
+            "database unavailable in %s %s [request_id=%s]: %s",
+            request.method,
+            redact_path(request.url.path),
+            request_id,
+            type(exc).__name__,
         )
         return JSONResponse(
             {
