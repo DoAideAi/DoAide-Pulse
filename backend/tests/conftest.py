@@ -176,6 +176,20 @@ def _fresh_publishing_breaker():
     publishers_breaker.reset()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_idea_breaker():
+    """The free idea generator's Gemini breaker, emptied around each test.
+
+    Module-level and in-process like the two above, so three failures a test
+    provokes on purpose would otherwise shut the endpoint for the next one.
+    """
+    from app.routers import viral
+
+    viral.idea_breaker.reset()
+    yield
+    viral.idea_breaker.reset()
+
+
 @pytest.fixture
 def db():
     Base.metadata.create_all(bind=engine)

@@ -27,10 +27,21 @@ from app.schemas.viral import (
     SubscribeOut,
     UnsubscribeIn,
 )
+from app.services.breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["viral"])
+
+#: Gemini for the free idea generator, which calls it directly rather than
+#: through ``llm_router`` and so had no breaker of its own. Without one, an
+#: outage cost every anonymous caller the full 30-second timeout on a worker
+#: thread — and sync routes share one pool, so a few IPs inside their own rate
+#: limit were enough to queue up the whole API behind a provider that was down.
+#: Counts transport and HTTP failures only: an unparseable answer comes back
+#: fast and holds nothing.
+idea_breaker = CircuitBreaker(threshold=3, cooldown_seconds=60.0)
+_IDEA_BREAKER_KEY = "gemini"
 
 
 @router.get(
@@ -251,6 +262,15 @@ def generate_content_ideas(
             detail="Content idea generation is temporarily unavailable. The AI service is not configured.",
         )
 
+    if idea_breaker.is_open(_IDEA_BREAKER_KEY):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Content idea generation is temporarily unavailable. Try again in a moment.",
+            headers={
+                "Retry-After": str(max(1, int(idea_breaker.seconds_remaining(_IDEA_BREAKER_KEY))))
+            },
+        )
+
     niche = json.dumps(payload.niche, ensure_ascii=False)
     prompt = (
         f"You are an expert content strategist. Generate {payload.count} unique, "
@@ -279,7 +299,10 @@ def generate_content_ideas(
             timeout=30.0,
         )
         resp.raise_for_status()
+        idea_breaker.record_success(_IDEA_BREAKER_KEY)
     except httpx.HTTPError as exc:
+        if idea_breaker.record_failure(_IDEA_BREAKER_KEY):
+            logger.warning("Gemini is failing; idea generation paused for 60s")
         logger.exception("Gemini API call failed for content ideas")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
