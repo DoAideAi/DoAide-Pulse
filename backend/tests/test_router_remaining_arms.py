@@ -18,6 +18,7 @@ from app.models.content import Content, ContentStatus, ContentType
 from app.models.project import Project, Tone
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.trigger import Trigger, TriggerKind
+from app.routers import auth as auth_router
 
 API = "/api/v1"
 
@@ -153,7 +154,7 @@ def test_a_duplicate_signup_lost_at_the_database_is_a_409_not_a_500(
     )
 
     assert resp.status_code == 409
-    assert resp.json()["detail"] == "Email already registered"
+    assert resp.json()["detail"] == auth_router.EMAIL_TAKEN
     assert "INSERT" not in resp.text
     assert "unique" not in resp.text
 
@@ -165,6 +166,7 @@ def test_the_pre_check_answers_the_ordinary_duplicate(client, user):
     )
 
     assert resp.status_code == 409
+    assert resp.json()["detail"] == auth_router.EMAIL_TAKEN
 
 
 def test_a_password_check_that_passes_for_a_missing_user_still_refuses(

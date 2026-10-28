@@ -96,6 +96,12 @@ def _assert_registration_allowed(invite_token: str | None) -> None:
         )
 
 
+#: Both duplicate-signup arms say this, so the race and the ordinary case read
+#: the same. It names the way on, because "Email already registered" left the
+#: person who had forgotten they had an account with nothing to try next.
+EMAIL_TAKEN = "An account with this email already exists. Sign in instead."
+
+
 @router.post(
     "/register",
     response_model=UserOut,
@@ -143,9 +149,7 @@ def register(
     # existing one only in case is the same mailbox, so it is a duplicate here
     # and must not become a second account. See :mod:`app.services.accounts`.
     if accounts.email_taken(db, payload.email):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="Email already registered."
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=EMAIL_TAKEN)
     user = User(
         email=accounts.normalize_email(payload.email),
         full_name=payload.full_name,
@@ -162,7 +166,7 @@ def register(
         # response the user is meant to read as "pick another address".
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered.",
+            detail=EMAIL_TAKEN,
         ) from None
     db.refresh(user)
     # An account appearing on a single-user install is worth a line whatever
