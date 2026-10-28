@@ -80,6 +80,16 @@ def _unique_slug(db: Session, user_id: int, name: str, *, exclude_id: int | None
         suffix += 1
 
 
+def _is_slug_collision(exc: IntegrityError) -> bool:
+    """Whether *exc* is ``uq_project_user_slug`` — see ``content_store.is_slug_collision``."""
+    orig = getattr(exc, "orig", None)
+    name = getattr(getattr(orig, "diag", None), "constraint_name", None)
+    if name:
+        return name == "uq_project_user_slug"
+    text = str(orig if orig is not None else exc)
+    return "uq_project_user_slug" in text or "projects.user_id, projects.slug" in text
+
+
 def _project_fields(project: Project) -> dict:
     """The column values shared by every serialisation path."""
     return {
@@ -386,26 +396,42 @@ def update_project(
     Renaming re-slugs the project, and so changes its public feed URL. A PATCH
     that sends the same name does not.
     """
-    project = owned_project(project_id, db, user)
     data = payload.model_dump(exclude_unset=True)
     reject_nulls(Project, data)
-
     if "autopilot_platforms" in data and data["autopilot_platforms"] is not None:
         data["autopilot_platforms"] = [
             p.value if hasattr(p, "value") else str(p) for p in data["autopilot_platforms"]
         ]
-    # Renaming re-slugs, but only if the name actually changed — otherwise a
-    # PATCH that touches nothing would bump `pulse` to `pulse-2`.
-    if "name" in data and data["name"] != project.name:
-        project.slug = _unique_slug(db, user.id, data["name"], exclude_id=project.id)
 
-    was_unreviewed = project.autopilot_mode in _PUBLISHES_UNREVIEWED
-    for key, value in data.items():
-        setattr(project, key, value)
-    if was_unreviewed and project.autopilot_mode not in _PUBLISHES_UNREVIEWED:
-        content_pipeline.hold_unreviewed(db, project)
+    def _apply(project: Project, collision_suffix: str) -> None:
+        # Renaming re-slugs, but only if the name actually changed — otherwise a
+        # PATCH that touches nothing would bump `pulse` to `pulse-2`.
+        if "name" in data and data["name"] != project.name:
+            slug = _unique_slug(db, user.id, data["name"], exclude_id=project.id)
+            project.slug = f"{slug}-{collision_suffix}" if collision_suffix else slug
 
-    db.commit()
+        was_unreviewed = project.autopilot_mode in _PUBLISHES_UNREVIEWED
+        for key, value in data.items():
+            setattr(project, key, value)
+        if was_unreviewed and project.autopilot_mode not in _PUBLISHES_UNREVIEWED:
+            content_pipeline.hold_unreviewed(db, project)
+
+    # The slug is picked by a SELECT and written by this commit, so a create
+    # or another rename landing in between takes the same slug first and this
+    # commit fails ``uq_project_user_slug``: an unhandled 500 for a rename
+    # that was valid when it was checked. ``create_project`` already retries
+    # this; a rename does too. The rollback discards the whole PATCH, so it is
+    # re-applied to the row as it now stands, with a random suffix on the slug.
+    for attempt in range(1, 4):
+        project = owned_project(project_id, db, user)
+        _apply(project, secrets.token_hex(3) if attempt > 1 else "")
+        try:
+            db.commit()
+            break
+        except IntegrityError as exc:
+            db.rollback()
+            if attempt == 3 or not _is_slug_collision(exc):
+                raise
     db.refresh(project)
     return _to_out(project, db=db)
 
