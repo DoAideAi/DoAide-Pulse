@@ -88,8 +88,8 @@ def test_the_surface_is_the_size_this_file_thinks_it_is():
     every check below as they stand. 158 with ``GET /analytics/features``
     (C103 M15); 159 with ``GET /analytics/funnel``, 160 with
     ``GET /analytics/autopilot``. 161 with ``POST /subscribers/unsubscribe``
-    (C103 M16)."""
-    assert len(ROUTES) == 161
+    (C103 M16); 162 with ``DELETE /auth/me``, erasing the account."""
+    assert len(ROUTES) == 162
 
 
 @pytest.mark.parametrize("route", ROUTES)

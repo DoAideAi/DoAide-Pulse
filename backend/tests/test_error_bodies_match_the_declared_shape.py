@@ -109,9 +109,9 @@ def test_the_two_sweeps_are_the_size_they_should_be():
     136 with the feedback list and its feature-area options, the two
     operator-only reads behind the feedback widget. 139 with M15's feature
     usage, content funnel and autopilot reports, which landed without moving
-    the pin and left this failing on main.
+    the pin and left this failing on main. 140 with ``DELETE /auth/me``.
     """
-    assert len(AUTHENTICATED) == 139
+    assert len(AUTHENTICATED) == 140
     assert len(BY_ID) == 67
 
 

@@ -60,6 +60,18 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class AccountDeleteRequest(BaseModel):
+    """The account's password, asked for again before the account is erased.
+
+    A bearer token is enough to read and edit; it is not enough to destroy
+    everything. A token lifted from a shared machine or a log should not be.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    password: str = Field(min_length=1, max_length=200)
+
+
 class PreferencesUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

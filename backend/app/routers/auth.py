@@ -44,6 +44,7 @@ from app.ratelimit import (
 )
 from app.routers._patch import reject_nulls
 from app.schemas.auth import (
+    AccountDeleteRequest,
     MessageOut,
     PasswordResetConfirm,
     PasswordResetRequest,
@@ -433,6 +434,43 @@ def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.delete(
+    "/me",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Erase the signed-in account and everything in it",
+    responses=errors(
+        *AUTHENTICATED,
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+    ),
+)
+@limiter.limit(settings.rate_limit_login)
+def delete_me(
+    request: Request,
+    response: Response,
+    payload: AccountDeleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Delete the account: projects, content, connections and their stored
+    credentials, keys, webhooks, triggers, templates, activity — and the
+    newsletter addresses collected on the account's pages. Irreversible. See
+    :func:`app.services.accounts.erase` for exactly what goes, and the two
+    things it cannot reach.
+
+    The password is asked for again. A wrong one is a 403 rather than a 401:
+    the token is fine, and a 401 would sign the person out of the page they
+    are typing into. Rate limited like a login, because it is a password check.
+    """
+    if not verify_password(payload.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="That password is not right, so nothing was deleted.",
+        )
+    accounts.erase(db, current_user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get(

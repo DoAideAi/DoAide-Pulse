@@ -40,7 +40,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -127,7 +127,39 @@ def email_taken(db: Session, email: str) -> bool:
     ) > 0
 
 
-__all__ = ["email_taken", "find_by_email", "normalize_email"]
+def erase(db: Session, user: User) -> None:
+    """Delete *user* and everything that is theirs. Commits.
+
+    One ``DELETE`` on ``users``: every table an account owns hangs off it by a
+    foreign key with ``ON DELETE CASCADE`` — projects, and through them their
+    content, revisions, translations, preview links, publications, ideas,
+    triggers and API keys; the account's platform connections and their
+    encrypted credentials, webhooks, templates, LLM keys, activity and reset
+    tokens. A revision another account wrote keeps its text and loses only the
+    author, which is ``SET NULL``.
+
+    The one thing that would survive the cascade is deleted first: newsletter
+    subscribers attributed to the account's projects. ``subscribers.project_id``
+    is ``SET NULL``, so without this the addresses collected on the account's
+    pages would outlive it, unattributed — another person's audience kept after
+    they asked for their data to go.
+
+    Not reached from here: what was published to other platforms (that lives
+    on those platforms, under the account's own credentials there), and images
+    uploaded through the editor, which are stored by content hash and not
+    attributed to an account.
+    """
+    from app.models.project import Project
+    from app.models.subscriber import Subscriber
+
+    owned = select(Project.id).where(Project.user_id == user.id)
+    db.execute(delete(Subscriber).where(Subscriber.project_id.in_(owned)))
+    db.execute(delete(User).where(User.id == user.id))
+    db.commit()
+    logger.info("account %s erased at its owner's request", user.id)
+
+
+__all__ = ["email_taken", "erase", "find_by_email", "normalize_email"]
 
 
 def is_operator(user: User) -> bool:
