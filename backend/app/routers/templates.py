@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.deps import ListOffset, QueryRowId, RowId, get_current_user, owned_project
+from app.deps import ListOffset, QueryRowId, RowId, get_current_user, lock_for_count, owned_project
 from app.models.content import (
     BODY_MARKDOWN_MAX_LENGTH,
     Content,
@@ -274,6 +274,7 @@ def create_template(
     if payload.default_project_id is not None:
         owned_project(payload.default_project_id, db, user)
 
+    lock_for_count(db, User, user.id)
     count = (
         db.scalar(
             select(func.count(ContentTemplate.id)).where(

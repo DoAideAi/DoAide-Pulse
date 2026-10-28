@@ -26,7 +26,8 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.database import get_db
-from app.deps import ListOffset, QueryRowId, RowId, get_current_user, owned_project
+from app.deps import ListOffset, QueryRowId, RowId, get_current_user, lock_for_count, owned_project
+from app.models.project import Project
 from app.models.trigger import Trigger, TriggerEvent, TriggerEventStatus, TriggerKind
 from app.models.user import User
 from app.ratelimit import account_key, limiter
@@ -269,6 +270,7 @@ def create_trigger(
     """Register a trigger. A webhook trigger's secret is in this response only."""
     owned_project(payload.project_id, db, user)
 
+    lock_for_count(db, Project, payload.project_id)
     count = (
         db.scalar(
             select(func.count(Trigger.id)).where(

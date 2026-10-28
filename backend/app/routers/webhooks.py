@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.deps import ListOffset, RowId, get_current_user, lock_for_count
 from app.logging_config import url_for_log
-from app.deps import ListOffset, RowId, get_current_user
 from app.models.user import User
 from app.models.webhook import (
     SUBSCRIBABLE_EVENTS,
@@ -153,6 +153,7 @@ def create_webhook(
     user: User = Depends(get_current_user),
 ) -> WebhookCreated:
     """Register an endpoint. The signing secret is in this response and nowhere else."""
+    lock_for_count(db, User, user.id)
     count = (
         db.scalar(
             select(func.count(Webhook.id)).where(Webhook.user_id == user.id)

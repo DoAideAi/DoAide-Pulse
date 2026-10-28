@@ -24,7 +24,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.database import get_db
-from app.deps import ListOffset, RowId, get_current_user, owned_project
+from app.deps import ListOffset, RowId, get_current_user, lock_for_count, owned_project
 from app.models.content import Content, ContentIdea, ContentStatus
 from app.models.mixins import elapsed_ms
 from app.models.project import AutopilotMode, Project, slugify
@@ -251,6 +251,7 @@ def create_project(
     keywords, the autopilot settings — sharpens what gets written and can be
     filled in later.
     """
+    lock_for_count(db, User, user.id)
     owned = db.scalar(select(func.count(Project.id)).where(Project.user_id == user.id)) or 0
     if owned >= MAX_PROJECTS_PER_USER:
         raise HTTPException(

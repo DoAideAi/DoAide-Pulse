@@ -21,8 +21,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.deps import ListOffset, QueryRowId, RowId, get_current_user, owned_project
+from app.deps import ListOffset, QueryRowId, RowId, get_current_user, lock_for_count, owned_project
 from app.models.api_key import ALL_SCOPES, ApiKey, ApiKeyScope
+from app.models.project import Project
 from app.models.user import User
 from app.ratelimit import limiter
 from app.schemas.api_key import (
@@ -157,6 +158,7 @@ def create_api_key(
     """Mint a key on a project. The token is in this response and nowhere else."""
     project = owned_project(payload.project_id, db, user)
 
+    lock_for_count(db, Project, project.id)
     live = (
         db.scalar(
             select(func.count(ApiKey.id)).where(
@@ -228,6 +230,7 @@ def rotate_api_key(
     """
     key = _owned_key(key_id, db, user)
     if payload.grace_hours > 0:
+        lock_for_count(db, Project, key.project_id)
         live = (
             db.scalar(
                 select(func.count(ApiKey.id)).where(

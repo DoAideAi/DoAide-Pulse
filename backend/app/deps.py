@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, Path, Query, status
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -139,6 +140,20 @@ def owned_project(project_id: int, db: Session, user: User) -> Project:
             status_code=status.HTTP_404_NOT_FOUND, detail="Project not found."
         )
     return project
+
+
+def lock_for_count(db: Session, model: type[User] | type[Project], row_id: int) -> None:
+    """Hold *row_id* until this transaction ends, so a count under it is true.
+
+    Every per-account and per-project ceiling is a count followed by an insert,
+    and two requests between the two both counted one under the ceiling and
+    both inserted — a burst of parallel creates went past it by as many as were
+    in flight. Taking the owner's row first queues them: the second counts
+    after the first has committed its row. Held until the handler commits, so
+    call it before the count and do not commit between the two. (PostgreSQL
+    honours the lock; SQLite has one writer at a time anyway.)
+    """
+    db.execute(select(model.id).where(model.id == row_id).with_for_update())
 
 
 #: The header a machine credential arrives in.
