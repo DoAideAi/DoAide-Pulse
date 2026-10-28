@@ -366,6 +366,15 @@ export const api = {
   alerts: (limit) => request(`/analytics/alerts${qs({ limit })}`),
   // Content by status and publish success rates — where everything stands.
   pipeline: () => request("/analytics/pipeline"),
+  // Which of Pulse's features this account uses, over the last `days`.
+  featureUsage: (days) => request(`/analytics/features${qs({ days })}`),
+  // Written -> review -> approved -> published, overall and by origin, with
+  // pieces idle past `staleDays` in draft or review.
+  contentFunnel: (days, staleDays) =>
+    request(`/analytics/funnel${qs({ days, stale_days: staleDays })}`),
+  // How often autopilot approves on its own, why it holds, and how often a
+  // person overrides it.
+  autopilotEffectiveness: (days) => request(`/analytics/autopilot${qs({ days })}`),
   // Newsletter sign-ups: totals, per-day series, sources. Counts only.
   subscriberGrowth: (days) => request(`/analytics/subscribers${qs({ days })}`),
   activitySummary: (days) => request(`/activity/summary${qs({ days })}`),
