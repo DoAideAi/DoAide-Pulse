@@ -149,6 +149,11 @@ detail — when the autopilot publishes without asking, how the quality and SEO
 scores are computed, how a publish time is chosen, and what happens after a
 failure.
 
+The decisions that look improvable from inside one file — bearer tokens rather
+than cookies, never auto-retrying an ambiguous publish, the single-tenant
+"operator", deterministic publish gates, SET NULL references, the off-box
+frontend build — are recorded with their reasons in [`docs/adr/`](docs/adr/).
+
 Three design decisions worth knowing before you read the code:
 
 **The AI chain never hard-fails.** Four providers are tried in order, each
