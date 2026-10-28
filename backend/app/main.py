@@ -22,8 +22,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from app.config import settings
 from app import openapi_docs
+from app.config import settings
 from app.logging_config import configure_logging, redact_path, request_id_var
 from app.ratelimit import limiter, rate_limit_exceeded_handler
 from app.routers import (
@@ -519,7 +519,7 @@ def create_app() -> FastAPI:
         # before it can decorate a response, and this 500 would go out with no
         # id at all. The id is in the log line above either way — but a 500 the
         # caller cannot quote back is the one error where that matters most.
-        return JSONResponse(
+        response = JSONResponse(
             {
                 "detail": "Something went wrong on our end. If this keeps "
                 f"happening, quote request id {request_id} when reporting it."
@@ -527,6 +527,10 @@ def create_app() -> FastAPI:
             status_code=500,
             headers={"X-Request-ID": request_id},
         )
+        # The same reason as the id above: this response is built outside the
+        # middleware that would otherwise add these.
+        _apply_security_headers(request, response)
+        return response
 
     app.add_exception_handler(Exception, _unhandled_exception)
 
@@ -703,50 +707,61 @@ def create_app() -> FastAPI:
         )
     )
 
+    def _apply_security_headers(request: Request, response: Response) -> None:
+        """The headers every response carries, set in one place.
+
+        Called by the middleware below for everything that comes back through
+        the stack, and by ``_unhandled_exception`` for the one response that
+        does not: Starlette serves the catch-all 500 from ``ServerErrorMiddleware``,
+        outside every middleware added here, so that 500 went out with no
+        ``Cache-Control: no-store``, no ``nosniff`` and no CSP (C104 M4).
+        """
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=()"
+        )
+        # Prevent caches (shared proxies, browsers) from storing
+        # authenticated responses that may carry tokens or user data.
+        #
+        # Skipped when the route has already set its own Cache-Control —
+        # the upload endpoint serves images with an immutable yearlong max-age,
+        # and overwriting that with no-store would defeat caching for the one
+        # response type that benefits from it and carries no user data.
+        if "cache-control" not in response.headers:
+            response.headers["Cache-Control"] = "no-store"
+        response.headers["Content-Security-Policy"] = csp
+        # HSTS, but only on a request that actually arrived over TLS.
+        #
+        # A browser ignores this header on a plain-HTTP response, so
+        # emitting it unconditionally would be merely useless in most
+        # places — except on localhost, where a developer who once runs an
+        # HTTPS dev server pins their own machine to TLS for a year and
+        # gets to discover why every other project on :8000 stopped
+        # loading. There is no way to unpin it but to clear it by hand.
+        #
+        # In production the app is behind Caddy, which terminates TLS and
+        # forwards over plain HTTP on the docker bridge — so the request's
+        # own scheme says "http" and the forwarded header is the only
+        # honest signal. It is trustworthy here specifically because
+        # nothing but Caddy can reach the port: the services bind the
+        # bridge address, not a public one (see deploy/Caddyfile.pulse).
+        forwarded_proto = request.headers.get("x-forwarded-proto", "")
+        over_tls = request.url.scheme == "https" or (
+            forwarded_proto.split(",")[0].strip().lower() == "https"
+        )
+        if over_tls:
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
+
     class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         async def dispatch(
             self, request: Request, call_next: RequestResponseEndpoint
         ) -> Response:
             response = await call_next(request)
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["X-Frame-Options"] = "DENY"
-            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-            response.headers["Permissions-Policy"] = (
-                "camera=(), microphone=(), geolocation=()"
-            )
-            # Prevent caches (shared proxies, browsers) from storing
-            # authenticated responses that may carry tokens or user data.
-            #
-            # Skipped when the route has already set its own Cache-Control —
-            # the upload endpoint serves images with an immutable yearlong max-age,
-            # and overwriting that with no-store would defeat caching for the one
-            # response type that benefits from it and carries no user data.
-            if "cache-control" not in response.headers:
-                response.headers["Cache-Control"] = "no-store"
-            response.headers["Content-Security-Policy"] = csp
-            # HSTS, but only on a request that actually arrived over TLS.
-            #
-            # A browser ignores this header on a plain-HTTP response, so
-            # emitting it unconditionally would be merely useless in most
-            # places — except on localhost, where a developer who once runs an
-            # HTTPS dev server pins their own machine to TLS for a year and
-            # gets to discover why every other project on :8000 stopped
-            # loading. There is no way to unpin it but to clear it by hand.
-            #
-            # In production the app is behind Caddy, which terminates TLS and
-            # forwards over plain HTTP on the docker bridge — so the request's
-            # own scheme says "http" and the forwarded header is the only
-            # honest signal. It is trustworthy here specifically because
-            # nothing but Caddy can reach the port: the services bind the
-            # bridge address, not a public one (see deploy/Caddyfile.pulse).
-            forwarded_proto = request.headers.get("x-forwarded-proto", "")
-            over_tls = request.url.scheme == "https" or (
-                forwarded_proto.split(",")[0].strip().lower() == "https"
-            )
-            if over_tls:
-                response.headers["Strict-Transport-Security"] = (
-                    "max-age=31536000; includeSubDomains"
-                )
+            _apply_security_headers(request, response)
             return response
 
     app.add_middleware(SecurityHeadersMiddleware)
