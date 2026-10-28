@@ -20,10 +20,10 @@ from datetime import datetime
 from typing import Annotated
 
 from pydantic import (
+    AllowInfNan,
     BaseModel,
     ConfigDict,
     Field,
-    AllowInfNan,
     Strict,
     StrictInt,
     field_validator,

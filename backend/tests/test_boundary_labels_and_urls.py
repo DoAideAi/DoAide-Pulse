@@ -177,3 +177,47 @@ def test_ordinary_urls_still_pass(client, auth, project, url):
 def test_a_bare_domain_still_gains_https(client, auth):
     resp = client.post(PROJECTS, headers=auth, json={"name": "P", "repo_url": "github.com/acme/app"})
     assert resp.json()["repo_url"] == "https://github.com/acme/app"
+
+
+# ---- a title filled in from a template ----------------------------------- #
+
+
+@pytest.fixture
+def headline_template(client, auth) -> int:
+    resp = client.post(
+        "/api/v1/templates",
+        headers=auth,
+        json={
+            "name": "Launch note",
+            "title_template": "{{headline}}",
+            "body_template": "Body {{detail}}",
+            "variables": [{"name": "headline"}, {"name": "detail"}],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["id"]
+
+
+@pytest.mark.parametrize(
+    ("value", "title"),
+    [
+        ("Two\nlines", "Two lines"),
+        ("bell\x07char", "bellchar"),
+        ("‮abc", "abc"),
+        # Nothing visible left: the template's own name, as for an empty value.
+        ("​", "Launch note"),
+        ("   ", "Launch note"),
+        # One pass: a value is never itself expanded.
+        ("{{project.name}}", "{{project.name}}"),
+    ],
+)
+def test_a_title_filled_from_a_template_is_cleaned_like_a_typed_one(
+    client, auth, project, headline_template, value, title
+):
+    resp = client.post(
+        f"/api/v1/templates/{headline_template}/use",
+        headers=auth,
+        json={"values": {"headline": value}, "project_id": project.id},
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["title"] == title

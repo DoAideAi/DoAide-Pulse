@@ -33,6 +33,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.models.content import BODY_MARKDOWN_MAX_LENGTH, TITLE_MAX_LENGTH
+from app.schemas.text import visible_label
 
 if TYPE_CHECKING:
     from app.models.project import Project
@@ -377,7 +378,12 @@ def render(
     body, body_filled = substitute(template.body_template or "", context)
 
     body = collapse_blank_runs(drop_empty_lines(template.body_template or "", body))
-    title = " ".join(title.split())
+    # The same cleaning a typed title gets (``schemas.text``), because a value
+    # filled in here becomes a title without passing that schema: a newline,
+    # a control character or a lone zero-width space in a value otherwise
+    # went straight into the piece's title (C104 M1). Empty when nothing
+    # visible is left, which callers already answer with the template's name.
+    title = visible_label(title)
 
     # Clipped after the whitespace and empty-line passes, not before: those
     # passes shrink the text, so measuring first would refuse renders that
