@@ -133,7 +133,10 @@ class TemplateBase(BaseModel):
             )
 
         if len(self.variables) > MAX_VARIABLES:
-            raise ValueError(f"At most {MAX_VARIABLES} variables per template.")
+            raise ValueError(
+                f"At most {MAX_VARIABLES} variables per template. Remove one this "
+                "template no longer uses."
+            )
 
         return self
 

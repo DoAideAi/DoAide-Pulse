@@ -202,7 +202,7 @@ class ContentCreate(BaseModel):
     def _strip_title(cls, value: str) -> str:
         title = value.strip()
         if not title:
-            raise ValueError("Title must contain non-whitespace characters.")
+            raise ValueError("A title is required — it cannot be only spaces.")
         return title
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
@@ -237,7 +237,7 @@ class ContentUpdate(BaseModel):
             return value
         title = value.strip()
         if not title:
-            raise ValueError("Title must contain non-whitespace characters.")
+            raise ValueError("A title is required — it cannot be only spaces.")
         return title
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
@@ -636,7 +636,7 @@ class HeadlineApplyIn(BaseModel):
     def _strip_title(cls, value: str) -> str:
         title = value.strip()
         if not title:
-            raise ValueError("Title must contain non-whitespace characters.")
+            raise ValueError("A title is required — it cannot be only spaces.")
         return title
 
 

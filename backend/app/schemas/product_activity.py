@@ -33,7 +33,7 @@ class ProductEventIn(BaseModel):
     @model_validator(mode="after")
     def _name_matches_kind(self) -> ProductEventIn:
         if self.kind == "action" and not self.name:
-            raise ValueError("an action needs a name")
+            raise ValueError('An "action" event needs a name, such as "email_sent".')
         if self.kind != "action":
             self.name = self.kind
         return self

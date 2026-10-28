@@ -72,3 +72,26 @@ def test_an_inverted_feedback_window_says_to_swap_it(client, auth, monkeypatch):
     resp = client.get("/api/v1/feedback?since=2026-10-10&until=2026-10-01", headers=auth)
     assert resp.status_code == 400, resp.text
     assert "Swap them" in resp.json()["detail"]
+
+
+def test_a_blank_title_is_named_in_plain_words(client, auth, project):
+    resp = client.post(
+        "/api/v1/content",
+        json={"project_id": project.id, "content_type": "tutorial", "title": "   "},
+        headers=auth,
+    )
+    assert resp.status_code == 422
+    messages = [e["msg"] for e in resp.json()["detail"]]
+    assert any("title is required" in m for m in messages), messages
+    assert not any("non-whitespace" in m for m in messages)
+
+
+def test_an_action_event_without_a_name_says_what_a_name_looks_like():
+    import pytest
+    from pydantic import ValidationError
+
+    from app.schemas.product_activity import ProductEventIn
+
+    with pytest.raises(ValidationError) as caught:
+        ProductEventIn(product="gst", kind="action")
+    assert "email_sent" in str(caught.value)
