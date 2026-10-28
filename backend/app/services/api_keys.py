@@ -338,8 +338,26 @@ def rotate(
     but neither should it silently extend a key that was deliberately dated.
     """
     moment = now or utcnow()
+    # Locked first, so two rotations of one key — a double-click — run one after
+    # the other and the second sees what the first did. Without it both passed
+    # the checks below and minted a replacement each. (PostgreSQL honours the
+    # lock; SQLite has one writer at a time anyway.)
+    db.execute(select(ApiKey.id).where(ApiKey.id == key.id).with_for_update())
+    db.refresh(key)
     if key.revoked_at is not None:
         raise ApiKeyError("That key is already revoked. Create a new one instead.")
+    successor = db.scalar(
+        select(ApiKey.prefix).where(
+            ApiKey.rotated_from_id == key.id, ApiKey.revoked_at.is_(None)
+        )
+    )
+    if successor is not None:
+        # In its grace window already. A second replacement would be a second
+        # live key under one name, whose token one of the two responses showed.
+        raise ApiKeyError(
+            f"That key was already rotated; its replacement is {successor}. "
+            "Rotate or revoke that one instead."
+        )
     if grace_hours < 0:
         raise ApiKeyError("Grace period cannot be negative.")
     if grace_hours > MAX_GRACE_HOURS:
