@@ -29,6 +29,18 @@ describe("countWords", () => {
     expect(countWords("hello\t \n world")).toBe(2);
   });
 
+  it("splits on exactly the characters Python's str.split() does", () => {
+    // A byte-order mark is not whitespace to Python, so "a\ufeffb" is one
+    // word on the server; JavaScript's \s would have made it two.
+    expect(countWords("\ufeffHello world")).toBe(2);
+    expect(countWords("a\ufeffb")).toBe(1);
+    // U+0085 and the separators U+001C–U+001F are whitespace to Python and
+    // not to \s.
+    expect(countWords("a\x85b")).toBe(2);
+    expect(countWords("a\x1cb\x1fc")).toBe(3);
+    expect(countWords("a\u00a0b\u3000c")).toBe(3);
+  });
+
   it("counts Markdown syntax as written, the way the server does", () => {
     // `**bold**` is one token to `str.split()`, so it is one token here.
     expect(countWords("A **bold** claim")).toBe(3);

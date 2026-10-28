@@ -14,6 +14,14 @@
 
 const WORDS_PER_MINUTE = 220;
 
+// The characters Python's `str.isspace()` accepts, which is what a bare
+// `str.split()` splits on. JavaScript's `\s` is not the same set: it also
+// matches U+FEFF (a byte-order mark, common at the start of pasted text) and
+// misses U+0085 and U+001C–U+001F, so `/\s+/` and `.trim()` counted a pasted
+// body differently from the server.
+const PYTHON_WHITESPACE =
+  /[\t\n\v\f\r\x1c-\x1f \x85\xa0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]+/;
+
 /**
  * Words in a body of Markdown, counted the way Python's bare `str.split()`
  * does: split on runs of whitespace, ignore any at the ends.
@@ -25,9 +33,9 @@ const WORDS_PER_MINUTE = 220;
  */
 export function countWords(text) {
   if (!text) return 0;
-  const trimmed = String(text).trim();
-  if (!trimmed) return 0;
-  return trimmed.split(/\s+/).length;
+  return String(text)
+    .split(PYTHON_WHITESPACE)
+    .filter(Boolean).length;
 }
 
 /**
