@@ -66,6 +66,14 @@ def get_public_article(
             Content.slug == slug,
             Content.status == ContentStatus.PUBLISHED,
         )
+        # Slugs are unique per project, not across Pulse, so two projects —
+        # two accounts, even — can both have a published ``hello-world``.
+        # Unordered, which one this URL showed was up to the planner and could
+        # change between requests; a newer piece by somebody else could take
+        # over a link that had been shared for months. The first to publish
+        # keeps it.
+        .order_by(Content.published_at.asc().nulls_last(), Content.id.asc())
+        .limit(1)
     )
     if content is None:
         raise HTTPException(
