@@ -189,7 +189,7 @@ class TestCalendarIdeas:
             IDEAS_URL, headers=auth, params={"start": "1900-01-01", "end": "2100-12-31"}
         )
         assert resp.status_code == 400
-        assert "365 days" in resp.json()["detail"]
+        assert "366 days" in resp.json()["detail"]
         year = {"start": "2026-01-01", "end": "2026-12-31"}
         ok = client.get(IDEAS_URL, headers=auth, params=year)
         assert ok.status_code == 200

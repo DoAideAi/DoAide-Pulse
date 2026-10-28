@@ -262,7 +262,7 @@ def test_calendar_rejects_window_over_365_days(client, auth):
         headers=auth,
     )
     assert resp.status_code == 400
-    assert "365" in resp.json()["detail"]
+    assert "366" in resp.json()["detail"]
 
 
 def test_calendar_accepts_window_under_365_days(client, auth):
@@ -426,3 +426,17 @@ def test_rescheduling_a_failed_publication_updates_content_status(
     assert content.status == ContentStatus.APPROVED
     pub = db.get(Publication, pub.id)
     assert pub.status == PublicationStatus.SCHEDULED
+
+
+def test_a_leap_year_fits_in_the_calendar(client, auth):
+    """2028 has 366 days; asking for all of it is asking for one year."""
+    for end in ("2028-12-31T23:59:59", "2029-01-01T00:00:00"):
+        resp = client.get(
+            f"/api/v1/calendar?start=2028-01-01T00:00:00&end={end}", headers=auth
+        )
+        assert resp.status_code == 200, (end, resp.text)
+
+    ideas = client.get(
+        "/api/v1/calendar/ideas", headers=auth, params={"start": "2028-01-01", "end": "2029-01-01"}
+    )
+    assert ideas.status_code == 200, ideas.text

@@ -37,7 +37,7 @@ that isn't possible as stated.
 | Message | Cause | What to do |
 |---|---|---|
 | `end is before start.` / `until is before since.` | An inverted window. It used to be an empty `200`, which read as "nothing there". | Swap the bounds. |
-| `Calendar window cannot exceed 365 days.` | The calendar or idea window is too wide. | Ask for a year or less at a time. |
+| `Calendar window cannot exceed 366 days.` (or `Idea window …`) | The calendar or idea window is too wide. | Ask for a year or less at a time. |
 | `Give a scheduled_for, or set optimize …` / `… not both.` | `POST /content/{id}/schedule` needs exactly one of a time or `optimize`. | Send one. To publish now, use `POST /content/{id}/publish`. |
 | `This piece is not queued anywhere yet — name the platforms …` | Scheduling a piece with no publications needs a platform list. | Pass `platforms`. |
 | `Name the platforms …` | A slot suggestion with nothing queued and nothing connected. | Pass `platforms`, or connect one in Settings. |

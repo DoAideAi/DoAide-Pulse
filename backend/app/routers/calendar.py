@@ -39,6 +39,12 @@ from app.services import (
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
+#: Widest window the calendar answers for: one calendar year, in *any* year.
+#: It was 365, so asking for 2028 — 1 January to 1 January, or to the last
+#: second of 31 December — was refused as "more than a year" because 2028 has
+#: 366 days, while the same request for 2027 was fine.
+CALENDAR_WINDOW_MAX_DAYS = 366
+
 
 
 #: Both windows here refuse the same mistake the same way. Says which bound
@@ -117,11 +123,11 @@ def get_calendar(
 
     # Cap the window so a careless or malicious request doesn't scan years of
     # publications into memory.
-    max_window = timedelta(days=365)
+    max_window = timedelta(days=CALENDAR_WINDOW_MAX_DAYS)
     if (window_end - window_start) > max_window:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Calendar window cannot exceed 365 days.",
+            detail=f"Calendar window cannot exceed {CALENDAR_WINDOW_MAX_DAYS} days.",
         )
 
     # Push the date filter into SQL so we never load the full publication table
@@ -432,7 +438,7 @@ def cadence_guide(
 IDEA_BACKLOG_LIMIT = 30
 
 #: Widest window GET /calendar/ideas answers for, as GET /calendar does.
-IDEA_WINDOW_MAX_DAYS = 365
+IDEA_WINDOW_MAX_DAYS = CALENDAR_WINDOW_MAX_DAYS
 
 #: Hand-written ideas per account. Nothing else bounds them — the backlog
 #: *read* is capped at :data:`IDEA_BACKLOG_LIMIT`, the table is not — so
