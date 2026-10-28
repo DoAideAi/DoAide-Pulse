@@ -150,6 +150,24 @@ describe("service health", () => {
     expect(await screen.findByText("openrouter")).toBeInTheDocument();
   });
 
+  it("shows a scheduler that has fallen behind, with what to check", async () => {
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+      workers: { status: "ok", required: false, detail: "" },
+      scheduler: {
+        status: "behind", required: false,
+        detail: "3 publications past due, the oldest by 47 min — check that pulse-beat and pulse-worker are running.",
+      },
+    });
+    draw();
+
+    expect(await screen.findByText("Scheduled publishing")).toBeInTheDocument();
+    expect(screen.getByText("behind")).toBeInTheDocument();
+    expect(screen.getByText(/3 publications past due/)).toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
+  });
+
   it("names the providers being skipped while their cool-down runs", async () => {
     api.healthDetail.mockResolvedValue({
       status: "ok",

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.exc import StaleDataError
@@ -1651,6 +1651,41 @@ def reclaim_stuck(db: Session, *, now: datetime | None = None) -> int:
 
 
 _DUE_PUBLICATIONS_LIMIT = 500
+
+
+#: How far past due a waiting publication has to be before it counts as the
+#: queue falling behind: three publish sweeps. One late sweep is noise; three
+#: missed in a row is a scheduler, a worker fleet or a queue that has stopped.
+BACKLOG_SWEEPS = 3
+
+
+def backlog(db: Session, *, now: datetime | None = None) -> tuple[int, datetime | None]:
+    """``(count, oldest_due)`` of publications well past due and still waiting.
+
+    The one signal that catches every way scheduled publishing can stop: beat
+    not firing the sweep, no worker taking the task, a broker that accepts and
+    loses. Each leaves the same trace — ``pending``/``scheduled`` rows whose
+    time came and went — and nothing else in Pulse looks at it. A healthy
+    install answers ``(0, None)``: the sweep runs every
+    ``publish_scan_interval_seconds``. A row parked for a retry or behind an
+    open breaker has a *future* time, so it is not counted (C104 M11).
+
+    Deployment-wide, like the worker probe it sits beside; only a count and an
+    age leave this function.
+    """
+    moment = now or utcnow()
+    cutoff = moment - timedelta(
+        seconds=settings.publish_scan_interval_seconds * BACKLOG_SWEEPS
+    )
+    # A pending row with no time is due from when it was queued or last moved.
+    due_at = func.coalesce(Publication.scheduled_for, Publication.updated_at)
+    count, oldest = db.execute(
+        select(func.count(), func.min(due_at)).where(
+            Publication.status.in_((PublicationStatus.PENDING, PublicationStatus.SCHEDULED)),
+            due_at < cutoff,
+        )
+    ).one()
+    return int(count or 0), (as_aware(oldest) if oldest is not None else None)
 
 
 def due_publications(db: Session, *, now: datetime | None = None) -> list[Publication]:

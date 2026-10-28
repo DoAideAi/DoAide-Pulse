@@ -12,11 +12,12 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
+from app.models.mixins import utcnow
 from app.models.user import User
 from app.ratelimit import limiter
 from app.schemas.errors import AUTHENTICATED, errors
 from app.schemas.settings import DependencyOut, HealthDetailOut, HealthOut
-from app.services import llm_router, publishers
+from app.services import llm_router, publishers, publishing_service
 from app.services.crypto import encryption_enabled
 from app.services.publishers import breaker as publishers_breaker
 
@@ -114,6 +115,31 @@ def _check_workers() -> _Probe | None:
         detail = "no worker answered"
         return _Probe(False, detail, detail)
     return _Probe(True)
+
+
+def _scheduler(db: Session) -> DependencyOut:
+    """Whether scheduled publishing is keeping up, read off the queue itself.
+
+    Every health check stayed green when ``pulse-beat`` died: the database,
+    Redis and the workers were all up and idle, and nothing fired the sweep
+    that publishes anything (C104 M11). The queue is where that shows — rows
+    whose time came and went — so that is what is asked. Logged when behind,
+    like the worker probe, so the fact is in the journal as well as the page.
+    """
+    try:
+        count, oldest = publishing_service.backlog(db)
+    except Exception as exc:  # noqa: BLE001 - reported as unknown, never a 500
+        logger.warning("scheduler probe failed: %s", exc)
+        return DependencyOut(status="unknown", required=False, detail=_short(exc))
+    if not count:
+        return DependencyOut(status="ok", required=False)
+    minutes = round((utcnow() - oldest).total_seconds() / 60) if oldest else 0
+    detail = (
+        f"{count} publication{'s' if count != 1 else ''} past due, the oldest by "
+        f"{minutes} min — check that pulse-beat and pulse-worker are running."
+    )
+    logger.warning("scheduled publishing is behind: %s", detail)
+    return DependencyOut(status="behind", required=False, detail=detail)
 
 
 def _short(exc: BaseException, *, public: bool = True) -> str:
@@ -258,11 +284,13 @@ def health_detail(
         required=False,
         detail="" if workers is None else workers.describe(public=False),
     )
+    scheduler_out = _scheduler(db)
     return HealthDetailOut(
         status="ok" if healthy else "degraded",
         database=db_out,
         redis=redis_out,
         workers=workers_out,
+        scheduler=scheduler_out,
         llm_providers=llm_router.configured_providers(),
         llm_breakers_open=llm_router.breaker.snapshot(),
         publish_breakers_open=publishers_breaker.snapshot(),

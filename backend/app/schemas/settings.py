@@ -138,6 +138,10 @@ class HealthDetailOut(HealthOut):
     #: this check would pull the site out of Caddy's rotation over a background
     #: outage.
     workers: DependencyOut = DependencyOut(status="unknown", required=False)
+    #: Whether scheduled publishing is keeping up: ``ok``, or ``behind`` with
+    #: how many publications are well past due and the oldest one's age. Not
+    #: required, for the reason ``workers`` is not — see ``publishing_service.backlog``.
+    scheduler: DependencyOut = DependencyOut(status="unknown", required=False)
     llm_providers: list[str] = []
     llm_breakers_open: dict = {}
     #: The publishing breakers, keyed ``platform:user_id``. Beside the LLM ones

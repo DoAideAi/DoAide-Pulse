@@ -173,6 +173,25 @@ export default function Settings() {
                   : "Set TOKEN_ENCRYPTION_KEY for production."
               }
             />
+            {/* The two background halves. Both were in the API and on no page,
+                so "why has nothing published?" had no answer here. Shown only
+                when the server reports them ("disabled" means no broker). */}
+            {health.data?.workers && health.data.workers.status !== "disabled" && (
+              <HealthRow
+                label="Background workers"
+                value={health.data.workers.status === "ok" ? "running" : health.data.workers.status}
+                ok={health.data.workers.status === "ok"}
+                hint={health.data.workers.detail || "Publishing and scans run here."}
+              />
+            )}
+            {health.data?.scheduler && health.data.scheduler.status !== "unknown" && (
+              <HealthRow
+                label="Scheduled publishing"
+                value={health.data.scheduler.status === "ok" ? "on time" : health.data.scheduler.status}
+                ok={health.data.scheduler.status === "ok"}
+                hint={health.data.scheduler.detail || "Nothing is waiting past its time."}
+              />
+            )}
             {Object.keys(health.data?.llm_breakers_open ?? {}).length > 0 && (
               <HealthRow
                 label="Tripped providers"
