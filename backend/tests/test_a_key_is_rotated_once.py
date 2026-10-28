@@ -103,3 +103,15 @@ def test_a_dated_key_still_in_date_hands_its_date_on(db, project):
     replacement, _ = api_keys.rotate(db, dated, grace_hours=0)
 
     assert as_aware(replacement.expires_at) == as_aware(until)
+
+
+def test_a_refused_rotation_leaves_a_line(client, auth, db, key, caplog):
+    import logging
+
+    api_keys.revoke(db, key)
+    with caplog.at_level(logging.INFO, logger="app.routers.api_keys"):
+        resp = client.post(f"/api/v1/api-keys/{key.id}/rotate", headers=auth, json={})
+
+    assert resp.status_code == 422
+    assert set(resp.json()) == {"detail"}
+    assert f"api key {key.prefix} rotation refused" in caplog.text

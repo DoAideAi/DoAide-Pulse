@@ -249,6 +249,11 @@ def rotate_api_key(
     try:
         replacement, token = api_keys.rotate(db, key, grace_hours=payload.grace_hours)
     except api_keys.ApiKeyError as exc:
+        # Refused credential operations leave a line, as refused sign-ins do —
+        # a rotation of an expired or revoked key is worth seeing in the log.
+        logger.info(
+            "api key %s rotation refused for user %s: %s", key.prefix, user.id, exc
+        )
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
         ) from exc
