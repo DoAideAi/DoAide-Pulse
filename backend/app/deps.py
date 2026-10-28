@@ -20,7 +20,12 @@ from app.services import api_keys
 
 logger = logging.getLogger(__name__)
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
+#: ``auto_error=False`` so a request with no token at all reaches
+#: :func:`get_current_user` and gets Pulse's sentence. FastAPI's own was a bare
+#: ``"Not authenticated"`` — the one 401 in the API that did not say what to do.
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.api_v1_prefix}/auth/login", auto_error=False
+)
 
 #: The widest value a primary key in this tree can hold.
 #:
@@ -72,8 +77,16 @@ _credentials_exc = HTTPException(
     headers={"WWW-Authenticate": "Bearer"},
 )
 
+_no_token_exc = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="Sign in to do this. Send the token from POST /auth/login as "
+    "'Authorization: Bearer <token>'.",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+
 def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    token: str | None = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> User:
     """Resolve the authenticated user from the bearer token.
 
@@ -82,6 +95,8 @@ def get_current_user(
     password reset end the sessions that were already open — see
     :attr:`app.models.user.User.tokens_valid_from`.
     """
+    if not token:
+        raise _no_token_exc
     claims = decode_access_token_claims(token)
     if claims is None:
         raise _credentials_exc

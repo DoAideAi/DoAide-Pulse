@@ -113,3 +113,19 @@ def test_a_non_admin_is_told_who_can_grant_product_activity(client, auth, monkey
     resp = client.get("/api/v1/products/activity", headers=auth)
     assert resp.status_code == 403
     assert "Ask the operator" in resp.json()["detail"]
+
+
+def test_a_request_with_no_token_says_how_to_sign_in(client):
+    """FastAPI's own answer here was a bare "Not authenticated"."""
+    resp = client.get("/api/v1/projects")
+    assert resp.status_code == 401
+    detail = resp.json()["detail"]
+    assert detail != "Not authenticated"
+    assert "POST /auth/login" in detail and "Bearer" in detail
+    assert resp.headers["WWW-Authenticate"] == "Bearer"
+
+
+def test_an_empty_bearer_is_answered_the_same_way(client):
+    resp = client.get("/api/v1/projects", headers={"Authorization": "Bearer "})
+    assert resp.status_code == 401
+    assert "POST /auth/login" in resp.json()["detail"]
