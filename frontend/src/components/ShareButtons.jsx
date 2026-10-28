@@ -2,7 +2,8 @@ import { useState } from "react";
 import trackEvent from "../lib/trackEvent";
 
 export default function ShareButtons({ url, title = "", text = "Check this out!", variant = "default" }) {
-  const [copied, setCopied] = useState(false);
+  // null, "ok" or "failed".
+  const [copied, setCopied] = useState(null);
   const shareUrl =
     url || (typeof window !== "undefined" ? window.location.href : "");
   const encoded = encodeURIComponent(shareUrl);
@@ -18,11 +19,19 @@ export default function ShareButtons({ url, title = "", text = "Check this out!"
   const linkedInUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encoded}`;
 
   function copyLink() {
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      trackEvent("share", { platform: "copy-link" });
-    });
+    // `navigator.clipboard` is missing outright on plain http and in some
+    // in-app browsers, and refused by others; the button used to do nothing
+    // visible in either case. Every other copy button in the app says so.
+    Promise.resolve()
+      .then(() => navigator.clipboard.writeText(shareUrl))
+      .then(
+        () => {
+          setCopied("ok");
+          trackEvent("share", { platform: "copy-link" });
+        },
+        () => setCopied("failed"),
+      )
+      .finally(() => setTimeout(() => setCopied(null), 4000));
   }
 
   const btnClass = variant === "prominent"
@@ -61,9 +70,13 @@ export default function ShareButtons({ url, title = "", text = "Check this out!"
       >
         LinkedIn
       </a>
-      <button onClick={copyLink} className={btnClass} data-testid="share-copy">
-        {copied ? "Copied!" : "Copy link"}
+      <button type="button" onClick={copyLink} className={btnClass} data-testid="share-copy">
+        {copied === "ok" ? "Copied!" : copied === "failed" ? "Couldn't copy" : "Copy link"}
       </button>
+      <span role="status" aria-live="polite" className="sr-only">
+        {copied === "ok" && "Link copied to the clipboard."}
+        {copied === "failed" && `Your browser blocked copying. The link is ${shareUrl}`}
+      </span>
     </div>
   );
 }

@@ -53,6 +53,23 @@ describe("ShareButtons", () => {
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
   });
 
+  it("says so when the clipboard refuses, instead of doing nothing", async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+    });
+    wrap(<ShareButtons url="https://example.com/a" />);
+    await userEvent.click(screen.getByTestId("share-copy"));
+    expect(await screen.findByText("Couldn't copy")).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("https://example.com/a");
+  });
+
+  it("copes with no clipboard API at all (plain http)", async () => {
+    Object.assign(navigator, { clipboard: undefined });
+    wrap(<ShareButtons url="https://example.com/b" />);
+    await userEvent.click(screen.getByTestId("share-copy"));
+    expect(await screen.findByText("Couldn't copy")).toBeInTheDocument();
+  });
+
   it("renders prominent variant with different styling", () => {
     wrap(<ShareButtons variant="prominent" url="https://example.com" />);
     const wa = screen.getByTestId("share-whatsapp");
