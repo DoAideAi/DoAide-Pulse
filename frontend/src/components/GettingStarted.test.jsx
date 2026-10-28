@@ -68,3 +68,14 @@ describe("GettingStarted", () => {
     expect(screen.queryByText("Get your first post out")).toBeNull();
   });
 });
+
+describe("the publish step", () => {
+  it("leads to the drafts, where publishing happens, not the empty queue", () => {
+    const step = gettingStartedSteps({ ...fresh, projectCount: 1, connectedCount: 1, contentCount: 1 }).find(
+      (s) => s.key === "publish",
+    );
+    expect(step.to).toBe("/content");
+    expect(step.hint).toMatch(/press Publish/);
+  });
+});
+

@@ -50,9 +50,12 @@ export function gettingStartedSteps({
     {
       key: "publish",
       title: "Publish it",
-      hint: "Approve the draft, then publish now or schedule it on the calendar.",
-      to: "/publish",
-      cta: "Publish",
+      // To the drafts, not /publish: that page is the queue of what is already
+      // on its way, so a first-time user arrived at "Nothing queued" and had to
+      // find their way back to the piece. Publishing happens in the editor.
+      hint: "Open the draft and press Publish — send it now or pick a time.",
+      to: "/content",
+      cta: "Open drafts",
       done: publishedCount > 0,
     },
   ];
