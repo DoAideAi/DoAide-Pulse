@@ -67,27 +67,34 @@ def test_ai_generation_error_hides_provider_chain(client, auth, monkeypatch):
 
 # ---- 2. Rate-limit responses do not reveal exact limits ---------------------
 
-def test_rate_limit_response_hides_exact_limit():
+def test_a_429_is_a_429_whatever_shape_the_limiter_state_has(monkeypatch):
+    """The handler's wording is best effort; its status is not.
+
+    This test used to assert that a 429 hides its limit, which eeb2e83 (M19)
+    deliberately reversed — a 429 now says which limit was hit. What it caught
+    in the meantime was real, though: it handed the handler a string where
+    slowapi stores a ``(limit, args)`` tuple, and the unpack sat outside the
+    handler's own ``try``, so the rate-limited request became a 500 (M7).
+    """
     from unittest.mock import MagicMock
 
     from app.ratelimit import rate_limit_exceeded_handler
 
-    exc = MagicMock()
-    exc.detail = "5 per 1 minute"
-
     scope = {"type": "http", "method": "POST", "path": "/api/v1/auth/login",
              "headers": [], "query_string": b"", "app": _app}
-    request = Request(scope)
-    request.state.view_rate_limit = "5 per 1 minute"
+    # Headers are not what this is about, and injecting them reads the same
+    # state the wording does.
+    monkeypatch.setattr(
+        _app.state.limiter, "_inject_headers", lambda response, _current: response
+    )
+    for state in ("5 per 1 minute", ("only-one",), 42, None):
+        request = Request(scope)
+        request.state.view_rate_limit = state
 
-    response = rate_limit_exceeded_handler(request, exc)
+        response = rate_limit_exceeded_handler(request, MagicMock())
 
-    assert response.status_code == 429
-    body = json.loads(response.body)
-    detail = body["detail"]
-    assert "5 per 1 minute" not in detail
-    assert "5/minute" not in detail
-    assert "limit:" not in detail.lower()
+        assert response.status_code == 429, state
+        assert json.loads(response.body)["detail"].startswith("Too many requests")
 
 
 # ---- 3. GitHub scan errors hide API paths and instructions ------------------

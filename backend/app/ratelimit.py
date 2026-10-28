@@ -332,8 +332,10 @@ def too_many_requests_detail(current_limit) -> str:
     fallback = "Too many requests — slow down and try again shortly."
     if not current_limit:
         return fallback
-    item, args = current_limit
     try:
+        # Inside the ``try`` as well (M7): the state is slowapi's to shape, and
+        # an unpack that failed outside it turned the 429 into a 500.
+        item, args = current_limit
         reset_at, _remaining = limiter.limiter.get_window_stats(item, *args)
     except Exception:  # noqa: BLE001 - the wording is best effort
         return fallback
