@@ -59,6 +59,13 @@ from app.tasks import autopilot_tasks
         "https://github.com/r2st/DoAide-Pulse/issues",
         "https://github.com/r2st",
         "not a url at all",
+        # Dot segments. The full name is interpolated into ``/repos/{name}``,
+        # and ``/repos/../user`` is ``/user`` once the client normalizes it —
+        # a GET on Pulse's own account with Pulse's own token.
+        "https://github.com/../user",
+        "https://github.com/r2st/..",
+        "https://github.com/./.",
+        "https://github.com/-r2st/thing",
     ],
 )
 def test_a_url_the_scan_cannot_read_has_no_full_name(url):

@@ -19,6 +19,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.content import ContentType
+from app.models.project import GITHUB_FULL_NAME_RE
 from app.models.trigger import TriggerEventStatus, TriggerKind
 from app.schemas.limits import BoundedId
 
@@ -79,24 +80,8 @@ MAX_CONFIG_LENGTHS: dict[str, int] = {
     "dedupe_path": 200,
 }
 
-#: ``owner/name`` as GitHub itself defines it: owners are alphanumeric with
-#: single internal hyphens (39 max), repository names allow dot and underscore
-#: too (100 max).
-#:
-#: Anchored, and deliberately not a "does it look roughly right" check, because
-#: this value is interpolated straight into an API path —
-#: ``f"/repos/{full_name}/commits"`` in :mod:`app.services.github_client`. A
-#: value with a ``?`` in it appends a query string to a URL that already has
-#: one; a value with a further ``/`` reaches a different endpoint entirely.
-#:
-#: The ``(?!\.{1,2}$)`` is the one rule GitHub's own charset does not imply:
-#: ``.`` and ``..`` are legal spellings under the name charset (``.github`` is a
-#: real repository) and are exactly the two that traverse out of ``/repos/``
-#: once a client normalizes the path.
-_REPO_RE = re.compile(
-    r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}"
-    r"/(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$"
-)
+#: ``owner/name`` — see :data:`app.models.project.GITHUB_FULL_NAME_RE`.
+_REPO_RE = GITHUB_FULL_NAME_RE
 
 
 def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[str, Any]:

@@ -138,6 +138,26 @@ def scan_due(
     return as_aware(last_scanned_at) <= (now or utcnow()) - timedelta(hours=hours)
 
 
+#: ``owner/name`` as GitHub itself defines it: owners are alphanumeric with
+#: single internal hyphens (39 max), repository names allow dot and underscore
+#: too (100 max).
+#:
+#: Anchored, and deliberately not a "does it look roughly right" check, because
+#: this value is interpolated straight into an API path —
+#: ``f"/repos/{full_name}/commits"`` in :mod:`app.services.github_client`. A
+#: value with a ``?`` in it appends a query string to a URL that already has
+#: one; a value with a further ``/`` reaches a different endpoint entirely.
+#:
+#: The ``(?!\.{1,2}$)`` is the one rule GitHub's own charset does not imply:
+#: ``.`` and ``..`` are legal spellings under the name charset (``.github`` is a
+#: real repository) and are exactly the two that traverse out of ``/repos/``
+#: once a client normalizes the path.
+GITHUB_FULL_NAME_RE = re.compile(
+    r"^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}"
+    r"/(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$"
+)
+
+
 #: ``owner/repo`` out of any of the GitHub URL shapes people actually paste.
 _REPO_RE = re.compile(
     r"github\.com[:/]+(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+?)(?:\.git)?/?$", re.I
@@ -165,7 +185,12 @@ def repo_full_name(repo_url: str | None) -> str | None:
     match = _REPO_RE.search(repo_url.strip())
     if not match:
         return None
-    return f"{match['owner']}/{match['repo']}"
+    full_name = f"{match['owner']}/{match['repo']}"
+    # The loose pattern above finds the pair; this decides whether it is one.
+    # ``github.com/../user`` matched it, and ``/repos/../user`` is ``/user``
+    # once the client normalizes the path — Pulse's own token, on an endpoint
+    # that is not a repository at all.
+    return full_name if GITHUB_FULL_NAME_RE.match(full_name) else None
 
 
 class Project(Base, TimestampMixin):
