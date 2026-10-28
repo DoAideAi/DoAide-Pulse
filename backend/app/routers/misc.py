@@ -15,6 +15,7 @@ from app.deps import get_current_user
 from app.models.mixins import utcnow
 from app.models.user import User
 from app.ratelimit import limiter
+from app.routers import viral
 from app.schemas.errors import AUTHENTICATED, errors
 from app.schemas.settings import DependencyOut, HealthDetailOut, HealthOut
 from app.services import llm_router, publishers, publishing_service
@@ -336,6 +337,7 @@ def health_detail(
         llm_providers=llm_router.configured_providers(),
         llm_breakers_open=llm_router.breaker.snapshot(),
         publish_breakers_open=publishers_breaker.snapshot(),
+        idea_breakers_open=viral.idea_breaker.snapshot(),
         github_configured=bool(settings.github_token),
         credential_encryption=encryption_enabled(),
         implemented_platforms=[p.value for p in publishers.implemented_platforms()],

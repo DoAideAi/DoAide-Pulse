@@ -153,6 +153,10 @@ class HealthDetailOut(HealthOut):
     #: nothing published?" has two shapes, and "the route to Dev.to for this
     #: account is being skipped for another four minutes" is one of them.
     publish_breakers_open: dict = {}
+    #: The free idea generator's Gemini breaker. That route calls Gemini
+    #: directly rather than through the LLM chain, so its breaker is its own
+    #: and a 503 from ``/tools/content-ideas`` is explained here or nowhere.
+    idea_breakers_open: dict = {}
     github_configured: bool = False
     credential_encryption: bool = False
     implemented_platforms: list[str] = []

@@ -85,3 +85,15 @@ def test_a_garbled_answer_does_not_count_as_down(client, gemini_configured):
 
     assert post.call_count == 4
     assert not viral.idea_breaker.is_open("gemini")
+
+
+def test_an_open_breaker_is_visible_on_the_health_detail(
+    client, auth, gemini_configured
+):
+    with patch("app.routers.viral.httpx.post", side_effect=httpx.ConnectError("down")):
+        for i in range(3):
+            _ask(client, f"203.0.113.{40 + i}")
+
+    detail = client.get("/api/v1/health/detail", headers=auth).json()
+
+    assert "gemini" in detail["idea_breakers_open"]
