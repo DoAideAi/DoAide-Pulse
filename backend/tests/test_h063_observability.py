@@ -40,7 +40,7 @@ class _FakeTrigger:
 class TestDuplicateSubscriberLogged:
     """A duplicate subscriber must produce a DEBUG log, not silence."""
 
-    def test_duplicate_subscriber_logs_email(self, caplog, monkeypatch):
+    def test_duplicate_subscriber_is_logged_without_its_address(self, caplog, monkeypatch):
         from sqlalchemy.exc import IntegrityError
         from app.routers import viral
 
@@ -48,13 +48,17 @@ class TestDuplicateSubscriberLogged:
             def add(self, obj):
                 pass
 
+            def scalar(self, _statement):
+                # No unattributed row yet, so the insert is what collides.
+                return None
+
             def commit(self):
                 raise IntegrityError("dup", {}, Exception("unique"))
 
             def rollback(self):
                 pass
 
-        fake_payload = SimpleNamespace(email="Dup@Example.COM", source="embed")
+        fake_payload = SimpleNamespace(email="Dup@Example.COM", source="embed", article=None)
 
         with caplog.at_level(logging.DEBUG, logger="app.routers.viral"):
             result = viral.subscribe.__wrapped__(
@@ -65,7 +69,10 @@ class TestDuplicateSubscriberLogged:
             )
 
         assert result.ok is True
-        assert "dup@example.com" in caplog.text
+        # Logged, but by event and not by address: a subscriber list is PII,
+        # the rule tests/test_logs_carry_no_credentials_or_addresses.py holds.
+        assert "duplicate subscriber" in caplog.text
+        assert "dup@example.com" not in caplog.text.lower()
 
 
 # ── Finding 2: unparseable every_hours is logged ─────────────────── #

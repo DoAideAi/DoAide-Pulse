@@ -135,7 +135,9 @@ def subscribe(
         )
     ):
         # The unique constraint cannot see this one — NULLs never collide —
-        # so an unattributed repeat is caught here.
+        # so an unattributed repeat is caught here. Logged like the other
+        # duplicate below: this branch was the one silent way to subscribe.
+        logger.debug("duplicate subscriber ignored: source=%s", payload.source or "direct")
         return SubscribeOut(ok=True)
     sub = Subscriber(email=email, source=payload.source, project_id=project_id)
     db.add(sub)
