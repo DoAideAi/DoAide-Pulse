@@ -79,6 +79,8 @@ def _ext_from_content_type(ct: str) -> str:
         status.HTTP_400_BAD_REQUEST,
         *AUTHENTICATED,
         status.HTTP_429_TOO_MANY_REQUESTS,
+        # The disk would not take it — full, read-only, gone. Nothing stored.
+        status.HTTP_503_SERVICE_UNAVAILABLE,
     ),
 )
 @limiter.limit(UPLOAD_LIMIT, key_func=account_key)
@@ -104,6 +106,24 @@ async def upload_image(
             f"Allowed: jpg, png, webp, gif.",
         )
     limit = settings.max_upload_bytes
+    try:
+        return await _store(file, limit)
+    except OSError as exc:
+        # A full disk, a read-only mount, a missing volume. Not a bug to report
+        # — the generic 500 said "something went wrong on our end" and sent
+        # people to do that — but storage that is not taking writes right now:
+        # nothing was kept (``_store`` removes its part file either way), and
+        # trying again later is the right move (C104 M5).
+        logger.error("upload could not be stored: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The image could not be saved — storage is not accepting files "
+            "right now. Nothing was stored; try again in a few minutes.",
+        ) from exc
+
+
+async def _store(file: UploadFile, limit: int) -> UploadOut:
+    """Stream *file* to disk under a content-addressed name, or raise."""
     base = _upload_dir()
     tmp = base / f".upload-{uuid.uuid4().hex}.part"
     digest = hashlib.sha256()

@@ -46,6 +46,7 @@ that isn't possible as stated.
 | `{Platform} rejected the credentials: …` | The platform said no while Pulse verified them. | Re-create the token on the platform; check its scopes. |
 | `The key did not work: …` | A personal LLM key failed its test completion. | Check the key and the model name with the provider. |
 | `That file is not a JPG, PNG, WebP or GIF image.` | Uploads are typed by their own leading bytes, not the `Content-Type` sent. | Upload a real image; SVG is refused on purpose. |
+| `The image could not be saved — storage is not accepting files right now…` (503) | The server's upload storage refused the write: full, read-only, or missing. Nothing was kept. | Try again in a few minutes; if it persists, the operator should check the upload volume's free space and mount. |
 | `This reset link is invalid, already used, or expired.` | Reset links are single-use and expire (`PASSWORD_RESET_TOKEN_TTL_MINUTES`). | Request a new one. |
 | `This project has no GitHub repo URL to scan.` | A repo scan on a project without `repo_url`. | Add the repo URL to the project. |
 | `Request body contains a NUL character …` / `The URL contains a NUL character …` | PostgreSQL cannot store `\u0000`, so it's refused at the door (middleware). | Remove it. It's usually a bad paste or a binary file. |
