@@ -164,17 +164,16 @@ function useNavCounts(pathname) {
 
   useEffect(() => {
     let cancelled = false;
+    // A failed poll keeps the last counts rather than zeroing them: a badge
+    // that vanishes for a minute because one request did not answer says
+    // "nothing to review" when the queue has not changed.
     const fetchCounts = () =>
-      Promise.all([
-        api.reviewQueue().catch(() => []),
-        api.publicationQueue().catch(() => []),
-      ]).then(([review, queue]) => {
-        if (cancelled) return;
-        setCounts({
-          review: review?.length ?? 0,
-          failed: (queue ?? []).filter((p) => p.status === "failed").length,
-        });
-      });
+      api
+        .queueCounts()
+        .then((next) => {
+          if (!cancelled) setCounts(next);
+        })
+        .catch(() => {});
 
     fetchCounts();
     const timer = setInterval(fetchCounts, 60000);

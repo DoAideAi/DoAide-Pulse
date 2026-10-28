@@ -14,7 +14,7 @@ import { api } from "../lib/api";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
 
 vi.mock("../lib/api", () => ({
-  api: { reviewQueue: vi.fn(), publicationQueue: vi.fn() },
+  api: { queueCounts: vi.fn() },
 }));
 
 const logout = vi.fn();
@@ -55,8 +55,7 @@ async function draw(path = "/") {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  api.reviewQueue.mockResolvedValue([]);
-  api.publicationQueue.mockResolvedValue([]);
+  api.queueCounts.mockResolvedValue({ review: 0, failed: 0 });
 });
 
 describe("getting past the navigation", () => {
@@ -128,27 +127,32 @@ describe("the destinations", () => {
 
 describe("the badges", () => {
   it("says what the number on Content means", async () => {
-    api.reviewQueue.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    api.queueCounts.mockResolvedValue({ review: 2, failed: 0 });
 
     await draw();
 
     expect(screen.getByLabelText("2 awaiting review")).toHaveTextContent("2");
   });
 
-  it("counts only the failed publications on Publish", async () => {
-    api.publicationQueue.mockResolvedValue([
-      { id: 1, status: "failed" },
-      { id: 2, status: "queued" },
-      { id: 3, status: "failed" },
-    ]);
+  it("shows the failed-publication count on Publish", async () => {
+    api.queueCounts.mockResolvedValue({ review: 0, failed: 2 });
 
     await draw();
 
     expect(screen.getByLabelText("2 failed publications")).toBeInTheDocument();
   });
 
+  it("counts past the first page of the queue", async () => {
+    // The counts come from X-Total-Count, not the length of a 50-row page.
+    api.queueCounts.mockResolvedValue({ review: 120, failed: 0 });
+
+    await draw();
+
+    expect(screen.getByLabelText("120 awaiting review")).toHaveTextContent("9+");
+  });
+
   it("caps the digits at 9+ so a long queue cannot widen the tab", async () => {
-    api.reviewQueue.mockResolvedValue(Array.from({ length: 14 }, (_, i) => ({ id: i })));
+    api.queueCounts.mockResolvedValue({ review: 14, failed: 0 });
 
     await draw();
 
@@ -163,9 +167,20 @@ describe("the badges", () => {
     expect(screen.queryByLabelText(/failed publications/)).not.toBeInTheDocument();
   });
 
+  it("keeps the last counts when a later poll fails", async () => {
+    api.queueCounts.mockResolvedValue({ review: 3, failed: 0 });
+    await draw();
+    expect(screen.getByLabelText("3 awaiting review")).toBeInTheDocument();
+
+    api.queueCounts.mockRejectedValue(new Error("500"));
+    await userEvent.click(screen.getByRole("link", { name: "Projects" }));
+    await act(async () => {});
+
+    expect(screen.getByLabelText("3 awaiting review")).toBeInTheDocument();
+  });
+
   it("keeps the chrome up when both queue requests fail", async () => {
-    api.reviewQueue.mockRejectedValue(new Error("500"));
-    api.publicationQueue.mockRejectedValue(new Error("500"));
+    api.queueCounts.mockRejectedValue(new Error("500"));
 
     await draw();
 
@@ -175,13 +190,13 @@ describe("the badges", () => {
 
   it("re-counts on navigation, so approving a draft updates the tab on the way out", async () => {
     await draw();
-    expect(api.reviewQueue).toHaveBeenCalledTimes(1);
+    expect(api.queueCounts).toHaveBeenCalledTimes(1);
 
-    api.reviewQueue.mockResolvedValue([{ id: 1 }]);
+    api.queueCounts.mockResolvedValue({ review: 1, failed: 0 });
     await userEvent.click(screen.getByRole("link", { name: "Projects" }));
     await act(async () => {});
 
-    expect(api.reviewQueue).toHaveBeenCalledTimes(2);
+    expect(api.queueCounts).toHaveBeenCalledTimes(2);
     expect(screen.getByLabelText("1 awaiting review")).toBeInTheDocument();
   });
 });
@@ -227,7 +242,7 @@ describe("the mobile menu", () => {
   });
 
   it("marks the collapsed menu when something is waiting behind it", async () => {
-    api.reviewQueue.mockResolvedValue([{ id: 1 }]);
+    api.queueCounts.mockResolvedValue({ review: 1, failed: 0 });
 
     await draw();
 

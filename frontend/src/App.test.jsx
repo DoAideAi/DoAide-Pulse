@@ -22,6 +22,7 @@ vi.mock("./lib/api", () => ({
   api: {
     reviewQueue: vi.fn(() => Promise.resolve([])),
     publicationQueue: vi.fn(() => Promise.resolve([])),
+    queueCounts: vi.fn(() => Promise.resolve({ review: 0, failed: 0 })),
   },
   getToken: vi.fn(() => "token"),
   setToken: vi.fn(),

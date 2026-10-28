@@ -626,13 +626,44 @@ describe("every endpoint's path and verb", () => {
   it("covers every method on the client", () => {
     // `login`, `register` and `logout` are covered by their own cases above —
     // one sends a form, one is unauthenticated, and one touches no network at
-    // all, so none of them fits the shape this table asserts.
-    const exempt = new Set(["login", "register", "logout", "uploadImage"]);
+    // all, so none of them fits the shape this table asserts. `queueCounts`
+    // makes two requests and has its own case below.
+    const exempt = new Set(["login", "register", "logout", "uploadImage", "queueCounts"]);
     const covered = new Set(ENDPOINTS.map(([name]) => name));
 
     const uncovered = Object.keys(api).filter(
       (name) => !covered.has(name) && !exempt.has(name),
     );
     expect(uncovered).toEqual([]);
+  });
+});
+
+describe("queueCounts", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function withTotals(totals) {
+    return vi.fn(async (url) => ({
+      ok: true,
+      status: 200,
+      statusText: "",
+      headers: { get: (name) => (name === "X-Total-Count" ? totals(url) : null) },
+      text: async () => "[]",
+    }));
+  }
+
+  it("reads each queue's size from X-Total-Count, not the page", async () => {
+    const fetchMock = withTotals((url) => (url.includes("status=failed") ? "7" : "120"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await api.queueCounts()).toEqual({ review: 120, failed: 7 });
+    const urls = fetchMock.mock.calls.map(([url]) => url);
+    expect(urls).toContain("/api/v1/content/queue/review?limit=1");
+    expect(urls).toContain("/api/v1/content/queue/publications?status=failed&limit=1");
+  });
+
+  it("falls back to the page length when a proxy drops the header", async () => {
+    vi.stubGlobal("fetch", withTotals(() => null));
+
+    expect(await api.queueCounts()).toEqual({ review: 0, failed: 0 });
   });
 });

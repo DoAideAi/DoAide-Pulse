@@ -21,6 +21,7 @@ import { ROUTER_FUTURE } from "../lib/routerFuture";
 vi.mock("../lib/api", () => ({
   api: {
     publicationQueue: vi.fn(),
+    queueCounts: vi.fn(() => Promise.resolve({ review: 0, failed: 0 })),
     platforms: vi.fn(),
     analytics: vi.fn(),
     retryPublication: vi.fn(),

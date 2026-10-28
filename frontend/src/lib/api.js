@@ -16,7 +16,7 @@ export function setToken(token) {
 
 async function request(
   path,
-  { method = "GET", body, form, auth = true, headers: extra } = {},
+  { method = "GET", body, form, auth = true, headers: extra, total = false } = {},
 ) {
   const headers = { ...extra };
   const token = getToken();
@@ -84,6 +84,12 @@ async function request(
   // and `trackEvent` already names them.
   if (method !== "GET" && !path.startsWith("/auth/")) {
     trackAction(`${method} ${routePattern(path)}`);
+  }
+  // `total: true` answers with the list's full size, from X-Total-Count, rather
+  // than the page. A count read off `data.length` stops at the page size.
+  if (total) {
+    const header = Number.parseInt(res.headers.get("X-Total-Count") ?? "", 10);
+    return Number.isNaN(header) ? (Array.isArray(data) ? data.length : 0) : header;
   }
   return data;
 }
@@ -201,6 +207,17 @@ export const api = {
       body: { content_ids: contentIds },
     }),
   publicationQueue: () => request("/content/queue/publications"),
+  // What the sidebar badges show. One row of each list and its X-Total-Count:
+  // counting `reviewQueue()` and the failed rows of `publicationQueue()` read
+  // the first page of each, so the badges topped out at 50 and missed any
+  // failure queued behind fifty pending publications.
+  queueCounts: async () => {
+    const [review, failed] = await Promise.all([
+      request("/content/queue/review?limit=1", { total: true }),
+      request("/content/queue/publications?status=failed&limit=1", { total: true }),
+    ]);
+    return { review, failed };
+  },
   setContentStatus: (id, status) =>
     request(`/content/${id}/status`, { method: "POST", body: { status } }),
   archiveOld: (payload) =>
