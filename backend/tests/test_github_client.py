@@ -31,14 +31,14 @@ def _response(
 
 
 def _stub(monkeypatch, handler) -> list[str]:
-    """Replace httpx.get, recording the paths asked for."""
+    """Replace the GitHub fetch, recording the paths asked for."""
     seen: list[str] = []
 
     def fake_get(url, **kwargs):
         seen.append(url)
         return handler(url, **kwargs)
 
-    monkeypatch.setattr(github_client.httpx, "get", fake_get)
+    monkeypatch.setattr(github_client, "_fetch", fake_get)
     return seen
 
 
@@ -680,3 +680,35 @@ def test_a_single_user_install_still_reads_its_own_private_repo(monkeypatch):
 
     activity = github_client.fetch_activity("operator/secret")
     assert activity.new_commits
+
+
+def test_a_huge_response_is_not_downloaded_past_the_cap(monkeypatch):
+    """The cap stops the read rather than trimming a body already held whole."""
+    import contextlib
+
+    served: list[int] = []
+    chunk = b"x" * 65_536
+
+    class _Body(httpx.SyncByteStream):
+        def __iter__(self):
+            for _ in range(80):  # 5 MB on offer
+                served.append(len(chunk))
+                yield chunk
+
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, stream=_Body()))
+
+    @contextlib.contextmanager
+    def fake_stream(method, url, **kwargs):
+        kwargs.pop("timeout", None)
+        kwargs.pop("follow_redirects", None)
+        with httpx.Client(transport=transport) as client, client.stream(
+            method, url, **kwargs
+        ) as resp:
+            yield resp
+
+    monkeypatch.setattr(github_client.httpx, "stream", fake_stream)
+
+    resp = github_client._fetch("https://api.github.test/repos/a/b", headers={}, params=None)
+
+    assert len(resp.content) == github_client._MAX_RESPONSE_BYTES
+    assert sum(served) < 2 * github_client._MAX_RESPONSE_BYTES, "read far past the cap"

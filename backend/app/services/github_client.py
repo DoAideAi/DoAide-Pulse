@@ -256,21 +256,45 @@ def _rate_limit(resp: httpx.Response) -> GitHubRateLimited | None:
 
 _MAX_RESPONSE_BYTES = 1_048_576
 
+#: Headers that describe the body as it came over the wire. The body handed on
+#: is already decoded and possibly cut, so neither is true of it any more —
+#: and httpx would try to gunzip it a second time on the strength of the first.
+_WIRE_HEADERS = frozenset({"content-encoding", "content-length", "transfer-encoding"})
+
+
+def _fetch(url: str, *, headers: dict, params: dict | None) -> httpx.Response:
+    """GET *url*, reading at most :data:`_MAX_RESPONSE_BYTES` of the body.
+
+    Streamed, so the cap is a limit and not a trim. The old ``httpx.get``
+    downloaded the whole response first and truncated it afterwards, which
+    bounded what the parser saw and nothing about what the worker held.
+    """
+    with httpx.stream(
+        "GET",
+        url,
+        headers=headers,
+        params=params,
+        timeout=settings.github_timeout_seconds,
+        follow_redirects=True,
+    ) as resp:
+        body = bytearray()
+        for chunk in resp.iter_bytes():
+            body.extend(chunk)
+            if len(body) >= _MAX_RESPONSE_BYTES:
+                del body[_MAX_RESPONSE_BYTES:]
+                break
+        kept = {k: v for k, v in resp.headers.items() if k.lower() not in _WIRE_HEADERS}
+        return httpx.Response(
+            resp.status_code, headers=kept, content=bytes(body), request=resp.request
+        )
+
 
 def _get(path: str, *, params: dict | None = None) -> httpx.Response:
     url = f"{settings.github_api_url.rstrip('/')}{path}"
     try:
-        resp = httpx.get(
-            url,
-            headers=_headers(),
-            params=params,
-            timeout=settings.github_timeout_seconds,
-            follow_redirects=True,
-        )
+        resp = _fetch(url, headers=_headers(), params=params)
     except httpx.HTTPError as exc:
         raise GitHubError(f"GitHub is not reachable: {friendly_network_error(exc)}") from exc
-    if len(resp.content) > _MAX_RESPONSE_BYTES:
-        resp._content = resp.content[:_MAX_RESPONSE_BYTES]
 
     # 403 and 429 are how GitHub says no, and it says no for two unrelated
     # reasons that have to be told apart — see :func:`_rate_limit`.

@@ -101,7 +101,7 @@ def test_a_secondary_rate_limit_is_a_rate_limit_and_not_an_unreachable_repo(
             request=httpx.Request("GET", url),
         )
 
-    monkeypatch.setattr(github_client.httpx, "get", throttled)
+    monkeypatch.setattr(github_client, "_fetch", throttled)
     monkeypatch.setattr(autopilot_tasks, "SessionLocal", task_session)
 
     result = autopilot_tasks.scan_project(project.id)
