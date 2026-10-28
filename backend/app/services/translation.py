@@ -165,7 +165,11 @@ class QualityIssue:
 #: Markdown fenced code blocks. Counted rather than parsed: the check is "are
 #: there as many as there were", and a fence count that survives is strong
 #: evidence the blocks did.
-_FENCE = re.compile(r"^\s*```", re.MULTILINE)
+#: ``[ \t]*``, not ``\s*``: ``\s`` matches newlines, so under MULTILINE every
+#: line start in a run of blank lines scanned the rest of the run — quadratic,
+#: about a minute of CPU for a 200,000-character body of newlines. A fence's
+#: indentation never spans lines, and the count is the same.
+_FENCE = re.compile(r"^[ \t]*```", re.MULTILINE)
 #: Bare and Markdown-embedded URLs. Deliberately greedy about what a URL is and
 #: conservative about its end, because a false match on both sides cancels out —
 #: the check compares two sets built by the same regex.

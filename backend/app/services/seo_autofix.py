@@ -41,7 +41,6 @@ LINKS_MIN = 2
 #: body that needs more is one whose keyword is wrong, not under-used.
 MAX_KEYWORD_INSERTS = 8
 
-_LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 _TITLE_SEPARATORS = (" — ", " – ", " | ", ": ", " - ")
 #: Words a shortened title must not end on — "Managing clients with" reads cut.
 _DANGLING = {
@@ -232,7 +231,12 @@ def fix_keyword_density(body_markdown: str, keyword: str) -> str:
 
 
 # A Markdown link that is not an image (``![alt](src)``), capturing the URL.
-_BODY_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(\s*<?([^)\s>]+)")
+# No class admits the character that opens it — the rule ``seo._LINK`` and
+# ``link_check._MD_LINK`` already follow. ``[^\]]+`` admitted ``[``, so a body
+# of opening brackets made every one of them scan to the end of the text and
+# back: quadratic, about 80 seconds of CPU for a 200,000-character body, on
+# the request that saved or approved it.
+_BODY_LINK = re.compile(r"(?<!!)\[[^\[\]]+\]\(\s*<?([^()\s>]+)")
 
 
 @dataclass

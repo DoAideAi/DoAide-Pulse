@@ -119,7 +119,18 @@ def extract_json_object(raw: str) -> dict[str, Any] | None:
     """
     if not raw:
         return None
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.S)
+    # String operations rather than ``re.sub(r"^```(?:json)?\s*|\s*```$")``:
+    # that pattern's second branch tried ``\s*```$`` from every position in a
+    # run of whitespace, which is quadratic in the run — and this reads a model
+    # reply of up to 4 MB, whose shape anything quoted in the prompt can steer.
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text[3:]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.lstrip()
+    if text.endswith("```"):
+        text = text[:-3].rstrip()
 
     best: dict[str, Any] | None = None
     for candidate in _balanced_objects(text):
