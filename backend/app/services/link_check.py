@@ -161,12 +161,20 @@ def _is_private(address: str) -> bool:
         parsed = ipaddress.ip_address(address)
     except ValueError:  # pragma: no cover - getaddrinfo returns valid addresses
         return False
+    # ``not is_global`` is the line that matters past the named ranges.
+    # ``is_private`` does not cover 100.64.0.0/10, the shared address space
+    # that carries Tailscale's tailnet addresses and Alibaba Cloud's metadata
+    # service (100.100.100.200), so a webhook, feed or self-hosted blog URL
+    # resolving there reached whatever Pulse's host could see on its tailnet.
+    # Multicast is not something anyone outside can be sent to either.
     return (
         parsed.is_private
         or parsed.is_loopback
         or parsed.is_link_local
         or parsed.is_reserved
         or parsed.is_unspecified
+        or parsed.is_multicast
+        or not parsed.is_global
     )
 
 
