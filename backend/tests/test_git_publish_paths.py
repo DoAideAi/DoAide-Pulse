@@ -51,6 +51,11 @@ class _Response:
 
 
 def test_publishing_with_no_token_anywhere_says_what_to_do_about_it(monkeypatch):
+    # The single-user install the fallback is for; see the open-registration
+    # test below for why it is not lent out otherwise.
+    monkeypatch.setattr(
+        "app.services.publishers.git.settings.registration_enabled", False, raising=False
+    )
     monkeypatch.setattr(
         "app.services.publishers.git.settings.github_token", "", raising=False
     )
@@ -66,6 +71,11 @@ def test_publishing_with_no_token_anywhere_says_what_to_do_about_it(monkeypatch)
 def test_a_blank_token_on_the_connection_falls_through_to_the_install_wide_one(
     monkeypatch,
 ):
+    # The single-user install the fallback is for; see the open-registration
+    # test below for why it is not lent out otherwise.
+    monkeypatch.setattr(
+        "app.services.publishers.git.settings.registration_enabled", False, raising=False
+    )
     monkeypatch.setattr(
         "app.services.publishers.git.settings.github_token", "ghp_install", raising=False
     )
@@ -79,6 +89,31 @@ def test_the_connection_s_own_token_wins_over_the_install_wide_one(monkeypatch):
     )
 
     assert GitAdapter()._token({"token": "ghp_mine"}) == "ghp_mine"
+
+
+def test_with_registration_open_the_install_wide_token_is_not_lent_out(monkeypatch):
+    """Open registration makes every account a stranger who names the repo.
+
+    Lending them the operator's token meant committing to whatever that token
+    can write — the operator's own repositories included.
+    """
+    monkeypatch.setattr(
+        "app.services.publishers.git.settings.github_token", "ghp_install", raising=False
+    )
+    monkeypatch.setattr(
+        "app.services.publishers.git.settings.registration_enabled", True, raising=False
+    )
+
+    with pytest.raises(CredentialError) as exc:
+        GitAdapter()._token({"token": ""})
+    assert "GITHUB_TOKEN" not in str(exc.value)
+    assert GitAdapter()._token({"token": "ghp_mine"}) == "ghp_mine"
+
+
+@pytest.mark.parametrize("repo", ["../user", "r2st/..", "../../orgs/x", "a b/c", "r2st/blog?x=1"])
+def test_a_repo_that_would_leave_repos_is_refused(repo):
+    with pytest.raises(CredentialError):
+        GitAdapter()._repo({"repo": repo})
 
 
 # --------------------------------------------------------------------------- #

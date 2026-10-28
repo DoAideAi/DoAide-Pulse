@@ -38,6 +38,7 @@ import httpx
 
 from app.config import settings
 from app.models.content import read_minutes_for
+from app.models.project import GITHUB_FULL_NAME_RE
 from app.models.publication import Platform
 from app.services import github_client, seo, social_cards
 from app.services.publishers import formatting
@@ -62,8 +63,10 @@ _DEFAULT_PATH = "src/content/blog/{slug}.md"
 
 _API = "https://api.github.com"
 
-#: `owner/repo`, the only form the contents API takes.
-_REPO_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
+#: `owner/repo`, the only form the contents API takes — GitHub's own rules,
+#: shared with the scan and the triggers. The old ``[\w.-]+/[\w.-]+`` let
+#: ``../x`` through, which is ``/repos/../x`` and so a different endpoint.
+_REPO_RE = GITHUB_FULL_NAME_RE
 
 #: Path shapes that would escape the repo, the checkout, or the URL.
 #:
@@ -232,11 +235,22 @@ class GitAdapter(Adapter):
         return repo
 
     def _token(self, credentials: dict[str, Any]) -> str:
-        token = str(credentials.get("token") or "").strip() or settings.github_token
+        token = str(credentials.get("token") or "").strip()
+        # The server's token only for the server's owner. With registration
+        # open, "every account" is whoever signed up, and the repo is theirs to
+        # name — so the fallback let any of them commit to whatever the
+        # operator's GITHUB_TOKEN can write. Same rule as the product dashboard.
+        if not token and not settings.registration_enabled:
+            token = settings.github_token
         if not token:
             raise CredentialError(
                 "Git publishing needs a token with write access — set one on the "
-                "connection, or configure GITHUB_TOKEN."
+                "connection"
+                + (
+                    "."
+                    if settings.registration_enabled
+                    else ", or configure GITHUB_TOKEN."
+                )
             )
         return token
 
