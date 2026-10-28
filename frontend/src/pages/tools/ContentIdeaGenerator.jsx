@@ -36,7 +36,13 @@ export default function ContentIdeaGenerator() {
       setIdeas(data);
       trackEvent("tool-use", { tool: "idea-generator", count });
     } catch (err) {
-      setError(err.message || "Could not generate ideas — check your connection and try again.");
+      // A failure with no status never reached Pulse — the browser's own
+      // "Failed to fetch" or "Load failed" — and quoting it tells a visitor
+      // nothing. Pulse's own refusals carry a sentence written for them.
+      setError(
+        (err.status && err.message) ||
+          "Could not generate ideas — check your connection and try again.",
+      );
     } finally {
       setLoading(false);
     }

@@ -31,6 +31,15 @@ describe("request", () => {
     vi.unstubAllGlobals();
   });
 
+  it("says the request did not get through instead of quoting the browser", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    const error = await api.listProjects().catch((e) => e);
+    expect(error.message).toMatch(/couldn't reach pulse/i);
+    expect(error.message).not.toMatch(/failed to fetch/i);
+    expect(error.status).toBe(0);
+  });
+
   it("surfaces the status when an error body is not JSON at all", async () => {
     vi.stubGlobal(
       "fetch",

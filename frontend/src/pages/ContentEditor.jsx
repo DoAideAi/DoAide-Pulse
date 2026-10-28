@@ -42,13 +42,16 @@ const AUTOSAVE_RETRY_BASE_MS = 5000;
 const AUTOSAVE_RETRY_MAX_MS = 60000;
 const AUTOSAVE_MAX_ATTEMPTS = 5;
 
-/** Whether sending the same text again could succeed. No status means the
- *  request never got an answer (offline, DNS, reset); 408/429/5xx are the
- *  server saying "not now". Anything else — a 412 stale version, a 422 the
- *  text fails validation on, a 401 — will answer the same way every time. */
+/** Whether sending the same text again could succeed. Status 0 (or none at
+ *  all) means the request never got an answer (offline, DNS, reset) — the
+ *  API client reports that as 0; 408/429/5xx are the server saying "not now".
+ *  Anything else — a 412 stale version, a 422 the text fails validation on, a
+ *  401 — will answer the same way every time. */
 export function isRetryableSaveError(err) {
   const status = err?.status;
-  return status === undefined || status === 408 || status === 429 || status >= 500;
+  return (
+    status === undefined || status === 0 || status === 408 || status === 429 || status >= 500
+  );
 }
 
 /** The server's copy, in the shape the editor's fields hold.

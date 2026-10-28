@@ -59,11 +59,22 @@ describe("ContentIdeaGenerator", () => {
   });
 
   it("shows error on API failure", async () => {
-    api.generateContentIdeas.mockRejectedValue(new Error("Service unavailable"));
+    api.generateContentIdeas.mockRejectedValue(
+      Object.assign(new Error("Service unavailable"), { status: 503 }),
+    );
     wrap();
     await userEvent.type(screen.getByLabelText(/your niche or topic/i), "cooking");
     await userEvent.click(screen.getByRole("button", { name: /generate ideas/i }));
     expect(await screen.findByText(/service unavailable/i)).toBeInTheDocument();
+  });
+
+  it("does not quote the browser's network error at the visitor", async () => {
+    api.generateContentIdeas.mockRejectedValue(new TypeError("Failed to fetch"));
+    wrap();
+    await userEvent.type(screen.getByLabelText(/your niche or topic/i), "cooking");
+    await userEvent.click(screen.getByRole("button", { name: /generate ideas/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/check your connection/i);
+    expect(screen.queryByText(/failed to fetch/i)).not.toBeInTheDocument();
   });
 
   it("disables button when input is empty", () => {

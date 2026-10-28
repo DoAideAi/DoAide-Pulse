@@ -30,7 +30,20 @@ async function request(
     payload = JSON.stringify(body);
   }
 
-  const res = await fetch(`${BASE}${path}`, { method, headers, body: payload });
+  let res;
+  try {
+    res = await fetch(`${BASE}${path}`, { method, headers, body: payload });
+  } catch {
+    // The request never got an answer — offline, DNS, a blocked CORS
+    // preflight. The browser's own wording for that is "Failed to fetch"
+    // (Chrome), "Load failed" (Safari) or "NetworkError when attempting to
+    // fetch resource." (Firefox), and every page that shows `err.message`
+    // quoted it verbatim. `status: 0` keeps it apart from anything Pulse said.
+    throw Object.assign(
+      new Error("Couldn't reach Pulse — check your connection and try again."),
+      { status: 0 },
+    );
+  }
 
   if (res.status === 401) setToken(null);
 
