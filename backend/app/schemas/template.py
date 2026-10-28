@@ -137,6 +137,17 @@ class TemplateUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(default=None, min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _named(cls, value: str | None) -> str | None:
+        """The create rule, on the edit too. A rename to spaces used to be stored."""
+        if value is None:
+            return None
+        name = value.strip()
+        if not name:
+            raise ValueError("A template needs a name — it is how you will find it.")
+        return name
     description: str | None = Field(default=None, max_length=500)
     mode: TemplateMode | None = None
     content_type: ContentType | None = None

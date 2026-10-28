@@ -134,6 +134,19 @@ class MachineIdeaCreate(BaseModel):
     #: machine-filed ideas are: something shipped, and somebody should say so.
     content_type: ContentType = ContentType.CHANGELOG
 
+    @field_validator("headline")
+    @classmethod
+    def _headline_has_words(cls, value: str) -> str:
+        """Three characters after stripping, not before.
+
+        The route strips the headline before storing it, so ``"   "`` passed
+        ``min_length=3`` and was filed as an empty idea.
+        """
+        headline = value.strip()
+        if len(headline) < 3:
+            raise ValueError("A headline needs at least three characters that are not spaces.")
+        return headline
+
 
 class MachineIdeaOut(BaseModel):
     """The filed idea, with the id needed to find it in the queue."""
