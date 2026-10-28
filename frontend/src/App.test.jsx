@@ -162,13 +162,20 @@ describe("an unshelled route that throws", () => {
 });
 
 describe("the route table", () => {
-  it("redirects an unknown path to the dashboard", async () => {
-    // Reached the dashboard route: its stand-in throws, and the boundary that
-    // catches it is the one inside Shell.
-    await whileCaught(() => draw("/no-such-page"));
+  it("says an unknown path is not there rather than redirecting", async () => {
+    await draw("/no-such-page");
 
-    expect(screen.getByRole("link", { name: "Projects" })).toBeInTheDocument();
-    expect(screen.getByText("dashboard exploded")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /couldn.t find that page/i }),
+    ).toBeInTheDocument();
+    // The address is quoted so a typo is visible.
+    expect(screen.getByText("/no-such-page")).toBeInTheDocument();
+    // Signed in, so the way on is the dashboard — offered, not forced.
+    expect(screen.getByRole("link", { name: "Go to your dashboard" })).toHaveAttribute(
+      "href",
+      "/dashboard",
+    );
+    expect(screen.queryByText("dashboard exploded")).not.toBeInTheDocument();
   });
 
   it("renders a protected page inside the Shell when it does not throw", async () => {

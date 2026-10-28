@@ -31,6 +31,7 @@ const Templates = lazyPage(() => import("./pages/Templates"));
 const TemplatesGallery = lazyPage(() => import("./pages/TemplatesGallery"));
 const Triggers = lazyPage(() => import("./pages/Triggers"));
 const PublicArticle = lazyPage(() => import("./pages/PublicArticle"));
+const NotFound = lazyPage(() => import("./pages/NotFound"));
 const SubjectLineTester = lazyPage(() => import("./pages/tools/SubjectLineTester"));
 const SendTimeOptimizer = lazyPage(() => import("./pages/tools/SendTimeOptimizer"));
 const NewsletterRoiCalculator = lazyPage(() => import("./pages/tools/NewsletterRoiCalculator"));
@@ -243,7 +244,16 @@ export default function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* A page that says it is not there, rather than a redirect that made a
+          dead link look like it had worked. See pages/NotFound. */}
+      <Route
+        path="*"
+        element={
+          <Unshelled section="not-found">
+            <NotFound />
+          </Unshelled>
+        }
+      />
     </Routes>
     <InstallPrompt />
     </>

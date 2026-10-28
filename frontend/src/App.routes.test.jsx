@@ -53,6 +53,7 @@ vi.mock("./pages/Settings", () => ({ default: () => <p>page: Settings</p> }));
 vi.mock("./pages/Templates", () => ({ default: () => <p>page: Templates</p> }));
 vi.mock("./pages/TemplatesGallery", () => ({ default: () => <p>page: TemplatesGallery</p> }));
 vi.mock("./pages/NewsletterGallery", () => ({ default: () => <p>page: NewsletterGallery</p> }));
+vi.mock("./pages/NotFound", () => ({ default: () => <p>page: NotFound</p> }));
 vi.mock("./pages/Triggers", () => ({ default: () => <p>page: Triggers</p> }));
 vi.mock("./pages/PublicArticle", () => ({ default: () => <p>page: PublicArticle</p> }));
 vi.mock("./pages/tools/ContentIdeaGenerator", () => ({ default: () => <p>page: ContentIdeaGenerator</p> }));
@@ -133,18 +134,27 @@ describe("the route table", () => {
     expect(screen.getByText(`page: ${name}`)).toBeInTheDocument();
   });
 
-  it("sends an unknown path to the dashboard", async () => {
+  it("answers an unknown path with the not-found page", async () => {
     await draw("/no-such-page");
 
-    expect(screen.getByText("page: Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("page: NotFound")).toBeInTheDocument();
+    expect(screen.queryByText("page: Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("answers an unknown path the same way when signed out", async () => {
+    session({ user: null });
+
+    await draw("/no-such-page");
+
+    expect(screen.getByText("page: NotFound")).toBeInTheDocument();
   });
 
   it("does not match a nested unknown path to the page above it", async () => {
-    // `/content/42/anything` is not a route. It must land on the dashboard
-    // rather than on the editor, which is what a path-prefix match would do.
+    // `/content/42/anything` is not a route. It must be a not-found rather
+    // than the editor, which is what a path-prefix match would do.
     await draw("/content/42/extra");
 
-    expect(screen.getByText("page: Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("page: NotFound")).toBeInTheDocument();
     expect(screen.queryByText("page: ContentEditor")).not.toBeInTheDocument();
   });
 });
