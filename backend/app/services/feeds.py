@@ -41,6 +41,7 @@ from xml.parsers import expat
 import httpx
 
 from app.config import settings
+from app.services import link_check
 from app.services.errors import friendly_network_error
 from app.services.webhooks import WebhookUrlError, validate_url
 
@@ -323,6 +324,8 @@ def _client() -> httpx.Client:
     return httpx.Client(
         timeout=settings.feed_timeout_seconds,
         follow_redirects=False,
+        # Connects only to the addresses it vets: see link_check.guarded_transport.
+        transport=link_check.guarded_transport(),
         headers={
             "User-Agent": f"Pulse/0.1 feeds (+{settings.openrouter_app_url})",
             "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",

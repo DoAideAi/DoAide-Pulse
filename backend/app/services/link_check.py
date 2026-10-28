@@ -34,6 +34,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+import httpcore
 import httpx
 
 from app.config import settings
@@ -176,6 +177,55 @@ def _is_private(address: str) -> bool:
         or parsed.is_multicast
         or not parsed.is_global
     )
+
+
+class _PublicOnlyBackend(httpcore.SyncBackend):
+    """Resolves a host once, refuses it if any address is not public, and
+    connects to an address it just vetted.
+
+    The pre-flight in :func:`unreachable_reason` resolves the hostname, and the
+    connection then resolved it *again*. A name served with a zero TTL can
+    answer the first lookup with a public address and the second with
+    ``127.0.0.1`` — DNS rebinding — so the check vetted an address nothing ever
+    connected to. Here the check and the connect use the same answer. TLS is
+    unaffected: httpcore verifies the certificate against the request's own
+    hostname, not the address the socket was opened to.
+    """
+
+    def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+        try:
+            infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except socket.gaierror as exc:
+            raise httpcore.ConnectError(f"Could not resolve {host}: {exc}") from exc
+        addresses = list(dict.fromkeys(info[4][0] for info in infos))
+        if not addresses or any(_is_private(address) for address in addresses):
+            raise httpcore.ConnectError(
+                f"{host} resolves to a private or loopback address — Pulse will not connect to it."
+            )
+        last: Exception | None = None
+        for address in addresses:
+            try:
+                return super().connect_tcp(
+                    address,
+                    port,
+                    timeout=timeout,
+                    local_address=local_address,
+                    socket_options=socket_options,
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout) as exc:
+                last = exc
+        raise last  # type: ignore[misc]  # the loop ran at least once
+
+
+def guarded_transport() -> httpx.HTTPTransport:
+    """A transport that will only open connections to public addresses.
+
+    For every client that fetches a URL a user or a model supplied — webhook
+    delivery, feed polling — so that the address vetted is the address used.
+    """
+    transport = httpx.HTTPTransport()
+    transport._pool._network_backend = _PublicOnlyBackend()
+    return transport
 
 
 _MAX_REDIRECTS = 10

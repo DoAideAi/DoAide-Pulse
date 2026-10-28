@@ -602,7 +602,10 @@ def _http_client() -> httpx.Client:
     not a default worth overriding anywhere: see the module docstring.
     """
     return httpx.Client(
-        timeout=settings.webhook_timeout_seconds, follow_redirects=False
+        timeout=settings.webhook_timeout_seconds,
+        follow_redirects=False,
+        # Connects only to the addresses it vets: see link_check.guarded_transport.
+        transport=link_check.guarded_transport(),
     )
 
 
