@@ -8,6 +8,7 @@ from app.database import Base
 from app.models.mixins import TimestampMixin
 
 EMAIL_MAX_LENGTH = 320
+SOURCE_MAX_LENGTH = 100
 
 
 class Subscriber(Base, TimestampMixin):
@@ -18,7 +19,9 @@ class Subscriber(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(EMAIL_MAX_LENGTH), nullable=False)
-    source: Mapped[str] = mapped_column(String(100), default="embed", nullable=False)
+    source: Mapped[str] = mapped_column(
+        String(SOURCE_MAX_LENGTH), default="embed", nullable=False
+    )
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"), index=True
     )

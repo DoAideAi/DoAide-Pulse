@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from app.models.subscriber import SOURCE_MAX_LENGTH
 
 
 class PublicArticleOut(BaseModel):
@@ -28,7 +30,21 @@ class SubscribeIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
-    source: str = Field(default="embed", max_length=100)
+    source: str = Field(default="embed", max_length=SOURCE_MAX_LENGTH)
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def _clip_source(cls, value: object) -> object:
+        """A label too long for its column is clipped, not a reason to refuse.
+
+        ``source`` is whatever the embedding page put in ``data-source``, which
+        the widget forwards verbatim, so a long campaign string meant a 422 and
+        every reader who signed up on that page was lost over an optional tag.
+        """
+        if not isinstance(value, str):
+            return value
+        value = " ".join(value.split())
+        return value[:SOURCE_MAX_LENGTH] or "embed"
 
 
 class SubscribeOut(BaseModel):

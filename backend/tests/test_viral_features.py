@@ -99,6 +99,23 @@ class TestSubscriber:
         sub = db.query(Subscriber).filter_by(email="reader2@example.com").first()
         assert sub.source == "article-cta"
 
+    def test_a_source_too_long_for_its_column_keeps_the_subscriber(self, client, db):
+        """``data-source`` is forwarded verbatim by the widget, unbounded."""
+        long_source = "newsletter?utm_source=partner&utm_campaign=" + "x" * 200
+        resp = client.post(
+            "/api/v1/subscribers",
+            json={"email": "long@example.com", "source": long_source},
+        )
+        assert resp.status_code == 201
+        sub = db.query(Subscriber).filter_by(email="long@example.com").first()
+        assert sub is not None
+        assert sub.source == long_source[:100]
+
+    def test_a_blank_source_is_recorded_as_the_embed(self, client, db):
+        client.post("/api/v1/subscribers", json={"email": "blank@example.com", "source": "  "})
+        sub = db.query(Subscriber).filter_by(email="blank@example.com").first()
+        assert sub.source == "embed"
+
     def test_duplicate_email_does_not_error(self, client, db):
         client.post("/api/v1/subscribers", json={"email": "dup@example.com"})
         resp = client.post("/api/v1/subscribers", json={"email": "dup@example.com"})
