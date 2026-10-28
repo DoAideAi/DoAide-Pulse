@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.product_event import ACTOR_MAX_LENGTH, NAME_MAX_LENGTH
 from app.services.product_catalog import BY_KEY
@@ -40,6 +40,10 @@ class ProductEventIn(BaseModel):
 
 
 class ProductEventBatchIn(BaseModel):
+    # The envelope is strict like every other body; the events inside it are
+    # not, so a product backend can send a field before Pulse reads it.
+    model_config = ConfigDict(extra="forbid")
+
     events: list[ProductEventIn] = Field(min_length=1, max_length=MAX_BATCH)
 
 

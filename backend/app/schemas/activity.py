@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.activity import NAME_MAX_LENGTH, PATH_MAX_LENGTH
 
@@ -13,12 +13,16 @@ MAX_BATCH = 50
 
 
 class ActivityEventIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     kind: Literal["page_view", "action"]
     name: str = Field(min_length=1, max_length=NAME_MAX_LENGTH)
     path: str | None = Field(default=None, max_length=PATH_MAX_LENGTH)
 
 
 class ActivityBatchIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     events: list[ActivityEventIn] = Field(min_length=1, max_length=MAX_BATCH)
 
 
