@@ -650,3 +650,33 @@ def test_a_repo_that_moved_more_than_a_page_reports_the_page_and_moves_on(monkey
 
     assert len(activity.new_commits) == 100
     assert activity.head_sha == "c0"
+
+
+# -- Whose repositories the operator's token is used to read ----------------- #
+
+
+def _private_repo_handler(url, **_):
+    if url.endswith("/releases"):
+        return _response([])
+    if url.endswith("/commits"):
+        return _response(COMMITS)
+    return _response({**REPO, "private": True})
+
+
+def test_with_registration_open_a_private_repo_is_not_read(monkeypatch):
+    """GITHUB_TOKEN can see the operator's private repos; a signup names the
+    repo, and its commit messages would become that signup's posts."""
+    monkeypatch.setattr(github_client.settings, "registration_enabled", True)
+    seen = _stub(monkeypatch, _private_repo_handler)
+
+    with pytest.raises(github_client.GitHubError, match="private"):
+        github_client.fetch_activity("operator/secret")
+    assert not any(u.endswith("/commits") for u in seen)
+
+
+def test_a_single_user_install_still_reads_its_own_private_repo(monkeypatch):
+    monkeypatch.setattr(github_client.settings, "registration_enabled", False)
+    _stub(monkeypatch, _private_repo_handler)
+
+    activity = github_client.fetch_activity("operator/secret")
+    assert activity.new_commits

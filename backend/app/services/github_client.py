@@ -577,6 +577,14 @@ def fetch_activity(
     repo = _json(_get(path), path)
     if not isinstance(repo, dict):
         raise GitHubError(f"Unexpected repo payload for {full_name}")
+    # Read with the operator's token, which can see the operator's private
+    # repositories. With registration open, the repo is whatever a stranger
+    # typed into their project — and its commit messages become their posts.
+    if repo.get("private") is True and settings.registration_enabled:
+        raise GitHubError(
+            f"{full_name} is a private repository. Pulse reads only public "
+            "repositories on an install with open registration."
+        )
 
     commits = fetch_commits(full_name, since_sha=since_sha)
     release = fetch_latest_release(full_name)
