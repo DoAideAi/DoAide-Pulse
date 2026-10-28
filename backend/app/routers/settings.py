@@ -449,17 +449,30 @@ def save_llm_key(
             "Check the server's encryption configuration.",
         ) from exc
 
+    def _store(row: UserLLMKey) -> None:
+        row.provider = payload.provider
+        row.model = payload.model
+        row.encrypted_key = encrypted
+        row.key_hint = user_llm.hint(payload.api_key)
+        row.last_verified_at = utcnow()
+        row.last_error = None
+        db.commit()
+
     row = user_llm.get_row(db, user.id)
-    if row is None:
-        row = UserLLMKey(user_id=user.id, provider=payload.provider)
-        db.add(row)
-    row.provider = payload.provider
-    row.model = payload.model
-    row.encrypted_key = encrypted
-    row.key_hint = user_llm.hint(payload.api_key)
-    row.last_verified_at = utcnow()
-    row.last_error = None
-    db.commit()
+    try:
+        if row is None:
+            row = UserLLMKey(user_id=user.id, provider=payload.provider)
+            db.add(row)
+        _store(row)
+    except IntegrityError:
+        # Two Saves inside the verifying completion both inserted; the unique
+        # ``user_id`` failed this one. Same answer as ``upsert_connection``:
+        # both keys verified, so the later write wins instead of a 500.
+        db.rollback()
+        row = user_llm.get_row(db, user.id)
+        if row is None:  # pragma: no cover - the conflict means it exists
+            raise
+        _store(row)
     return _llm_settings(db, user)
 
 

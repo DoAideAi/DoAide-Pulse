@@ -57,3 +57,39 @@ def test_the_second_save_updates_the_first_one_s_row(client, auth, db, user, mon
     db.expire_all()
     rows = db.query(PlatformConnection).filter_by(user_id=user.id).all()
     assert [r.display_name for r in rows] == ["second-save"]
+
+
+def test_two_saves_of_an_llm_key_at_once(client, auth, db, user, monkeypatch):
+    from app.models.user_llm_key import UserLLMKey
+    from app.services import user_llm
+
+    monkeypatch.setattr(user_llm, "verify", lambda *a, **kw: None)
+
+    def the_other_request_commits_first(session, flush_context, instances):
+        if not any(isinstance(o, UserLLMKey) for o in session.new):
+            return
+        other = TestSession()
+        other.add(
+            UserLLMKey(
+                user_id=user.id,
+                provider="openrouter",
+                encrypted_key=encrypt_credentials({"api_key": "first"}),
+                key_hint="irst",
+            )
+        )
+        other.commit()
+        other.close()
+
+    event.listen(db, "before_flush", the_other_request_commits_first, once=True)
+
+    resp = client.put(
+        "/api/v1/settings/llm-key",
+        headers=auth,
+        json={"provider": "openrouter", "api_key": "sk-or-second-key-0000"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    db.expire_all()
+    rows = db.query(UserLLMKey).filter_by(user_id=user.id).all()
+    assert len(rows) == 1
+    assert rows[0].key_hint == user_llm.hint("sk-or-second-key-0000")
