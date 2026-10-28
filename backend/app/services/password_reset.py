@@ -121,6 +121,24 @@ def consume(db: Session, raw_token: str, new_password: str) -> User | None:
         return None
 
     now = utcnow()
+    # The read above is advice; this is the verdict. Two requests holding the
+    # same link both see ``used_at`` empty, and without a conditional write both
+    # set a password — the later one silently replacing the first, from a link
+    # that promises to work once. Exactly one UPDATE can match.
+    claimed = db.execute(
+        update(PasswordResetToken)
+        .where(
+            PasswordResetToken.id == row.id,
+            PasswordResetToken.used_at.is_(None),
+        )
+        .values(used_at=now)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not claimed:
+        db.rollback()
+        logger.info("password reset token %s replayed", row.id)
+        return None
+
     user.hashed_password = hash_password(new_password)
     # Every access token issued before this moment stops working. Without it a
     # reset changes what the *next* sign-in needs and nothing else, so somebody
@@ -128,7 +146,6 @@ def consume(db: Session, raw_token: str, new_password: str) -> User | None:
     # token live for the rest of its lifetime — see
     # :attr:`app.models.user.User.tokens_valid_from`.
     user.tokens_valid_from = now
-    row.used_at = now
     # Any other link that was issued before this one must not survive the reset.
     revoke_all(db, user.id)
     db.commit()

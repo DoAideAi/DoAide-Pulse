@@ -432,3 +432,38 @@ def test_consume_stamps_the_cutoff(db, user):
     # same way for the same reason; this is the test saying it in the test's
     # voice rather than a second spelling of "what a cutoff is".
     assert as_aware(user.tokens_valid_from).timestamp() >= before.timestamp() - 1
+
+
+def test_two_requests_racing_on_one_link_set_only_one_password(db, user, monkeypatch):
+    """Both read the token as unspent; only the first conditional write wins."""
+    from sqlalchemy import update
+
+    from app.models.mixins import utcnow
+    from app.models.password_reset import PasswordResetToken
+    from app.security import verify_password
+    from app.services import password_reset
+
+    raw = password_reset.issue(db, user)
+    db.commit()
+    original_scalar = db.scalar
+
+    def racing_scalar(statement, *args, **kwargs):
+        row = original_scalar(statement, *args, **kwargs)
+        # The other request spends the token between this one's read and its
+        # write; the ORM copy read above still says it is unused.
+        db.execute(
+            update(PasswordResetToken)
+            .where(PasswordResetToken.id == row.id)
+            .values(used_at=utcnow())
+            .execution_options(synchronize_session=False)
+        )
+        return row
+
+    old_hash = user.hashed_password
+    monkeypatch.setattr(db, "scalar", racing_scalar)
+    assert password_reset.consume(db, raw, "a-second-new-password") is None
+    monkeypatch.undo()
+
+    db.refresh(user)
+    assert user.hashed_password == old_hash
+    assert not verify_password("a-second-new-password", user.hashed_password)
