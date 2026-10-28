@@ -192,6 +192,14 @@ export default function Settings() {
                 hint={health.data.scheduler.detail || "Nothing is waiting past its time."}
               />
             )}
+            {health.data?.queue && !["disabled", "unknown"].includes(health.data.queue.status) && (
+              <HealthRow
+                label="Task queue"
+                value={health.data.queue.status === "ok" ? "draining" : health.data.queue.status}
+                ok={health.data.queue.status === "ok"}
+                hint={health.data.queue.detail || "Work is taken as fast as it arrives."}
+              />
+            )}
             {Object.keys(health.data?.llm_breakers_open ?? {}).length > 0 && (
               <HealthRow
                 label="Tripped providers"

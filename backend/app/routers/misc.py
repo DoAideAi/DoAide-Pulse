@@ -142,6 +142,47 @@ def _scheduler(db: Session) -> DependencyOut:
     return DependencyOut(status="behind", required=False, detail=detail)
 
 
+#: The Celery queue every task here is sent to — nothing sets ``task_routes``.
+_QUEUE = "celery"
+
+
+def _queue() -> DependencyOut:
+    """How many tasks are waiting in the broker for a worker to take them.
+
+    The worker probe answers "is anything consuming" and the scheduler probe
+    "are publications going out", and neither sees a worker that answers ping
+    while one slow generation holds it: scans, webhooks and triggers pile up
+    in the broker behind it with every probe green. The broker's list length
+    is that pile. ``disabled`` when tasks run inline and there is no queue.
+    """
+    if not settings.celery_enabled:
+        return DependencyOut(status="disabled", required=False)
+    try:
+        import redis
+
+        client = redis.Redis.from_url(
+            settings.celery_broker_url,
+            socket_connect_timeout=settings.health_check_timeout_seconds,
+            socket_timeout=settings.health_check_timeout_seconds,
+        )
+        try:
+            waiting = int(client.llen(_QUEUE))
+        finally:
+            client.close()
+    except Exception as exc:  # noqa: BLE001 - reported as unknown, never a 500
+        logger.warning("queue probe failed: %s", _short(exc, public=False))
+        return DependencyOut(status="unknown", required=False, detail=_short(exc))
+    detail = f"{waiting} task{'s' if waiting != 1 else ''} waiting"
+    if waiting < settings.health_queue_backlog_warn:
+        return DependencyOut(status="ok", required=False, detail=detail)
+    detail += (
+        f", past the {settings.health_queue_backlog_warn} warning line — "
+        "pulse-worker is not keeping up."
+    )
+    logger.warning("task queue is behind: %s", detail)
+    return DependencyOut(status="behind", required=False, detail=detail)
+
+
 def _short(exc: BaseException, *, public: bool = True) -> str:
     """One line of cause, truncated.
 
@@ -291,6 +332,7 @@ def health_detail(
         redis=redis_out,
         workers=workers_out,
         scheduler=scheduler_out,
+        queue=_queue(),
         llm_providers=llm_router.configured_providers(),
         llm_breakers_open=llm_router.breaker.snapshot(),
         publish_breakers_open=publishers_breaker.snapshot(),

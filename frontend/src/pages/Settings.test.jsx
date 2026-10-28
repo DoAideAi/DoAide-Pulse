@@ -168,6 +168,35 @@ describe("service health", () => {
     expect(screen.getByText("running")).toBeInTheDocument();
   });
 
+  it("shows a task queue that is backing up, and nothing when tasks run inline", async () => {
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+      workers: { status: "ok", required: false, detail: "" },
+      queue: {
+        status: "behind", required: false,
+        detail: "250 tasks waiting, past the 200 warning line — pulse-worker is not keeping up.",
+      },
+    });
+    draw();
+
+    expect(await screen.findByText("Task queue")).toBeInTheDocument();
+    expect(screen.getByText("behind")).toBeInTheDocument();
+    expect(screen.getByText(/250 tasks waiting/)).toBeInTheDocument();
+  });
+
+  it("leaves the task queue off the page when there is no broker", async () => {
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+      queue: { status: "disabled", required: false, detail: "" },
+    });
+    draw();
+
+    expect(await screen.findByText("openrouter")).toBeInTheDocument();
+    expect(screen.queryByText("Task queue")).not.toBeInTheDocument();
+  });
+
   it("names the providers being skipped while their cool-down runs", async () => {
     api.healthDetail.mockResolvedValue({
       status: "ok",

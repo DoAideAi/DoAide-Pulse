@@ -298,6 +298,11 @@ class Settings(BaseSettings):
     # Per-dependency budget for the /health probes. Short on purpose: Caddy polls
     # this every 30s and a health check that hangs is itself an outage.
     health_check_timeout_seconds: float = 2.0
+    # Tasks waiting in the broker before /health/detail calls the queue behind.
+    # A worker that answers ping but is pinned by a slow job leaves the queue
+    # growing with every probe green; a sweep fans out a few dozen tasks at
+    # most, so a few hundred waiting is work arriving faster than it drains.
+    health_queue_backlog_warn: int = 200
 
     # ---- AI (OpenRouter — free models only) ----
     openrouter_api_key: str = ""

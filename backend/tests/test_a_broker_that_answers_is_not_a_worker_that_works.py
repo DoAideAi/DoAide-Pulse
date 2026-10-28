@@ -26,6 +26,7 @@ import pytest
 
 from app.config import settings
 from app.routers import misc
+from app.schemas.settings import DependencyOut
 
 HEALTH = "/api/v1/health"
 
@@ -37,8 +38,15 @@ def redis_up(monkeypatch):
 
 @pytest.fixture
 def celery_on(monkeypatch):
-    """Tests run with ``CELERY_ENABLED=false``; this is the deployed shape."""
+    """Tests run with ``CELERY_ENABLED=false``; this is the deployed shape.
+
+    The queue-depth probe is stubbed quiet: it reads the real broker, and its
+    own lines are counted in ``test_a_backed_up_task_queue_shows_in_health``.
+    """
     monkeypatch.setattr(settings, "celery_enabled", True)
+    monkeypatch.setattr(
+        misc, "_queue", lambda: DependencyOut(status="ok", required=False)
+    )
 
 
 def _warnings(caplog) -> list[str]:
