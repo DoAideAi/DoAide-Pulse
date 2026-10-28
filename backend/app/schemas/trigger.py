@@ -80,6 +80,13 @@ MAX_CONFIG_LENGTHS: dict[str, int] = {
     "dedupe_path": 200,
 }
 
+#: Free-text settings read with ``str(...)``, and settings read as numbers.
+#: ``content_type``, ``feed_url`` and ``repo`` have checks of their own below.
+_TEXT_CONFIG: tuple[str, ...] = (
+    "instructions", "topic", "headline_path", "summary_path", "url_path", "dedupe_path",
+)
+_NUMBER_CONFIG: tuple[str, ...] = ("every_hours", "hour_utc", "commit_threshold")
+
 #: ``owner/name`` — see :data:`app.models.project.GITHUB_FULL_NAME_RE`.
 _REPO_RE = GITHUB_FULL_NAME_RE
 
@@ -99,6 +106,26 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
     missing = [key for key in REQUIRED_CONFIG[kind] if not str(body.get(key) or "").strip()]
     if missing:
         raise ValueError(f"A {kind.value} trigger needs {', '.join(missing)}.")
+
+    # ``config`` is free-form JSON, and every consumer reads these with
+    # ``str(...)``: an object or list here became its Python repr in the model
+    # prompt (``instructions``) or the signal headline (``topic``).
+    for key in _TEXT_CONFIG:
+        value = body.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{key} must be text.")
+
+    for key in _NUMBER_CONFIG:
+        # ``float(True)`` is 1.0: a checkbox is not an interval. Objects and
+        # lists fail the conversions below with each key's own message.
+        if isinstance(body.get(key), bool):
+            raise ValueError(f"{key} must be a number.")
+
+    if body.get("require_signature") is not None and not isinstance(
+        body["require_signature"], bool
+    ):
+        # ``"false"`` is truthy, so a string would mean the opposite of what it says.
+        raise ValueError("require_signature must be true or false.")
 
     for key, cap in MAX_CONFIG_LENGTHS.items():
         value = body.get(key)
