@@ -760,6 +760,20 @@ class BulkContentIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     content_ids: list[BoundedId] = Field(min_length=1, max_length=100)
+
+    @field_validator("content_ids")
+    @classmethod
+    def _unique_ids(cls, value: list[int]) -> list[int]:
+        """Each piece once, in the order first named.
+
+        ``[7, 7, 7]`` acted on piece 7 three times — three SEO preflights, three
+        link checks on a bulk publish, each a network round trip — and answered
+        ``{"succeeded": [7, 7, 7], "total": 3}``, which reads as three pieces
+        approved when there was one. The result is now about the pieces, not
+        the list that named them.
+        """
+        return list(dict.fromkeys(value))
+
     dry_run: bool = Field(
         default=False,
         description=(

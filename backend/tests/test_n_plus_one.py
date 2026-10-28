@@ -757,3 +757,22 @@ def test_opening_a_preview_link_reads_the_draft_once(client, db, user, sql_log):
     # And the view is still recorded.
     db.refresh(link)
     assert link.view_count == 1
+
+
+def test_a_bulk_batch_names_each_piece_once(client, auth, db, user):
+    """M19: ``[a, a, b, a]`` is two pieces, in the order they were first named.
+
+    Repeats were acted on once per mention and counted that way, so a
+    duplicated id read as extra pieces rejected and cost an extra pass.
+    """
+    a, b = _seed_ids(db, user.id, 2, offset=700)
+
+    resp = client.post(
+        "/api/v1/content/bulk/reject",
+        json={"content_ids": [a, a, b, a]},
+        headers=auth,
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["succeeded"] == [a, b]
+    assert resp.json()["total"] == 2
