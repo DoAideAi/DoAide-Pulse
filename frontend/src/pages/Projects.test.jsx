@@ -103,6 +103,22 @@ describe("a project card", () => {
     expect(link).toHaveAttribute("href", `${window.location.origin}/api/v1/projects/7/feed.xml`);
   });
 
+  it("says why an Auto project will never publish on its own, and offers the fix", async () => {
+    api.listProjects.mockResolvedValue([
+      project({
+        autopilot_mode: "auto",
+        autopilot_blocked_reason:
+          "Autopilot is set to publish on its own but names no platforms, so every piece stops for review.",
+      }),
+    ]);
+    const user = userEvent.setup();
+    draw();
+
+    expect(await screen.findByText(/names no platforms/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Fix it" }));
+    expect(screen.getByRole("heading", { name: "Edit Pulse" })).toBeInTheDocument();
+  });
+
   it("offers no feed link before anything is published, since the feed is a 404 then", async () => {
     api.listProjects.mockResolvedValue([project({ published_count: 0 })]);
     draw();
@@ -513,6 +529,37 @@ describe("the add/edit dialog", () => {
         live_url: null,
         canonical_platform: null,
       }),
+    );
+  });
+
+  it("names where Auto publishes, offering only connected, finished platforms", async () => {
+    api.platforms.mockResolvedValue([
+      { platform: "devto", display_name: "Dev.to", implemented: true, connection: { status: "connected" } },
+      { platform: "medium", display_name: "Medium", implemented: true, connection: null },
+      { platform: "twitter", display_name: "Twitter / X", implemented: false },
+    ]);
+    api.listProjects.mockResolvedValue([project()]);
+    api.updateProject.mockResolvedValue(project());
+    const user = userEvent.setup();
+    draw();
+    await screen.findByText("Pulse");
+    await user.click(screen.getByRole("button", { name: "Edit" }));
+
+    // Not asked while the mode is Draft: there is nothing to publish to.
+    expect(screen.queryByText("Autopilot publishes to")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Autopilot"), "auto");
+
+    expect(await screen.findByText(/every piece will wait for your review/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Medium/ })).toBeDisabled();
+    expect(screen.queryByRole("checkbox", { name: /Twitter/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /Dev\.to/ }));
+    expect(screen.queryByText(/every piece will wait for your review/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save project" }));
+
+    expect(api.updateProject).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ autopilot_mode: "auto", autopilot_platforms: ["devto"] }),
     );
   });
 

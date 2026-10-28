@@ -14,7 +14,7 @@ const AUTOPILOT_MODES = [
   {
     value: "auto",
     label: "Auto",
-    hint: "Write and publish when the model is confident.",
+    hint: "Write, and publish to the platforms below when every quality check passes.",
   },
 ];
 
@@ -28,6 +28,7 @@ const EMPTY_FORM = {
   keywords: "",
   tone: "technical",
   autopilot_mode: "draft",
+  autopilot_platforms: [],
   auto_canonical: true,
   canonical_platform: "",
   utm_enabled: true,
@@ -197,6 +198,17 @@ function ProjectCard({ project, onEdit, onChanged }) {
         </span>
       </div>
 
+      {project.autopilot_blocked_reason && (
+        // The API has said why for a while; nothing showed it, so a project on
+        // Auto that could never publish looked like one that simply hadn't yet.
+        <p role="status" className="rounded bg-warn-wash px-2.5 py-1.5 text-xs text-warn">
+          {project.autopilot_blocked_reason}{" "}
+          <button type="button" className="font-medium underline" onClick={onEdit}>
+            Fix it
+          </button>
+        </p>
+      )}
+
       {project.description && (
         <p className="line-clamp-2 text-sm text-ink-500">{project.description}</p>
       )}
@@ -279,6 +291,7 @@ function ProjectDialog({ project, draft = null, onClose, onSaved, onError }) {
           keywords: project.keywords.join(", "),
           tone: project.tone,
           autopilot_mode: project.autopilot_mode,
+          autopilot_platforms: project.autopilot_platforms ?? [],
           auto_canonical: project.auto_canonical,
           canonical_platform: project.canonical_platform ?? "",
           utm_enabled: project.utm_enabled,
@@ -294,6 +307,14 @@ function ProjectDialog({ project, draft = null, onClose, onSaved, onError }) {
 
   const set = (key) => (event) =>
     setForm((current) => ({ ...current, [key]: event.target.value }));
+
+  const togglePlatform = (platform) =>
+    setForm((current) => ({
+      ...current,
+      autopilot_platforms: current.autopilot_platforms.includes(platform)
+        ? current.autopilot_platforms.filter((p) => p !== platform)
+        : [...current.autopilot_platforms, platform],
+    }));
 
   const splitList = (value) =>
     value
@@ -466,6 +487,45 @@ function ProjectDialog({ project, draft = null, onClose, onSaved, onError }) {
           </p>
         </div>
       </div>
+
+      {form.autopilot_mode === "auto" && (
+        // Where "Auto" publishes. The form never had this, so choosing Auto
+        // saved a project with no destinations — and the backend, correctly,
+        // sends every piece of such a project to review. Auto behaved exactly
+        // like Draft, and nothing on the page said why.
+        <fieldset className="space-y-2 rounded-lg border border-line px-4 py-3">
+          <legend className="label px-1">Autopilot publishes to</legend>
+          {(platforms ?? [])
+            .filter((p) => p.implemented)
+            .map((p) => {
+              const connected = p.connection?.status === "connected";
+              return (
+                <label key={p.platform} className="flex items-start gap-2.5 text-sm text-ink-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    disabled={!connected && !form.autopilot_platforms.includes(p.platform)}
+                    checked={form.autopilot_platforms.includes(p.platform)}
+                    onChange={() => togglePlatform(p.platform)}
+                  />
+                  <span>
+                    {p.display_name}
+                    {!connected && (
+                      <span className="mt-0.5 block text-xs text-ink-400">
+                        Not connected — <Link to="/settings" className="text-brand-600">connect it in Settings</Link>
+                      </span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          {form.autopilot_platforms.length === 0 && (
+            <p className="text-xs text-warn">
+              Pick at least one, or every piece will wait for your review as in Draft.
+            </p>
+          )}
+        </fieldset>
+      )}
 
       <fieldset className="space-y-3 rounded-lg border border-line px-4 py-3">
         <legend className="label px-1">Syndication</legend>
