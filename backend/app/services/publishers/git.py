@@ -61,6 +61,14 @@ logger = logging.getLogger(__name__)
 #: collections and Eleventy both read this path; Hugo wants `content/posts`.
 _DEFAULT_PATH = "src/content/blog/{slug}.md"
 
+#: One ``{...}`` in a path template. Substituted by name, never through
+#: ``str.format``: the template comes from a settings form, and format's
+#: mini-language is not a substitution — ``{slug:>999999999}`` asked a worker
+#: for a gigabyte of padding on every publish, and ``{slug.upper}`` committed a
+#: file named after a bound method's repr.
+_PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
+_PLACEHOLDERS = ("slug", "year", "month", "day")
+
 _API = "https://api.github.com"
 
 #: `owner/repo`, the only form the contents API takes — GitHub's own rules,
@@ -276,18 +284,18 @@ class GitAdapter(Adapter):
         # Content always carries a slug; the fallback is for a request built by
         # hand, where writing to `post.md` beats writing to `.md`.
         slug = (request.slug or "").strip() or "post"
-        try:
-            path = template.format(
-                slug=slug,
-                year=f"{now:%Y}",
-                month=f"{now:%m}",
-                day=f"{now:%d}",
-            )
-        except (KeyError, IndexError) as exc:
-            bad = str(exc).strip("'\"")
-            raise CredentialError(
-                f"'{template}' uses a placeholder '{bad}' that this adapter does not provide"
-            ) from exc
+        values = {"slug": slug, "year": f"{now:%Y}", "month": f"{now:%m}", "day": f"{now:%d}"}
+
+        def fill(match: re.Match[str]) -> str:
+            name = match.group(1)
+            if name not in values:
+                raise CredentialError(
+                    f"'{template}' uses a placeholder '{{{name}}}' that this adapter "
+                    f"does not provide. Use {', '.join('{%s}' % p for p in _PLACEHOLDERS)}."
+                )
+            return values[name]
+
+        path = _PLACEHOLDER.sub(fill, template)
 
         # Check first, normalise second. Trimming leading "./" from a path that
         # begins "../" would turn a traversal into a plausible-looking relative
