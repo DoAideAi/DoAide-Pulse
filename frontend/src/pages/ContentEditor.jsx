@@ -2121,6 +2121,17 @@ function HistoryPanel({ contentId, onRestored }) {
 
 /** Pick platforms and a time. Unconnected and unfinished platforms are shown
  *  but disabled, with the reason — hiding them makes the list look arbitrary. */
+/** An ISO instant as a `datetime-local` value, in the browser's own zone —
+ *  which is how the field reads what it holds, and how `submit` reads it back. */
+export function toLocalInput(iso) {
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
 function PublishDialog({ content, platforms, onClose, onDone, onError }) {
   const [selected, setSelected] = useState([]);
   const [when, setWhen] = useState("");
@@ -2135,6 +2146,18 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
     content.publications
       .filter((p) => p.status === "published")
       .map((p) => p.platform),
+  );
+
+  // When Pulse would publish to what is ticked. The editor had only a bare
+  // date field, while the calendar and the SEO page offered the times the
+  // account's own results (or the platform's guidance) point to — so the one
+  // place most pieces are scheduled from was the one place without the answer.
+  const { data: slots } = useApi(
+    () =>
+      selected.length
+        ? api.scheduleSuggestions(content.id, selected).catch(() => [])
+        : Promise.resolve([]),
+    [content.id, selected.join(",")],
   );
 
   function toggle(platform) {
@@ -2241,6 +2264,29 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
           value={when}
           onChange={(e) => setWhen(e.target.value)}
         />
+        {slots?.length > 0 && (
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-ink-400">Suggested</p>
+            {slots.map((slot) => (
+              <button
+                key={`${slot.platform}-${slot.when}`}
+                type="button"
+                className="block w-full rounded border border-line px-2 py-1 text-left text-xs hover:bg-ink-50"
+                onClick={() => setWhen(toLocalInput(slot.when))}
+                title={slot.rationale}
+              >
+                <span className="font-medium text-ink-800">{formatDateTime(slot.when)}</span>
+                <span className="text-ink-400">
+                  {" "}
+                  · {platforms.find((p) => p.platform === slot.platform)?.display_name ?? slot.platform}
+                </span>
+                {slot.rationale && (
+                  <span className="block truncate text-[11px] text-ink-400">{slot.rationale}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <label className="flex items-start gap-2.5 text-sm text-ink-700">

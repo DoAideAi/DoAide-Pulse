@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ContentEditor, { PUBLICATION_POLL_MS, publicationsInFlight } from "./ContentEditor";
+import ContentEditor, { PUBLICATION_POLL_MS, publicationsInFlight, toLocalInput } from "./ContentEditor";
 import { api } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
@@ -44,6 +44,7 @@ vi.mock("../lib/api", () => ({
     headlineWinner: vi.fn(),
     adoptHeadlineWinner: vi.fn(),
     unscheduleContent: vi.fn(),
+    scheduleSuggestions: vi.fn(),
     publishContent: vi.fn(),
     listRevisions: vi.fn(),
     restoreRevision: vi.fn(),
@@ -135,6 +136,7 @@ beforeEach(() => {
   api.listPreviewLinks.mockResolvedValue([]);
   api.listRevisions.mockResolvedValue({ items: [], total: 0, retained: 50 });
   api.headlinePerformance.mockResolvedValue([]);
+  api.scheduleSuggestions.mockResolvedValue([]);
   api.listLanguages.mockResolvedValue([]);
   api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
   // The auto-save is on a real 2-second timer in this file, and several tests
@@ -688,6 +690,39 @@ describe("the publish dialog", () => {
     await screen.findByRole("heading", { name: "Publish" });
     return user;
   }
+
+  it("suggests when to publish to what is ticked, and fills the time in", async () => {
+    api.scheduleSuggestions.mockResolvedValue([
+      { platform: "devto", when: "2026-11-03T13:00:00Z", rationale: "Dev.to: Tue–Thu at 13:00 UTC" },
+    ]);
+    api.publishContent.mockResolvedValue([]);
+    const user = await openDialog();
+    // Nothing ticked, nothing to suggest for.
+    expect(api.scheduleSuggestions).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("checkbox", { name: /Dev\.to/ }));
+    await user.click(await screen.findByRole("button", { name: /Dev\.to: Tue–Thu/ }));
+
+    expect(api.scheduleSuggestions).toHaveBeenCalledWith(3, ["devto"]);
+    expect(screen.getByLabelText(/When/)).toHaveValue(toLocalInput("2026-11-03T13:00:00Z"));
+    await user.click(screen.getByRole("button", { name: "Schedule" }));
+    await waitFor(() =>
+      expect(api.publishContent).toHaveBeenCalledWith(
+        3,
+        expect.objectContaining({ platforms: ["devto"], scheduled_for: "2026-11-03T13:00:00.000Z" }),
+      ),
+    );
+  });
+
+  it("still publishes when no suggestion can be had", async () => {
+    api.scheduleSuggestions.mockRejectedValue(new Error("boom"));
+    const user = await openDialog();
+
+    await user.click(screen.getByRole("checkbox", { name: /Dev\.to/ }));
+
+    expect(screen.getByRole("button", { name: "Publish now" })).toBeEnabled();
+    expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
+  });
 
   it("will not publish with nothing selected", async () => {
     await openDialog();

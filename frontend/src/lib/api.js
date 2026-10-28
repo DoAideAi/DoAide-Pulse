@@ -251,6 +251,12 @@ export const api = {
   // Cancels every row that would still go out on its own (scheduled or
   // pending) without publishing anything; returns the rows it cancelled.
   unscheduleContent: (id) => request(`/content/${id}/schedule`, { method: "DELETE" }),
+  // When Pulse would publish this on each of `platforms`, and why — the
+  // learned cadence, or the platform's published guidance. Changes nothing.
+  scheduleSuggestions: (id, platforms) =>
+    request(
+      `/content/${id}/schedule/suggestions?${new URLSearchParams(platforms.map((p) => ["platforms", p]))}`,
+    ),
   // `force` approves past the SEO preflight's 409 — the human override for
   // checks that are advice about a piece somebody has already read.
   approveContent: (id, { force = false } = {}) =>
