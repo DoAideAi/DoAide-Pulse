@@ -1866,10 +1866,17 @@ def _manual_source(user: User, campaign_key: str | None) -> dict:
     response_model=ContentDetail,
     status_code=status.HTTP_201_CREATED,
     summary="Write a piece by hand",
-    responses=errors(*OWNED),
+    responses=errors(*OWNED, status.HTTP_429_TOO_MANY_REQUESTS),
 )
+# Generous for a person, and the one cap on the multiplier: every piece can be
+# published, and publishing fans out to each connected platform and to up to
+# twenty webhooks the account chose, which may point anywhere public. The
+# editor autosaves through PATCH, so writing never spends from this.
+@limiter.limit(settings.rate_limit_content_create, key_func=account_key)
 def create_content(
     payload: ContentCreate,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> ContentDetail:

@@ -186,6 +186,9 @@ class Settings(BaseSettings):
     # Writing a whole piece: one LLM call of a few thousand tokens, ~20s of
     # somebody watching a spinner. Six an hour is a busy editorial day; sixty is
     # not a person.
+    # Hand-written pieces, per account. Generous for a person; it bounds how
+    # fast one account can mint content to publish and to fan out to webhooks.
+    rate_limit_content_create: str = "120/hour;1000/day"
     rate_limit_ai_generate: str = "60/hour;300/day"
     # The small single-shot model calls — rewriting a passage, headline
     # variants, a repurposed blurb. Cheaper per call and used far more often
