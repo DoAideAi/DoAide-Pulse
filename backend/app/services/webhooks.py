@@ -49,6 +49,7 @@ from app.models.webhook import (
     WebhookDelivery,
     WebhookEvent,
 )
+from app.schemas.urls import check_url_characters
 from app.services import link_check, signals
 from app.services.crypto import (
     CredentialEncryptionError,
@@ -124,6 +125,15 @@ def validate_url(url: str) -> str:
         raise WebhookUrlError("A webhook URL must start with http:// or https://")
     if len(candidate) > 700:
         raise WebhookUrlError("That URL is too long (700 characters maximum)")
+    # Not ``check_http_url``: that one refuses ``user:password@`` because its
+    # links are public, and a webhook receiver behind basic auth is a normal
+    # thing to point at. The character rules are the same for both. Without
+    # them ``https://exa mple.com/`` was saved with a 201 and only failed when
+    # the first event tried to go out.
+    try:
+        check_url_characters(candidate)
+    except ValueError as exc:
+        raise WebhookUrlError(f"That webhook URL {exc}.") from exc
 
     unreachable = link_check.unreachable_reason(candidate)
     if unreachable:

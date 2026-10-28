@@ -14,16 +14,35 @@ import unicodedata
 from urllib.parse import urlsplit
 
 
+def check_url_characters(url: str) -> None:
+    """Raise ``ValueError`` if *url* holds a character no URL can contain raw.
+
+    Whitespace and control characters, and — M19 — invisible *format*
+    characters: a zero-width space or a bidi mark copied in with a link from a
+    chat or a document. Python does not count those as whitespace, so
+    ``https://example.com/post\u200b`` was stored as a canonical URL that a
+    browser percent-encodes into an address that does not exist. A real URL
+    carries such a character only percent-encoded, so refusing the raw one
+    costs nothing.
+    """
+    if any(ch.isspace() or unicodedata.category(ch) == "Cc" for ch in url):
+        raise ValueError(
+            "must not contain spaces — encode a space in a path as %20"
+        )
+    if any(unicodedata.category(ch) == "Cf" for ch in url):
+        raise ValueError(
+            "contains an invisible character, usually from copy and paste — "
+            "retype the link or paste it again from the address bar"
+        )
+
+
 def check_http_url(url: str) -> str:
     """Raise ``ValueError`` unless *url* — already known to start with
     ``http://`` or ``https://`` — is one a reader's browser can follow.
 
     Returns *url* unchanged, so a validator can ``return check_http_url(url)``.
     """
-    if any(ch.isspace() or unicodedata.category(ch) == "Cc" for ch in url):
-        raise ValueError(
-            "must not contain spaces — encode a space in a path as %20"
-        )
+    check_url_characters(url)
     try:
         parts = urlsplit(url)
         hostname = parts.hostname
@@ -39,4 +58,4 @@ def check_http_url(url: str) -> str:
     return url
 
 
-__all__ = ["check_http_url"]
+__all__ = ["check_http_url", "check_url_characters"]
