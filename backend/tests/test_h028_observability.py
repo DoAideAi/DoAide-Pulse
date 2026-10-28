@@ -81,7 +81,9 @@ class TestMailerSuccessLogIncludesRecipient:
         with caplog.at_level(logging.INFO, logger="app.services.mailer"):
             mailer.send(to="alice@example.com", subject="Weekly digest", body="hi")
 
-        assert "alice@example.com" in caplog.text
+        # Masked since C102 M12: which mailbox, not whose.
+        assert "a***@example.com" in caplog.text
+        assert "alice@example.com" not in caplog.text
 
     @pytest.mark.usefixtures("_smtp_up")
     def test_success_log_contains_subject(self, caplog):
@@ -99,7 +101,8 @@ class TestMailerFailureLogIncludesContext:
         with caplog.at_level(logging.ERROR, logger="app.services.mailer"):
             mailer.send(to="bob@example.com", subject="Password reset", body="link")
 
-        assert "bob@example.com" in caplog.text
+        assert "b***@example.com" in caplog.text
+        assert "bob@example.com" not in caplog.text
 
     @pytest.mark.usefixtures("_smtp_broken")
     def test_failure_log_contains_subject(self, caplog):
@@ -119,73 +122,61 @@ class TestMailerFailureLogIncludesContext:
 # ── Finding 2: _mark_connection_invalid logs the transition ───────── #
 
 
-class _FakeConnection:
-    """Minimal stand-in for PlatformConnection."""
+CIPHERTEXT = "stored-ciphertext"
 
-    def __init__(self, *, id: int, user_id: int, platform: Platform):
-        self.id = id
-        self.user_id = user_id
-        self.platform = platform
-        self.status = "connected"
-        self.last_error = None
+
+@pytest.fixture
+def conn(db, user):
+    """A real connection row, since the invalidation is a conditional UPDATE."""
+    from app.models.platform_connection import PlatformConnection
+
+    row = PlatformConnection(
+        user_id=user.id,
+        platform=Platform.DEVTO,
+        status=ConnectionStatus.CONNECTED,
+        encrypted_credentials=CIPHERTEXT,
+    )
+    db.add(row)
+    db.commit()
+    return row
 
 
 class TestMarkConnectionInvalidLogs:
     """Invalidating a connection must leave a WARNING in the journal."""
 
-    def test_log_contains_platform(self, caplog, monkeypatch):
-        conn = _FakeConnection(id=42, user_id=7, platform=Platform.DEVTO)
-        monkeypatch.setattr(
-            publishing_service,
-            "_connection_for",
-            lambda db, uid, plat: conn,
+    def _mark(self, db, user, error="Token rejected"):
+        publishing_service._mark_connection_invalid(
+            db, user.id, Platform.DEVTO, error, ciphertext=CIPHERTEXT,
         )
-        with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
-            publishing_service._mark_connection_invalid(
-                None, 7, Platform.DEVTO, "Token rejected", connection=conn,
-            )
 
+    def test_log_contains_platform(self, caplog, db, user, conn):
+        with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
+            self._mark(db, user)
         assert "devto" in caplog.text
 
-    def test_log_contains_user_id(self, caplog, monkeypatch):
-        conn = _FakeConnection(id=42, user_id=7, platform=Platform.DEVTO)
+    def test_log_contains_user_id(self, caplog, db, user, conn):
         with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
-            publishing_service._mark_connection_invalid(
-                None, 7, Platform.DEVTO, "Token rejected", connection=conn,
-            )
+            self._mark(db, user)
+        assert str(user.id) in caplog.text
 
-        assert "7" in caplog.text
-
-    def test_log_contains_connection_id(self, caplog, monkeypatch):
-        conn = _FakeConnection(id=42, user_id=7, platform=Platform.DEVTO)
+    def test_log_contains_connection_id(self, caplog, db, user, conn):
         with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
-            publishing_service._mark_connection_invalid(
-                None, 7, Platform.DEVTO, "Token rejected", connection=conn,
-            )
+            self._mark(db, user)
+        assert f"connection {conn.id} " in caplog.text
 
-        assert "42" in caplog.text
-
-    def test_log_contains_error_reason(self, caplog, monkeypatch):
-        conn = _FakeConnection(id=42, user_id=7, platform=Platform.DEVTO)
+    def test_log_contains_error_reason(self, caplog, db, user, conn):
         with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
-            publishing_service._mark_connection_invalid(
-                None, 7, Platform.DEVTO, "Token rejected by platform", connection=conn,
-            )
-
+            self._mark(db, user, "Token rejected by platform")
         assert "Token rejected" in caplog.text
 
-    def test_status_is_set_to_invalid(self):
-        conn = _FakeConnection(id=42, user_id=7, platform=Platform.DEVTO)
-        publishing_service._mark_connection_invalid(
-            None, 7, Platform.DEVTO, "Expired", connection=conn,
-        )
-
+    def test_status_is_set_to_invalid(self, db, user, conn):
+        self._mark(db, user, "Expired")
+        db.commit()
+        db.refresh(conn)
         assert conn.status is ConnectionStatus.INVALID
 
-    def test_last_error_is_set(self):
-        conn = _FakeConnection(id=42, user_id=7, platform=Platform.DEVTO)
-        publishing_service._mark_connection_invalid(
-            None, 7, Platform.DEVTO, "Expired token", connection=conn,
-        )
-
+    def test_last_error_is_set(self, db, user, conn):
+        self._mark(db, user, "Expired token")
+        db.commit()
+        db.refresh(conn)
         assert conn.last_error == clip_error("Expired token")

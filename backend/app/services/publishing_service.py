@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.exc import StaleDataError
@@ -503,24 +503,48 @@ def _mark_connection_invalid(
     platform: Platform,
     error: str,
     *,
-    connection: PlatformConnection | None = None,
+    ciphertext: str | None,
 ) -> None:
-    if connection is None:
-        connection = db.scalar(
-            select(PlatformConnection).where(
-                PlatformConnection.user_id == user_id,
-                PlatformConnection.platform == platform,
-            )
+    """Mark the connection whose credentials were just refused as invalid.
+
+    Only if those are still its credentials. The refusal is about the
+    *ciphertext this attempt decrypted*, and a publish can take a while: the
+    user may have saved fresh credentials meanwhile (reconnecting is exactly
+    what a "your token expired" error invites), or removed the connection.
+    Writing to the row loaded at the start of the attempt marked the new, valid
+    credentials INVALID in the first case — every later publish then failed as
+    not connected — and in the second updated a deleted row, whose
+    ``StaleDataError`` rolled back this publication's own failure record.
+    One conditional UPDATE answers both: it touches the row only if it still
+    holds what was refused.
+    """
+    if ciphertext is None:
+        return
+    marked = db.scalar(
+        update(PlatformConnection)
+        .where(
+            PlatformConnection.user_id == user_id,
+            PlatformConnection.platform == platform,
+            PlatformConnection.encrypted_credentials == ciphertext,
         )
-    if connection is not None:
-        connection.status = ConnectionStatus.INVALID
-        connection.last_error = clip_error(error)
+        .values(status=ConnectionStatus.INVALID, last_error=clip_error(error))
+        .returning(PlatformConnection.id)
+        .execution_options(synchronize_session=False)
+    )
+    if marked is not None:
         logger.warning(
             "connection %s for user %s on %s marked invalid: %s",
-            connection.id,
+            marked,
             user_id,
             platform.value,
             clip_error(error),
+        )
+    else:
+        logger.info(
+            "credentials for user %s on %s were refused, but the connection was "
+            "replaced or removed during the attempt; left as it is",
+            user_id,
+            platform.value,
         )
 
 
@@ -762,8 +786,12 @@ def execute(db: Session, publication: Publication) -> Publication:
     db.flush()
 
     connection: PlatformConnection | None = None
+    #: What this attempt decrypted — read now, because ``connection`` can be
+    #: refreshed from a row the user has since rewritten.
+    used_ciphertext: str | None = None
     try:
         connection = _connection_for(db, user_id, publication.platform)
+        used_ciphertext = connection.encrypted_credentials
         credentials = _credentials_for(
             db, user_id, publication.platform, connection=connection
         )
@@ -831,7 +859,7 @@ def execute(db: Session, publication: Publication) -> Publication:
         # connection's problem. The connection is marked invalid below, which is
         # the thing that actually stops the other rows trying.
         _mark_connection_invalid(
-            db, user_id, publication.platform, str(exc), connection=connection
+            db, user_id, publication.platform, str(exc), ciphertext=used_ciphertext
         )
         _fail(db, publication, str(exc), terminal=True)
         return publication

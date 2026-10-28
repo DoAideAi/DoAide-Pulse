@@ -97,7 +97,7 @@ def test_marking_a_connection_invalid_when_there_is_no_connection_is_a_no_op(db,
     exception inside the worker, losing the error message that explains it.
     """
     publishing_service._mark_connection_invalid(
-        db, user.id, Platform.DEVTO, "401 Unauthorized"
+        db, user.id, Platform.DEVTO, "401 Unauthorized", ciphertext="whatever-was-used"
     )
 
     db.commit()  # nothing to write, but the caller commits regardless
