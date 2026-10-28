@@ -15,6 +15,7 @@ vi.mock("../lib/api", () => ({
     pipeline: vi.fn(),
     featureUsage: vi.fn(),
     contentFunnel: vi.fn(),
+    autopilotEffectiveness: vi.fn(),
     activitySummary: vi.fn(),
     subscriberGrowth: vi.fn(),
   },
@@ -216,6 +217,12 @@ beforeEach(() => {
       days: 90, stale_days: 7,
       overall: { written: 0, reached_review: 0, approved: 0, published: 0, dropped: 0, review_rate: null, approval_rate: null, publish_rate: null, overall_rate: null },
       by_origin: [], median_hours_to_publish: null, stuck_in_draft: 0, stuck_in_review: 0, stuck: [],
+    });
+  api.autopilotEffectiveness.mockResolvedValue({
+      days: 90, routed: 0, auto_approved: 0, held: 0, auto_rate: null, inferred: 0, hold_reasons: [],
+      held_published: 0, override_rate: null, held_rejected: 0, rejection_rate: null, auto_pulled: 0,
+      pulled_rate: null, auto_below_seo_threshold: 0, median_quality_auto: null, median_quality_held: null,
+      quality_distribution: [],
     });
   api.activitySummary.mockResolvedValue({
     days: 30,
@@ -816,6 +823,7 @@ describe("feature usage", () => {
     draw();
     expect(await screen.findByText("What gets used")).toBeInTheDocument();
     expect(await screen.findByText("From draft to published")).toBeInTheDocument();
+    expect(await screen.findByText("How autopilot judges")).toBeInTheDocument();
   });
 
   it("is on the page before anything is published, too", async () => {

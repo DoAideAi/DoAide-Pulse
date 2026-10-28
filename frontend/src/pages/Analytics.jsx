@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { AutopilotPanel } from "../components/analytics/AutopilotPanel";
 import { FeatureUsagePanel } from "../components/analytics/FeatureUsagePanel";
 import { FunnelPanel } from "../components/analytics/FunnelPanel";
 import { ActivityPanel, PipelineHealth } from "../components/analytics/PipelinePanels";
@@ -91,6 +92,9 @@ export default function Analytics() {
         <Section name="funnel">
           <FunnelPanel />
         </Section>
+        <Section name="autopilot">
+          <AutopilotPanel />
+        </Section>
         <Section name="activity">
           <ActivityPanel />
         </Section>
@@ -121,6 +125,10 @@ export default function Analytics() {
 
       <Section name="funnel">
         <FunnelPanel />
+      </Section>
+
+      <Section name="autopilot">
+        <AutopilotPanel />
       </Section>
 
       <Section name="reach">
