@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from email.utils import parsedate_to_datetime
@@ -290,13 +291,22 @@ def _client() -> httpx.Client:
     )
 
 
+#: How long a whole download may take, as a multiple of the per-read timeout.
+FEED_DEADLINE_FACTOR = 3
+
+
 def _read_capped(http: httpx.Client, target: str) -> bytes:
     """The feed body, abandoning the download once it passes the cap.
 
     Streamed rather than fetched whole: checking the length after ``.content``
     has already buffered a gigabyte into memory would be a check that runs
     strictly too late to help.
+
+    And under one overall deadline, because the size cap is not a time cap:
+    httpx's timeout bounds each read, so a feed served a few bytes at a time
+    just inside it held the poller for days on one URL a user typed in.
     """
+    deadline = time.monotonic() + settings.feed_timeout_seconds * FEED_DEADLINE_FACTOR
     with http.stream("GET", target) as response:
         if response.is_redirect:
             raise FeedError(
@@ -314,6 +324,11 @@ def _read_capped(http: httpx.Client, target: str) -> bytes:
                 raise FeedError(
                     f"That feed is larger than {MAX_FEED_BYTES // (1024 * 1024)} MB, "
                     "which is more than Pulse will parse."
+                )
+            if time.monotonic() > deadline:
+                raise FeedError(
+                    "The feed took too long to download. Check the URL, or try "
+                    "again later."
                 )
             chunks.append(chunk)
     return b"".join(chunks)
