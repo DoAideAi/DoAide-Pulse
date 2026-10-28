@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.config import settings
-
 from app.models.content import (
     BODY_MARKDOWN_MAX_LENGTH,
     CANONICAL_URL_MAX_LENGTH,
@@ -19,6 +18,7 @@ from app.models.project import Tone
 from app.models.publication import Platform, PublicationStatus
 from app.schemas.limits import BoundedId, Keyword, MarketingImageUrl, Tag, Timezone
 from app.services import inline_edit
+from app.services.publishers.base import is_outcome_unknown
 
 #: The description every ``timezone`` field on a scheduling request carries.
 #:
@@ -270,6 +270,18 @@ class PublicationOut(BaseModel):
     )
 
     model_config = {"from_attributes": True}
+
+    @computed_field(
+        description=(
+            "True when the last attempt reached the platform and then failed "
+            "without a usable answer, so the post may already be live. Check the "
+            "platform before retrying: a retry of a post that landed is a "
+            "duplicate (for a newsletter, a second email to the whole list)."
+        )
+    )
+    @property
+    def outcome_unknown(self) -> bool:
+        return self.status == PublicationStatus.FAILED and is_outcome_unknown(self.error)
 
 
 class SeoIssueOut(BaseModel):

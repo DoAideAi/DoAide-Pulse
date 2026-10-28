@@ -148,6 +148,18 @@ class OutcomeUnknown(PublishError):
     """
 
 
+#: The phrase every :class:`OutcomeUnknown` message ends on. The error text is
+#: all a publication row keeps of its failure, so this is how the API can tell
+#: the client that pressing Retry may post the piece a second time
+#: (``PublicationOut.outcome_unknown``). Every message raising one must carry it.
+OUTCOME_UNKNOWN_MARKER = "before retrying"
+
+
+def is_outcome_unknown(error: str | None) -> bool:
+    """Whether a stored publication error is an :class:`OutcomeUnknown`."""
+    return bool(error) and OUTCOME_UNKNOWN_MARKER in error.lower()
+
+
 class NotImplementedAdapter(PublishError):
     """The platform is known but its adapter is not finished.
 
