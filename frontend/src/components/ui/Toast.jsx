@@ -38,9 +38,29 @@ export function ToastProvider({ children }) {
       if (!message) return undefined;
       const id = ++counter;
       const ttl = duration ?? (tone === "error" ? 6000 : 3500);
-      setToasts((list) => [...list, { id, message, tone }]);
+      setToasts((list) => [...list, { id, message, tone, ttl }]);
       if (ttl > 0) timers.current.set(id, setTimeout(() => dismiss(id), ttl));
       return id;
+    },
+    [dismiss],
+  );
+
+  // Held while the pointer or keyboard focus is on a toast, and given its full
+  // time again on the way out. An error that vanished after six seconds — or
+  // while somebody was halfway through reading it, or reaching for its close
+  // button — was a time limit nobody could extend (WCAG 2.2.1).
+  const hold = useCallback((id) => {
+    const timer = timers.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timers.current.delete(id);
+    }
+  }, []);
+  const release = useCallback(
+    (id, ttl) => {
+      if (ttl > 0 && !timers.current.has(id)) {
+        timers.current.set(id, setTimeout(() => dismiss(id), ttl));
+      }
     },
     [dismiss],
   );
@@ -68,6 +88,10 @@ export function ToastProvider({ children }) {
           <div
             key={t.id}
             role={t.tone === "error" ? "alert" : "status"}
+            onMouseEnter={() => hold(t.id)}
+            onMouseLeave={() => release(t.id, t.ttl)}
+            onFocus={() => hold(t.id)}
+            onBlur={() => release(t.id, t.ttl)}
             className={[
               "pointer-events-auto flex w-full max-w-sm items-start justify-between gap-3",
               "animate-fade-up rounded-lg border px-4 py-3 text-sm shadow-lift",

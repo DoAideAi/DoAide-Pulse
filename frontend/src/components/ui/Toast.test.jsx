@@ -9,7 +9,7 @@
  * toast raised outside a provider fails loudly rather than silently doing
  * nothing were all unexercised.
  */
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider, useToast } from "./Toast";
 import { whileCaught } from "../../test/caught";
@@ -208,5 +208,36 @@ describe("outside a provider", () => {
     await whileCaught(() => {
       expect(() => render(<Raiser />)).toThrow(/within a ToastProvider/);
     });
+  });
+});
+
+describe("holding one while it is being read", () => {
+  it("stays while the pointer is on it, and goes its full time after", async () => {
+    const { toast } = draw();
+    act(() => void toast.error("Could not save"));
+    const card = screen.getByRole("alert");
+
+    fireEvent.mouseEnter(card);
+    act(() => void vi.advanceTimersByTime(60_000));
+    expect(screen.getByText("Could not save")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(card);
+    act(() => void vi.advanceTimersByTime(5_000));
+    expect(screen.getByText("Could not save")).toBeInTheDocument();
+    act(() => void vi.advanceTimersByTime(1_500));
+    expect(screen.queryByText("Could not save")).toBeNull();
+  });
+
+  it("stays while keyboard focus is on its close button", () => {
+    const { toast } = draw();
+    act(() => void toast.success("Project saved"));
+
+    act(() => screen.getByRole("button", { name: "Dismiss notification" }).focus());
+    act(() => void vi.advanceTimersByTime(60_000));
+    expect(screen.getByText("Project saved")).toBeInTheDocument();
+
+    act(() => screen.getByRole("button", { name: "Dismiss notification" }).blur());
+    act(() => void vi.advanceTimersByTime(4_000));
+    expect(screen.queryByText("Project saved")).toBeNull();
   });
 });
