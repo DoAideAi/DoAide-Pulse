@@ -189,12 +189,27 @@ def get_audit(
     "/audit",
     response_model=MetaAuditOut | AuditQueuedOut,
     summary="Audit one site now, or queue every site",
-    responses=errors(
-        *AUTHENTICATED,
-        status.HTTP_403_FORBIDDEN,
-        status.HTTP_404_NOT_FOUND,
-        status.HTTP_429_TOO_MANY_REQUESTS,
-    ),
+    # Two successes with two bodies. The union above is what FastAPI validates
+    # against (and documents for 200); the 202 entry is the queued body, which
+    # was returned and never declared, so a client reading the spec could not
+    # know it existed.
+    responses={
+        status.HTTP_200_OK: {
+            "description": "One site (``site=``) audited in the request; the fresh audit.",
+        },
+        status.HTTP_202_ACCEPTED: {
+            "model": AuditQueuedOut,
+            "description": (
+                "Every site queued for the worker. Re-read GET /seo/audit for the result."
+            ),
+        },
+        **errors(
+            *AUTHENTICATED,
+            status.HTTP_403_FORBIDDEN,
+            status.HTTP_404_NOT_FOUND,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        ),
+    },
 )
 @limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
 def run_audit(

@@ -221,3 +221,14 @@ def test_the_health_dashboard_carries_audit_issue_counts(client, auth, db):
     assert gst["meta_issues"] >= 1
     assert tax["meta_issues"] is None
     assert body["totals"]["meta_issues"] == gst["meta_issues"]
+
+
+def test_the_queued_answer_is_in_the_spec():
+    """H086: queuing every site answers 202 with {queued}, and the spec only
+    declared 200 — a client generated from it had no type for that body."""
+    from app.main import app
+
+    responses = app.openapi()["paths"]["/api/v1/seo/audit"]["post"]["responses"]
+    queued = responses["202"]["content"]["application/json"]["schema"]
+    assert queued == {"$ref": "#/components/schemas/AuditQueuedOut"}
+    assert "200" in responses
