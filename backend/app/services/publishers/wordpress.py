@@ -166,7 +166,7 @@ class WordPressAdapter(Adapter):
 
         post_id = data.get("id")
         if not post_id:
-            raise PublishError(f"WordPress returned no post id: {data}")
+            raise self._unreadable_answer(resp, f"WordPress returned no post id: {data}")
 
         # `link` is the permalink; a draft has none, so fall back to the editor.
         url = data.get("link") or (

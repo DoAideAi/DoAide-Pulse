@@ -475,6 +475,27 @@ class Adapter(ABC):
             values.append(value)
         return tuple(values)
 
+    def _unreadable_answer(self, response: httpx.Response, message: str) -> PublishError:
+        """The error for a response Pulse cannot read a result out of.
+
+        Retryable as a rule — a CDN page or a truncated body is a blip. Except
+        when it answers a *write* that succeeded: a 2xx to a POST or PATCH means
+        the post, email or toot exists, and only its id is missing. Retrying
+        that is a duplicate (a second newsletter to the whole list), so it is
+        :class:`OutcomeUnknown` instead — terminal, with "check before retrying".
+        """
+        try:
+            method = response.request.method.upper()
+        except (AttributeError, RuntimeError):  # no request attached: cannot tell
+            method = "GET"
+        status_code = getattr(response, "status_code", 0) or 0
+        if 200 <= status_code < 300 and method not in _IDEMPOTENT_METHODS:
+            return OutcomeUnknown(
+                f"{message} — {self.display_name} accepted the request, so it "
+                f"has probably gone out. Check {self.display_name} before retrying."
+            )
+        return PublishError(message)
+
     def _json(self, response: httpx.Response) -> Any:
         """The response body decoded, as a :class:`PublishError` if it will not.
 
@@ -496,9 +517,10 @@ class Adapter(ABC):
             return response.json()
         except ValueError as exc:
             content_type = response.headers.get("content-type") or "no content-type"
-            error = PublishError(
+            error = self._unreadable_answer(
+                response,
                 f"{self.display_name} returned a non-JSON body "
-                f"({response.status_code}, {content_type})"
+                f"({response.status_code}, {content_type})",
             )
             error.__cause__ = exc
             raise error from exc
@@ -526,10 +548,11 @@ class Adapter(ABC):
         if data is None:
             return {}
         if not isinstance(data, dict):
-            raise PublishError(
+            raise self._unreadable_answer(
+                response,
                 f"{self.display_name} returned a JSON "
                 f"{type(data).__name__} where an object was expected "
-                f"({response.status_code})"
+                f"({response.status_code})",
             )
         return data
 

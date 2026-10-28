@@ -156,3 +156,48 @@ def test_a_send_buttondown_refused_outright_still_retries_on_schedule(db, newsle
 
     db.refresh(newsletter)
     assert newsletter.status == PublicationStatus.SCHEDULED  # parked for a retry
+
+
+# ---- accepted, but the answer cannot be read ----------------------------- #
+
+
+def _accepted(monkeypatch, *, json=None, content=None, method_seen=None):
+    def fake(method, url, **kwargs):
+        if method_seen is not None:
+            method_seen.append(method)
+        if content is not None:
+            return httpx.Response(201, content=content, headers={"content-type": "text/html"},
+                                  request=httpx.Request(method, url))
+        return httpx.Response(201, json=json, request=httpx.Request(method, url))
+
+    monkeypatch.setattr(base, "_exchange", fake)
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [{"json": {"detail": "queued"}}, {"content": b"<html>gateway</html>"}, {"json": ["ok"]}],
+    ids=["no-id", "html", "not-an-object"],
+)
+def test_a_send_buttondown_accepted_but_did_not_describe_is_not_resent(
+    db, newsletter, monkeypatch, answer
+):
+    seen: list[str] = []
+    _accepted(monkeypatch, method_seen=seen, **answer)
+
+    publishing_service.execute(db, newsletter)
+
+    db.refresh(newsletter)
+    assert seen == ["POST"]
+    assert newsletter.status == PublicationStatus.FAILED
+    assert newsletter.scheduled_for is None
+    assert "probably gone out" in newsletter.error
+
+
+def test_an_unreadable_answer_to_a_read_stays_retryable(monkeypatch):
+    _accepted(monkeypatch, content=b"<html>gateway</html>")
+    probe = _Probe()
+
+    resp = probe._request("GET", _URL)
+    with pytest.raises(PublishError) as raised:
+        probe._json(resp)
+    assert not isinstance(raised.value, OutcomeUnknown)

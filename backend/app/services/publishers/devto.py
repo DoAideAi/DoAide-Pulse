@@ -146,7 +146,7 @@ class DevToAdapter(Adapter):
 
         article_id = data.get("id")
         if not article_id:
-            raise PublishError(f"Dev.to returned no article id: {data}")
+            raise self._unreadable_answer(resp, f"Dev.to returned no article id: {data}")
 
         return PublishResult(
             external_id=str(article_id),

@@ -177,7 +177,7 @@ class ButtondownAdapter(Adapter):
 
         email_id = data.get("id")
         if not email_id:
-            raise PublishError(f"Buttondown returned no email id: {data}")
+            raise self._unreadable_answer(resp, f"Buttondown returned no email id: {data}")
 
         # `absolute_url` is the public archive page. A draft has no archive yet,
         # so fall back to the dashboard, which is where the user has to go to

@@ -221,7 +221,7 @@ class MastodonAdapter(Adapter):
 
         status_id = data.get("id")
         if not status_id:
-            raise PublishError(f"Mastodon returned no status id: {data}")
+            raise self._unreadable_answer(resp, f"Mastodon returned no status id: {data}")
 
         return PublishResult(
             external_id=str(status_id),

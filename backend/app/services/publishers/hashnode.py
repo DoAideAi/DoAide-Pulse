@@ -29,6 +29,7 @@ from app.services.publishers.base import (
     Adapter,
     CredentialError,
     CredentialField,
+    OutcomeUnknown,
     PublishError,
     PublishRequest,
     PublishResult,
@@ -181,7 +182,7 @@ class HashnodeAdapter(Adapter):
 
         data = body.get("data")
         if not data:
-            raise PublishError(f"Hashnode returned no data: {body}")
+            raise self._unreadable_answer(resp, f"Hashnode returned no data: {body}")
         return data
 
     def verify(self, credentials: dict[str, Any]) -> str:
@@ -222,7 +223,10 @@ class HashnodeAdapter(Adapter):
             draft = ((data.get("createDraft") or {}).get("draft")) or {}
             draft_id = draft.get("id")
             if not draft_id:
-                raise PublishError(f"Hashnode returned no draft: {data}")
+                # The mutation answered without errors: the draft exists.
+                raise OutcomeUnknown(
+                    f"Hashnode returned no draft: {data} — check Hashnode before retrying."
+                )
             return PublishResult(
                 external_id=str(draft_id),
                 # A draft has no public address; the editor is the useful link.
@@ -234,7 +238,10 @@ class HashnodeAdapter(Adapter):
         post = ((data.get("publishPost") or {}).get("post")) or {}
         post_id = post.get("id")
         if not post_id:
-            raise PublishError(f"Hashnode returned no post: {data}")
+            # The mutation answered without errors: the post is live.
+            raise OutcomeUnknown(
+                f"Hashnode returned no post: {data} — check Hashnode before retrying."
+            )
 
         return PublishResult(
             external_id=str(post_id),

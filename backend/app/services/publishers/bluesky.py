@@ -241,7 +241,7 @@ class BlueskyAdapter(Adapter):
 
         uri = data.get("uri")
         if not uri:
-            raise PublishError(f"Bluesky returned no record uri: {data}")
+            raise self._unreadable_answer(resp, f"Bluesky returned no record uri: {data}")
 
         # at://did:plc:xxxx/app.bsky.feed.post/3k... — the last segment is the
         # rkey, which is what the web URL is built from. The handle is used

@@ -140,7 +140,7 @@ class MediumAdapter(Adapter):
 
         post_id = data.get("id")
         if not post_id:
-            raise PublishError(f"Medium returned no post id: {data}")
+            raise self._unreadable_answer(resp, f"Medium returned no post id: {data}")
 
         return PublishResult(
             external_id=str(post_id),
