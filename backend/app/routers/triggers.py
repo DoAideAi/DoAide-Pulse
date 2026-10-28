@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, replace
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
@@ -103,6 +104,33 @@ def _nesting_exceeds(value: object, limit: int) -> bool:
             return True
         stack.extend((child, depth + 1) for child in children)
     return False
+
+
+#: What PostgreSQL will not store in ``text`` or ``jsonb``: NUL, and the lone
+#: UTF-16 surrogates ``json.loads`` happily decodes from ``"\\ud800"``
+#: (psycopg cannot encode them to UTF-8 at all).
+_UNSTORABLE = re.compile("[\x00\ud800-\udfff]")
+
+
+def _storable(value: object) -> object:
+    """*value* with every string — keys included — stripped of :data:`_UNSTORABLE`.
+
+    An inbound body comes from a third party and lands in a JSON column, in a
+    headline and in a summary. The app-wide body check refuses ``\\u0000`` only
+    in requests that declare JSON, and FastAPI's own parser refuses lone
+    surrogates; this endpoint reads raw bytes with neither in front of it, so a
+    sender posting either got a 500 from the database on every delivery.
+    Dropped rather than refused, like everything else this endpoint tolerates:
+    the rest of the event is still news. Called after the depth check, so the
+    recursion here is bounded.
+    """
+    if isinstance(value, str):
+        return _UNSTORABLE.sub("", value)
+    if isinstance(value, dict):
+        return {_storable(k): _storable(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_storable(item) for item in value]
+    return value
 
 
 def _owned(trigger_id: RowId, db: Session, user: User) -> Trigger:
@@ -742,6 +770,7 @@ def _ingest(db: Session, token: str, raw: bytes, headers: _InboundHeaders) -> di
         # Not every sender speaks JSON, and a form post or a plain-text alert is
         # still news. It becomes the summary rather than being refused.
         payload = {"text": body_text[:10000]}
+    payload = _storable(payload)
 
     signal = trigger_service.signal_from_webhook(trigger, payload)
     # Replay protection, layered *under* the sender's own dedupe rather than
