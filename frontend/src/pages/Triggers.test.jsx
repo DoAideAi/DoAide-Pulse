@@ -93,6 +93,31 @@ beforeEach(() => {
 });
 
 describe("the list", () => {
+  it("does not hide the triggers behind 'No projects yet' when projects fail to load", async () => {
+    api.listProjects.mockRejectedValueOnce(new Error("offline"));
+    api.listProjects.mockResolvedValueOnce([{ id: 7, name: "Pulse" }]);
+    // `userEvent.click` rather than `userEvent.setup()`: setup installs a
+    // getter-only navigator.clipboard that the copy tests below cannot stub.
+    draw();
+
+    expect(await screen.findByText(/Could not load your projects: offline/)).toBeInTheDocument();
+    expect(screen.queryByText("No projects yet")).not.toBeInTheDocument();
+    expect(screen.getByText("Changelog feed")).toBeInTheDocument();
+
+    const banner = screen.getByText(/Could not load your projects/).closest("[role=alert]");
+    await userEvent.click(within(banner).getByRole("button", { name: "Retry" }));
+    await waitFor(() =>
+      expect(screen.queryByText(/Could not load your projects/)).not.toBeInTheDocument(),
+    );
+  });
+
+  it("still says 'No projects yet' when there really are none", async () => {
+    api.listProjects.mockResolvedValue([]);
+    draw();
+
+    expect(await screen.findByText("No projects yet")).toBeInTheDocument();
+  });
+
   it("shows what each trigger watches, not just its name", async () => {
     draw();
     expect(await screen.findByText("Changelog feed")).toBeInTheDocument();

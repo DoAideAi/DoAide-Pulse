@@ -29,7 +29,12 @@ const KIND_LABELS = { github: "GitHub", rss: "RSS", webhook: "Webhook", schedule
 export default function Triggers() {
   const toast = useToast();
   const [projectId, setProjectId] = useState("");
-  const { data: projects } = useApi(() => api.listProjects(), []);
+  const {
+    data: projects,
+    error: projectsError,
+    loading: projectsLoading,
+    reload: reloadProjects,
+  } = useApi(() => api.listProjects(), []);
   const { data: kinds } = useApi(() => api.triggerKinds(), []);
   const {
     data: triggers,
@@ -44,6 +49,10 @@ export default function Triggers() {
   const [issued, setIssued] = useState(null);
 
   const hasProjects = (projects?.length ?? 0) > 0;
+  // "No projects" is something only a *loaded* list can say. Read from the
+  // length alone it was also true while the list was in flight or had failed,
+  // and either way the page hid every trigger behind "Add a project first".
+  const projectsKnownEmpty = projects !== null && projects.length === 0;
 
   return (
     <div className="stagger space-y-6">
@@ -82,10 +91,16 @@ export default function Triggers() {
       </div>
 
       <ErrorBanner message={error} onRetry={reload} />
+      {projectsError && !projects && (
+        <ErrorBanner
+          message={`Could not load your projects: ${projectsError}`}
+          onRetry={reloadProjects}
+        />
+      )}
 
-      {loading && !triggers ? (
+      {(loading && !triggers) || (projectsLoading && !projects) ? (
         <Skeleton rows={3} />
-      ) : !hasProjects ? (
+      ) : projectsKnownEmpty ? (
         <Empty
           title="No projects yet"
           hint="Add a project first — triggers write about one."
