@@ -195,7 +195,10 @@ When the project names a canonical platform and it's in the batch, that
 platform is scheduled first, and every copy goes at least
 `SYNDICATION_DELAY_SECONDS` (**900**, 15 min) behind it. A copy published before
 the original has a URL can't carry a `rel=canonical` link to it.
-`publishing_service.queue` applies the same rule to immediate publishes.
+`publishing_service.queue` applies the same rule to immediate publishes. The delay is a queue-time guess, so it is checked again when a copy comes due:
+a copy whose original is still waiting (parked after a retryable failure) is
+held behind the original's new time, until the original publishes or gives up
+(`publishing_service.execute`, the same rule as `retry_hold`).
 
 **Times are UTC throughout.** A naive datetime from a client is read as UTC. A
 time in the past, or further ahead than `SCHEDULE_MAX_HORIZON_DAYS`, is refused

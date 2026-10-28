@@ -754,6 +754,29 @@ def execute(db: Session, publication: Publication) -> Publication:
         )
         return publication
 
+    # A syndicated copy whose original has not gone out yet. :func:`queue` sets
+    # the copies a fixed delay behind the original, but that is a guess made at
+    # queue time: an original parked by a retryable failure now goes out later
+    # than the guess, and the copies went at their own time regardless — live
+    # with no ``rel=canonical``, permanently, which is the outcome the stagger
+    # exists to prevent (C104 M2). The same rule a hand retry follows
+    # (:func:`retry_hold`): wait behind the original's own time, and stop
+    # waiting once the original is published, failed or cancelled — so the wait
+    # is bounded by the original's retry budget. No attempt spent, no error:
+    # waiting for the original is not a failure.
+    hold = retry_hold(content, publication)
+    if hold is not None and hold > utcnow():
+        publication.status = PublicationStatus.SCHEDULED
+        publication.scheduled_for = hold
+        db.commit()
+        logger.info(
+            "publication %s to %s held until %s: the original has not gone out yet",
+            publication.id,
+            publication.platform.value,
+            hold.isoformat(),
+        )
+        return publication
+
     user_id = content.project.user_id
     adapter = publishers.get_adapter(publication.platform)
 
