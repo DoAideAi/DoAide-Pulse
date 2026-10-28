@@ -39,11 +39,10 @@ function scoreSubjectLine(text) {
     tips.push("Too long. Subject lines over 60 characters get cut off on mobile.");
   }
 
-  const lower = text.toLowerCase();
-  let powerCount = 0;
-  for (const w of POWER_WORDS) {
-    if (lower.includes(w)) powerCount++;
-  }
+  // Whole words only: a substring match counted "news", "renewal" and
+  // "freelance" as power words and congratulated the writer for them.
+  const words = new Set(text.toLowerCase().match(/[a-z]+/g) ?? []);
+  const powerCount = POWER_WORDS.filter((w) => words.has(w)).length;
   score += Math.min(powerCount * 5, 15);
   if (powerCount > 0) tips.push(`Found ${powerCount} power word(s) — nice!`);
   else tips.push("Add a power word like 'free', 'exclusive', or 'proven' to boost urgency.");
@@ -66,7 +65,11 @@ function scoreSubjectLine(text) {
     tips.push("Too many emojis — one is effective, more than three looks spammy.");
   }
 
-  const capsWords = text.split(/\s+/).filter((w) => w.length > 1 && w === w.toUpperCase() && /[A-Z]/.test(w));
+  // Three letters or fewer is an acronym (AI, SEO, API), not shouting —
+  // penalising it told every "5 AI tools" headline to stop using caps.
+  const capsWords = (text.match(/[A-Za-z]+/g) ?? []).filter(
+    (w) => w.length > 3 && w === w.toUpperCase(),
+  );
   if (capsWords.length > 0) {
     score -= capsWords.length * 10;
     tips.push("Avoid ALL CAPS words — they trigger spam filters and feel aggressive.");
@@ -124,19 +127,24 @@ export default function SubjectLineTester() {
           />
         </div>
 
-        {text.trim() && (
-          <div className="flex items-center gap-4">
-            <div className={`text-4xl font-bold ${scoreColor(score)}`} data-testid="score">
-              {score}
-            </div>
-            <div>
-              <div className={`font-semibold ${scoreColor(score)}`} data-testid="label">
-                {scoreLabel(score)}
+        {/* Always mounted so a screen reader hears the score change as the
+            line is typed; a live region that appears with its content is
+            not announced. */}
+        <div aria-live="polite">
+          {text.trim() && (
+            <div className="flex items-center gap-4">
+              <div className={`text-4xl font-bold ${scoreColor(score)}`} data-testid="score">
+                {score}
               </div>
-              <div className="text-xs text-ink-400">out of 100</div>
+              <div>
+                <div className={`font-semibold ${scoreColor(score)}`} data-testid="label">
+                  {scoreLabel(score)}
+                </div>
+                <div className="text-xs text-ink-400">out of 100</div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {tips.length > 0 && text.trim() && (

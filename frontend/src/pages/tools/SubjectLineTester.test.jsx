@@ -33,6 +33,26 @@ describe("SubjectLineTester", () => {
     expect(score).toBeGreaterThanOrEqual(70);
   });
 
+  it("counts power words as whole words, not inside other words", async () => {
+    wrap();
+    await userEvent.type(
+      screen.getByLabelText(/your subject line/i),
+      "Renewal news for freelance writers",
+    );
+    const tips = screen.getByTestId("tips").textContent;
+    expect(tips).not.toMatch(/power word\(s\)/);
+    expect(tips).toMatch(/Add a power word/);
+  });
+
+  it("does not call a short acronym shouting", async () => {
+    wrap();
+    await userEvent.type(
+      screen.getByLabelText(/your subject line/i),
+      "5 AI tools for better SEO this week",
+    );
+    expect(screen.getByTestId("tips").textContent).not.toMatch(/ALL CAPS/);
+  });
+
   it("scores an ALL CAPS subject line low", async () => {
     wrap();
     await userEvent.type(
