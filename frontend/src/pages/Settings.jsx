@@ -600,7 +600,7 @@ function PlatformRow({ platform, onConnect, onChanged }) {
 
 function WebhooksSection() {
   const toast = useToast();
-  const { data, loading, reload } = useApi(() => api.listWebhooks(), []);
+  const { data, error, loading, reload } = useApi(() => api.listWebhooks(), []);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
   const [secret, setSecret] = useState(null);
@@ -653,6 +653,10 @@ function WebhooksSection() {
       />
       {loading && !data ? (
         <Skeleton rows={2} />
+      ) : error && !data ? (
+        // Not the empty state: "No webhooks" over a failed load invited adding
+        // a second endpoint next to the one that was already there.
+        <ErrorBanner message={`Could not load webhooks: ${error}`} onRetry={reload} />
       ) : (data ?? []).length === 0 ? (
         <Empty
           title="No webhooks"
@@ -942,7 +946,7 @@ function EditWebhookDialog({ webhook, onClose, onDone }) {
 
 function ApiKeysSection() {
   const toast = useToast();
-  const { data, loading, reload } = useApi(() => api.listApiKeys(), []);
+  const { data, error, loading, reload } = useApi(() => api.listApiKeys(), []);
   const [creating, setCreating] = useState(false);
   const [token, setToken] = useState(null);
 
@@ -970,6 +974,10 @@ function ApiKeysSection() {
       />
       {loading && !data ? (
         <Skeleton rows={2} />
+      ) : error && !data ? (
+        // As with webhooks: an empty state here read as "you have no keys" and
+        // sent people to mint another one.
+        <ErrorBanner message={`Could not load API keys: ${error}`} onRetry={reload} />
       ) : (data ?? []).length === 0 ? (
         <Empty
           title="No API keys"

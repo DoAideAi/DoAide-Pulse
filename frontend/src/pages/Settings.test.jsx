@@ -765,6 +765,22 @@ describe("outbound webhooks", () => {
     expect(await screen.findByText("No webhooks")).toBeInTheDocument();
   });
 
+  it("reports a failed load rather than claiming there are none", async () => {
+    api.listWebhooks.mockRejectedValueOnce(new Error("Pulse did not answer"));
+    api.listWebhooks.mockResolvedValueOnce([webhook()]);
+    const user = userEvent.setup();
+    draw();
+
+    expect(
+      await screen.findByText("Could not load webhooks: Pulse did not answer"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No webhooks")).not.toBeInTheDocument();
+
+    const banner = screen.getByText(/Could not load webhooks/).closest("[role=alert]");
+    await user.click(within(banner).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText(webhook().url)).toBeInTheDocument();
+  });
+
   it("renders a webhook row with its URL and events", async () => {
     api.listWebhooks.mockResolvedValue([webhook()]);
     draw();
@@ -903,6 +919,16 @@ describe("API keys", () => {
     draw();
 
     expect(await screen.findByText("No API keys")).toBeInTheDocument();
+  });
+
+  it("reports a failed load rather than claiming there are none", async () => {
+    api.listApiKeys.mockRejectedValueOnce(new Error("Pulse did not answer"));
+    draw();
+
+    expect(
+      await screen.findByText("Could not load API keys: Pulse did not answer"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("No API keys")).not.toBeInTheDocument();
   });
 
   it("renders a key row with its name, prefix, and scopes", async () => {
