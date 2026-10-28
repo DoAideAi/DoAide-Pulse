@@ -59,7 +59,10 @@ def visible_label(value: str) -> str:
     ).strip()
     if not any(not ch.isspace() and unicodedata.category(ch) != "Cf" for ch in cleaned):
         return ""
-    return cleaned
+    # Composed, so one title has one spelling: a decomposed "é" (what macOS
+    # hands over from a file name) and the precomposed one look identical and
+    # otherwise compare, search and slug as different text (C104 M6).
+    return unicodedata.normalize("NFC", cleaned)
 
 
 __all__ = ["visible_label"]

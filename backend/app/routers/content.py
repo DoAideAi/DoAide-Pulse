@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import unicodedata
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 
@@ -511,9 +512,11 @@ def list_content(
     if q is not None and q.strip():
         # ``%`` and ``_`` are the user's characters, not wildcards: searching
         # for "100%" should not match every title containing "100".
-        needle = (
-            q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        )
+        # NFC, as every stored title is (``schemas.text.visible_label``): a
+        # decomposed "é" typed or pasted from a file name is the same text as
+        # the precomposed one in the title, and did not find it (C104 M6).
+        typed = unicodedata.normalize("NFC", q.strip())
+        needle = typed.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         base = base.where(Content.title.ilike(f"%{needle}%", escape="\\"))
 
     # Total count for the UI to render pagination controls.
