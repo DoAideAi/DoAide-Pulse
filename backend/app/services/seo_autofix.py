@@ -328,21 +328,30 @@ def _link_targets(db: Session, content: Content, project: Project | None) -> lis
         .limit(200)
     ).all()
 
+    # A piece with no canonical URL is linked to wherever it went live. One
+    # query for all of them: this used to be a SELECT per row, up to 200 of
+    # them every time a draft's link count was taken — and with no ORDER BY,
+    # so which platform's URL came back was the database's choice. The
+    # earliest publication wins now, the same answer every time.
+    from app.models.publication import Publication
+
+    missing = [row.id for row in rows if not row.canonical_url]
+    live: dict[int, str] = {}
+    if missing:
+        for content_id, external_url in db.execute(
+            select(Publication.content_id, Publication.external_url)
+            .where(
+                Publication.content_id.in_(missing),
+                Publication.external_url.is_not(None),
+            )
+            .order_by(Publication.content_id, Publication.id)
+        ):
+            live.setdefault(content_id, external_url)
+
     urls: dict[int, str] = {}
     titles: dict[int, str] = {}
     for row in rows:
-        url = row.canonical_url
-        if not url:
-            from app.models.publication import Publication
-
-            url = db.scalar(
-                select(Publication.external_url)
-                .where(
-                    Publication.content_id == row.id,
-                    Publication.external_url.is_not(None),
-                )
-                .limit(1)
-            )
+        url = row.canonical_url or live.get(row.id)
         if url:
             urls[row.id] = url
             titles[row.id] = row.title
