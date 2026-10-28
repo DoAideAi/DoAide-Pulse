@@ -719,10 +719,17 @@ function IdeaBacklog({ state }) {
       <p className="mb-3 text-xs text-ink-400">
         Unwritten ideas. Pick a day to put one on the calendar, or write it now.
       </p>
-      {backlog.length === 0 && (
-        <p className="text-xs text-ink-400">
-          Nothing waiting. Ideas from your repos land here, or add one below.
-        </p>
+      {state.error && !state.data ? (
+        // A failed read is not an empty backlog: "Nothing waiting" here sent
+        // people off to add ideas they already had.
+        <ErrorBanner message={`Could not load ideas: ${state.error}`} onRetry={state.reload} />
+      ) : (
+        backlog.length === 0 &&
+        !state.loading && (
+          <p className="text-xs text-ink-400">
+            Nothing waiting. Ideas from your repos land here, or add one below.
+          </p>
+        )
       )}
       <ul className="space-y-3">
         {backlog.slice(0, 8).map((idea) => (

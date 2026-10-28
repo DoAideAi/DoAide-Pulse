@@ -767,6 +767,20 @@ describe("the suggestions aside", () => {
 });
 
 describe("ideas on the calendar", () => {
+  it("says the ideas could not be loaded, rather than that there are none", async () => {
+    api.calendarIdeas.mockRejectedValue(new Error("Bad Gateway"));
+    draw();
+
+    expect(await screen.findByText(/Could not load ideas: Bad Gateway/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing waiting/)).toBeNull();
+  });
+
+  it("says there are none when there are none", async () => {
+    draw();
+
+    expect(await screen.findByText(/Nothing waiting/)).toBeInTheDocument();
+  });
+
   const idea = (overrides = {}) => ({
     id: 90,
     project_id: 1,
