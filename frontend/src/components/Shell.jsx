@@ -130,7 +130,10 @@ export default function Shell({ children }) {
 
       {/* Main content area */}
       <div className="flex min-w-0 flex-1 flex-col md:ml-56">
-        <main id="main" tabIndex={-1} className="flex-1 px-4 py-8 pt-20 sm:px-6 md:px-8 md:pt-8">
+        {/* pb-24: the Feedback button and the dashboard's Quick Actions bar float
+            over the bottom of the page, and without the room the last lines of
+            a long page sat under them even when scrolled to the end. */}
+        <main id="main" tabIndex={-1} className="flex-1 px-4 pb-24 pt-20 sm:px-6 md:px-8 md:pt-8">
           <div className="mx-auto max-w-5xl">
             {children}
           </div>

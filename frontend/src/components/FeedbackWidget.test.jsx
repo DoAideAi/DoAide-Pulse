@@ -33,6 +33,24 @@ describe("FeedbackWidget", () => {
     });
   });
 
+  it("sits under other dialogs, not over their backdrop", () => {
+    // Dialog's backdrop is z-40. At z-40 and later in the DOM, the button
+    // stayed clickable over any open modal and stacked a second one on it.
+    draw();
+    const button = screen.getByRole("button", { name: "Feedback" });
+    expect(button.className).toMatch(/\bz-30\b/);
+    expect(button.className).not.toMatch(/\bz-40\b/);
+    expect(button.className).toMatch(/\bprint:hidden\b/);
+  });
+
+  it("keeps its name on a phone, where only the icon shows", () => {
+    draw();
+    const button = screen.getByRole("button", { name: "Feedback" });
+    expect(button).toHaveAttribute("aria-label", "Feedback");
+    expect(button.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Feedback")).toHaveClass("hidden", "sm:inline");
+  });
+
   it("says which feature it detected, and lets the person change it", async () => {
     const user = userEvent.setup();
     draw("/content/42");

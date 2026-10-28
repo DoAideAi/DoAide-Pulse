@@ -34,14 +34,22 @@ export default function FeedbackWidget() {
 
   return (
     <>
+      {/* z-30, under Dialog's z-40 backdrop: at the same z-index and later in
+          the DOM it floated over every other open modal, still clickable, and
+          opened a second dialog on top of the first. Icon-only below `sm`, so
+          it clears the dashboard's centred Quick Actions bar on a phone. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-lg hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+        className="fixed bottom-5 right-4 z-30 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-white shadow-lg hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:right-5 sm:px-4 print:hidden"
         style={{ backgroundColor: "#2563eb" }}
         aria-haspopup="dialog"
+        aria-label="Feedback"
       >
-        Feedback
+        <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+          <path d="M3 4.5A2.5 2.5 0 0 1 5.5 2h9A2.5 2.5 0 0 1 17 4.5v6a2.5 2.5 0 0 1-2.5 2.5H9.4l-3.6 3.1A.5.5 0 0 1 5 15.7V13h.5A2.5 2.5 0 0 1 3 10.5v-6Z" />
+        </svg>
+        <span className="hidden sm:inline">Feedback</span>
       </button>
       {open && <FeedbackForm pathname={pathname} onClose={() => setOpen(false)} />}
     </>
