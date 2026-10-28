@@ -102,3 +102,24 @@ def test_a_user_supplied_host_resolving_to_loopback_is_never_connected(monkeypat
         base._exchange(
             "POST", "https://blog.example.com/x", timeout=5, follow_redirects=False, guarded=True
         )
+
+
+def test_the_link_checker_uses_the_guarded_transport(monkeypatch):
+    import httpx
+
+    seen = []
+    real_client = httpx.Client
+
+    def spy(**kwargs):
+        seen.append(kwargs.get("transport"))
+        return real_client(
+            transport=httpx.MockTransport(lambda request: httpx.Response(200)),
+            follow_redirects=False,
+        )
+
+    monkeypatch.setattr(link_check, "_unreachable_for_a_reader", lambda url: None)
+    monkeypatch.setattr(link_check.httpx, "Client", spy)
+
+    link_check.check(["https://example.com/a"])
+
+    assert isinstance(seen[0]._pool._network_backend, link_check._PublicOnlyBackend)

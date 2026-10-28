@@ -357,6 +357,9 @@ def check(urls: list[str], *, timeout: float | None = None) -> list[LinkStatus]:
         httpx.Client(
             timeout=budget,
             follow_redirects=False,
+            # The per-hop pre-flight resolves each host; this makes the connect
+            # use an address that passed the same check (no DNS rebinding).
+            transport=guarded_transport(),
             headers={
                 # Some hosts 403 an unidentified client outright. Saying who we
                 # are turns a pile of `unknown` verdicts into real answers.
