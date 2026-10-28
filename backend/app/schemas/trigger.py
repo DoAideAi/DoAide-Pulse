@@ -104,6 +104,20 @@ def _has_surrogate(value: object) -> bool:
     return False
 
 
+def _whole(value: object) -> int:
+    """*value* as an int, refusing a fraction rather than truncating it.
+
+    ``int(3.9)`` is 3: an ``hour_utc`` of 3.9 was stored as 3 and the trigger
+    fired an hour off from what was typed, with a 201 to say all was well.
+    ``3.0`` and ``"3"`` are whole and still accepted.
+    """
+    if isinstance(value, float):
+        if not value.is_integer():
+            raise ValueError("not a whole number")
+        return int(value)
+    return int(value)  # type: ignore[call-overload]
+
+
 #: ``owner/name`` — see :data:`app.models.project.GITHUB_FULL_NAME_RE`.
 _REPO_RE = GITHUB_FULL_NAME_RE
 
@@ -185,7 +199,7 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
 
     if body.get("hour_utc") is not None:
         try:
-            hour = int(body["hour_utc"])
+            hour = _whole(body["hour_utc"])
         except (TypeError, ValueError) as exc:
             raise ValueError("hour_utc must be an hour of the day, 0-23.") from exc
         if not 0 <= hour <= 23:
@@ -194,7 +208,7 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
 
     if body.get("commit_threshold") is not None:
         try:
-            threshold = int(body["commit_threshold"])
+            threshold = _whole(body["commit_threshold"])
         except (TypeError, ValueError) as exc:
             raise ValueError("commit_threshold must be a whole number.") from exc
         if threshold < 1:

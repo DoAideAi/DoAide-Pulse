@@ -396,3 +396,18 @@ def test_real_text_in_a_setting_is_kept_whole(client, auth, project):
     resp = _create(client, auth, project, kind="schedule", topic=topic, every_hours=24)
     assert resp.status_code == 201, resp.text
     assert resp.json()["config"]["topic"] == topic
+
+
+def test_a_fractional_hour_or_threshold_is_refused_not_truncated(client, auth, project):
+    """M19: ``int(3.9)`` stored 3 — a trigger an hour off what was typed."""
+    hour = _create(client, auth, project, kind="schedule", topic="t", every_hours=24, hour_utc=3.9)
+    assert hour.status_code == 422, hour.text
+    assert "hour_utc" in hour.text
+
+    threshold = _create(client, auth, project, kind="github", repo="a/b", commit_threshold=2.5)
+    assert threshold.status_code == 422, threshold.text
+    assert "commit_threshold" in threshold.text
+
+    whole = _create(client, auth, project, kind="schedule", topic="t", every_hours=24, hour_utc=3.0)
+    assert whole.status_code == 201, whole.text
+    assert whole.json()["config"]["hour_utc"] == 3
