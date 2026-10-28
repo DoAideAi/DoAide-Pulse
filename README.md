@@ -144,6 +144,11 @@ Content ──▶ publishing_service.queue ──▶ Publication (one per platfo
                                     metrics_tasks ──▶ ContentMetric
 ```
 
+[`docs/BUSINESS_LOGIC.md`](docs/BUSINESS_LOGIC.md) walks through the decisions in
+detail — when the autopilot publishes without asking, how the quality and SEO
+scores are computed, how a publish time is chosen, and what happens after a
+failure.
+
 Three design decisions worth knowing before you read the code:
 
 **The AI chain never hard-fails.** Four providers are tried in order, each
