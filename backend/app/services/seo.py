@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from xml.etree.ElementTree import Element, SubElement, tostring
 
+from app.schemas.text import visible_label
+
 #: Google truncates meta descriptions around 155-160 characters. We aim under
 #: the lower bound so a trailing word is never clipped mid-thought.
 META_DESCRIPTION_MAX = 155
@@ -123,7 +125,10 @@ def normalize_keywords(keywords: list[str], *, extra: list[str] | None = None) -
     out: list[str] = []
     seen: set[str] = set()
     for raw in [*keywords, *(extra or [])]:
-        keyword = re.sub(r"\s+", " ", str(raw)).strip().lower().strip("#,.")
+        # ``visible_label`` collapses whitespace as the regex here did, and also
+        # drops zero-width and bidi characters — a keyword made only of those
+        # was kept (and became the focus keyword) whenever it was two long.
+        keyword = visible_label(str(raw)).lower().strip("#,.").strip()
         # Single characters and bare numbers are never a useful keyword.
         if len(keyword) < 2 or keyword.isdigit() or keyword in seen:
             continue

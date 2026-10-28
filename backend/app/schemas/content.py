@@ -51,11 +51,27 @@ def _clean_tags(value: list[str] | None) -> list[str] | None:
     out: list[str] = []
     seen: set[str] = set()
     for raw in value:
-        tag = raw.strip()
+        # ``visible_label`` rather than ``strip``: a zero-width space is not
+        # whitespace to Python, so ``"\u200b"`` survived as a chip that
+        # rendered as nothing, and a bidi override as one drawn backwards.
+        tag = visible_label(raw)
         if tag and tag.casefold() not in seen:
             seen.add(tag.casefold())
             out.append(tag)
     return out
+
+
+def _clean_focus_keyword(value: str | None) -> str | None:
+    """One visible line, or ``""``.
+
+    Stored as sent, ``"   "`` became the focus keyword every SEO check then
+    searched the title and body for, and a zero-width space one that no text
+    can ever contain. Blank is the honest value — it means "none set", and on
+    an update it clears the field, which is what sending whitespace asked for.
+    """
+    if value is None:
+        return None
+    return visible_label(value)
 
 
 def _absolute_image_url(value: str | None) -> str | None:
@@ -231,6 +247,7 @@ class ContentCreate(BaseModel):
     _check_gallery = field_validator("marketing_images")(_absolute_image_urls)
     _check_canonical = field_validator("canonical_url")(_absolute_canonical_url)
     _normalise_tags = field_validator("tags")(_clean_tags)
+    _clean_focus = field_validator("focus_keyword")(_clean_focus_keyword)
 
 
 class ContentUpdate(BaseModel):
@@ -269,6 +286,7 @@ class ContentUpdate(BaseModel):
     _check_gallery = field_validator("marketing_images")(_absolute_image_urls)
     _check_canonical = field_validator("canonical_url")(_absolute_canonical_url)
     _normalise_tags = field_validator("tags")(_clean_tags)
+    _clean_focus = field_validator("focus_keyword")(_clean_focus_keyword)
 
     _settable = field_validator("status")(_settable_status)
 
