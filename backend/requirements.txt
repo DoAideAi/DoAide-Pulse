@@ -18,6 +18,12 @@ h11>=0.16.0
 uvicorn[standard]>=0.30
 python-multipart>=0.0.31
 email-validator>=2.1
+# Not imported directly: email-validator's DNS dependency. Floor is 2.9.0 for
+# CVE-2026-114605 (excessive CPU decompressing a crafted DNS name). Pulse
+# validates addresses without a deliverability lookup, so it parses no DNS
+# replies today — but the box had 2.8.0, and without a floor here `pip install
+# -r` keeps whatever is installed for as long as email-validator is satisfied.
+dnspython>=2.9.0
 
 # ---- Data ----
 sqlalchemy>=2.0
@@ -61,6 +67,13 @@ redis>=5.0
 
 # ---- HTTP (LLM providers, GitHub, platform APIs) ----
 httpx>=0.27
+# Not imported directly: the CA bundle httpx trusts. Floor is 2026.10.18 for
+# PYSEC-2026-4320 — earlier bundles still trust the emSign ECC Root CA - G3,
+# under which eight intermediates' private keys are compromised, so anyone
+# holding one could pass as any platform's API and be handed the credentials
+# the publishers send it. Pinned here because nothing else would ever move it:
+# production was on 2026.7.22.
+certifi>=2026.10.18
 
 # ---- Content ----
 # Markdown -> HTML for the platforms that don't take Markdown (Medium, LinkedIn,

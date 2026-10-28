@@ -29,6 +29,11 @@ MINIMUMS = {
     ("backend/requirements.txt", "markdown"): "3.8.1",
     ("backend/requirements.txt", "pypdf"): "6.21.2",
     ("backend/requirements.txt", "cryptography"): "50.0",
+    # M17 (2026-10-28): transitive, and on the box below the fix. certifi for
+    # PYSEC-2026-4320 (a CA with compromised intermediates still trusted);
+    # dnspython for CVE-2026-114605 (CPU exhaustion on a crafted DNS name).
+    ("backend/requirements.txt", "certifi"): "2026.10.18",
+    ("backend/requirements.txt", "dnspython"): "2.9.0",
     ("mcp/requirements.txt", "mcp"): "1.28.1",
 }
 
