@@ -67,3 +67,38 @@ def test_webhook_and_feed_clients_use_the_guarded_transport(make):
     with make() as client:
         backend = client._transport._pool._network_backend
     assert isinstance(backend, link_check._PublicOnlyBackend)
+
+
+def test_a_publish_to_a_user_supplied_host_goes_through_the_guarded_transport(monkeypatch):
+    import httpx
+
+    from app.services.publishers import base
+
+    used = []
+
+    def fake_guarded():
+        used.append(True)
+        return httpx.MockTransport(lambda request: httpx.Response(200, json={"ok": True}))
+
+    monkeypatch.setattr(link_check, "guarded_transport", fake_guarded)
+
+    response = base._exchange(
+        "GET", "https://blog.example.com/wp-json", timeout=5, follow_redirects=False, guarded=True
+    )
+
+    assert used == [True]
+    assert response.json() == {"ok": True}
+
+
+def test_a_user_supplied_host_resolving_to_loopback_is_never_connected(monkeypatch):
+    import httpx
+
+    from app.services.publishers import base
+
+    _resolves_to(monkeypatch, "127.0.0.1")
+    monkeypatch.setattr(httpcore.SyncBackend, "connect_tcp", lambda *a, **kw: pytest.fail("connected"))
+
+    with pytest.raises(httpx.ConnectError, match="private or loopback"):
+        base._exchange(
+            "POST", "https://blog.example.com/x", timeout=5, follow_redirects=False, guarded=True
+        )

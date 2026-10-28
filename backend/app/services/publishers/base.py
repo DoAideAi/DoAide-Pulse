@@ -37,6 +37,7 @@ outbound webhooks, for the same reason.
 """
 from __future__ import annotations
 
+import contextlib
 import email.utils
 import logging
 import random
@@ -619,6 +620,9 @@ class Adapter(ABC):
                 params=params,
                 timeout=settings.publish_timeout_seconds,
                 follow_redirects=False,
+                # The pre-flight above resolved the host; this makes the
+                # connect use an address that passes the same check.
+                guarded=True,
             )
             if not response.is_redirect:
                 return response
@@ -815,7 +819,13 @@ _DEADLINE_FACTOR = 3
 
 
 def _exchange(
-    method: str, url: str, *, timeout: float, follow_redirects: bool, **kwargs: Any
+    method: str,
+    url: str,
+    *,
+    timeout: float,
+    follow_redirects: bool,
+    guarded: bool = False,
+    **kwargs: Any,
 ) -> httpx.Response:
     """One HTTP request, its body read to at most :data:`_MAX_RESPONSE_BYTES`.
 
@@ -828,11 +838,28 @@ def _exchange(
     truncated. And under one overall deadline, because a body dripped slowly
     enough held a publish worker for hours. Past the deadline the exchange
     raises ``ReadTimeout``, which the retry policy already treats as a timeout.
+
+    *guarded* is for a host the user typed: the connection goes through
+    :func:`link_check.guarded_transport`, so the address connected to is one
+    that passed the public-address check rather than whatever a second DNS
+    lookup returned (DNS rebinding).
     """
     deadline = time.monotonic() + timeout * _DEADLINE_FACTOR
-    with httpx.stream(
-        method, url, timeout=timeout, follow_redirects=follow_redirects, **kwargs
-    ) as response:
+    with contextlib.ExitStack() as stack:
+        if guarded:
+            client = stack.enter_context(
+                httpx.Client(
+                    transport=link_check.guarded_transport(),
+                    timeout=timeout,
+                    follow_redirects=follow_redirects,
+                )
+            )
+            opened = client.stream(method, url, **kwargs)
+        else:
+            opened = httpx.stream(
+                method, url, timeout=timeout, follow_redirects=follow_redirects, **kwargs
+            )
+        response = stack.enter_context(opened)
         chunks: list[bytes] = []
         total = 0
         for chunk in response.iter_bytes():
