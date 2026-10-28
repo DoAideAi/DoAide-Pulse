@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.project import AutopilotMode, Tone
 from app.models.publication import Platform
 from app.schemas.limits import Keyword, TechStackEntry
+from app.schemas.text import visible_label
 
 
 def _publishable(platform: Platform) -> Platform:
@@ -103,7 +104,7 @@ class ProjectBase(BaseModel):
     @field_validator("name")
     @classmethod
     def _strip_name(cls, value: str) -> str:
-        name = value.strip()
+        name = visible_label(value)
         if not name:
             raise ValueError("A project needs a name.")
         return name
@@ -175,7 +176,7 @@ class ProjectUpdate(BaseModel):
     def _strip_name(cls, value: str | None) -> str | None:
         if value is None:
             return value
-        name = value.strip()
+        name = visible_label(value)
         if not name:
             raise ValueError("A project needs a name.")
         return name

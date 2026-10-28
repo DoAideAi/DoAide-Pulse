@@ -17,6 +17,7 @@ from app.models.content import (
 from app.models.project import Tone
 from app.models.publication import Platform, PublicationStatus
 from app.schemas.limits import BoundedId, Keyword, MarketingImageUrl, Tag, Timezone
+from app.schemas.text import visible_label
 from app.services import inline_edit
 from app.services.publishers.base import is_outcome_unknown
 
@@ -200,9 +201,11 @@ class ContentCreate(BaseModel):
     @field_validator("title")
     @classmethod
     def _strip_title(cls, value: str) -> str:
-        title = value.strip()
+        title = visible_label(value)
         if not title:
-            raise ValueError("A title is required — it cannot be only spaces.")
+            raise ValueError(
+                "A title is required — it cannot be only spaces or invisible characters."
+            )
         return title
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
@@ -235,9 +238,11 @@ class ContentUpdate(BaseModel):
     def _strip_title(cls, value: str | None) -> str | None:
         if value is None:
             return value
-        title = value.strip()
+        title = visible_label(value)
         if not title:
-            raise ValueError("A title is required — it cannot be only spaces.")
+            raise ValueError(
+                "A title is required — it cannot be only spaces or invisible characters."
+            )
         return title
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
@@ -634,9 +639,11 @@ class HeadlineApplyIn(BaseModel):
     @field_validator("title")
     @classmethod
     def _strip_title(cls, value: str) -> str:
-        title = value.strip()
+        title = visible_label(value)
         if not title:
-            raise ValueError("A title is required — it cannot be only spaces.")
+            raise ValueError(
+                "A title is required — it cannot be only spaces or invisible characters."
+            )
         return title
 
 

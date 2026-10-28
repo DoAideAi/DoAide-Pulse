@@ -8,6 +8,7 @@ something new has shipped.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # Imported at runtime, not under TYPE_CHECKING: SQLAlchemy 2.0 resolves the
 # `Mapped[...]` annotations at class-definition time and needs the real name.
@@ -94,8 +95,19 @@ class AutopilotMode(StrEnum):
 
 
 def slugify(value: str) -> str:
-    """URL-safe slug from a project or content title."""
-    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
+    """URL-safe slug from a project or content title.
+
+    Accented letters keep their base letter — "Ünïcödé" is ``unicode`` — by
+    decomposing them (NFKD) and dropping the combining marks. Without that step
+    every non-ASCII letter was a separator, and the same title slugged to
+    ``n-c-d``. Scripts with no Latin decomposition (日本語, العربية) still come
+    out empty and fall back to ``untitled``, which ``unique_content_slug``
+    numbers.
+    """
+    ascii_text = (
+        unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    )
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_text.strip().lower()).strip("-")
     return slug or "untitled"
 
 
