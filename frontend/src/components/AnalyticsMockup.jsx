@@ -1,10 +1,14 @@
 import { Link } from "react-router-dom";
 
+// Illustrative numbers, and only for metrics Pulse really reports — views,
+// reads, clicks and sign-ups (see pages/Analytics.jsx). This used to show an
+// open rate and a bounce rate, which Pulse never measures, under a badge that
+// said only "Preview", so the figures read as a real account's.
 const MOCK_STATS = [
-  { label: "Open Rate", value: "42.3%", trend: "+5.2%", up: true },
-  { label: "Click Rate", value: "8.7%", trend: "+1.4%", up: true },
+  { label: "Views", value: "18.4k", trend: "+2.1k", up: true },
+  { label: "Read to the end", value: "41%", trend: "+3%", up: true },
+  { label: "Click-through", value: "6.2%", trend: "+0.8%", up: true },
   { label: "Subscribers", value: "2,847", trend: "+312", up: true },
-  { label: "Bounce Rate", value: "0.8%", trend: "-0.3%", up: false },
 ];
 
 const MOCK_CHART_BARS = [
@@ -72,12 +76,12 @@ export default function AnalyticsMockup() {
         <span className="landing-section-eyebrow">Premium Analytics</span>
         <h2 className="landing-section-title">See what your audience does</h2>
         <p className="landing-section-subtitle">
-          Track opens, clicks, subscriber growth, and engagement trends. Upgrade to unlock the full analytics dashboard.
+          Track views, reads, clicks, subscriber growth, and engagement trends. Upgrade to unlock the full analytics dashboard.
         </p>
       </div>
 
       <div className="landing-analytics-dashboard">
-        <div className="landing-analytics-blur-badge">Preview</div>
+        <div className="landing-analytics-blur-badge">Sample data</div>
 
         <div className="landing-analytics-stats">
           {MOCK_STATS.map((s) => (
@@ -95,7 +99,7 @@ export default function AnalyticsMockup() {
 
         <div className="landing-analytics-charts">
           <div className="landing-analytics-chart-card">
-            <div className="landing-analytics-chart-title">Opens this week</div>
+            <div className="landing-analytics-chart-title">Views this week</div>
             <div className="landing-analytics-bars">
               {MOCK_CHART_BARS.map((bar) => (
                 <div key={bar.label} className="landing-analytics-bar-col">

@@ -11,29 +11,27 @@ const wrap = () =>
   );
 
 describe("AnalyticsMockup", () => {
-  it("renders the four stat cards", () => {
+  it("renders the four stat cards, all metrics Pulse reports", () => {
     wrap();
-    expect(screen.getByText("Open Rate")).toBeInTheDocument();
-    expect(screen.getByText("Click Rate")).toBeInTheDocument();
+    expect(screen.getByText("Views")).toBeInTheDocument();
+    expect(screen.getByText("Read to the end")).toBeInTheDocument();
+    expect(screen.getByText("Click-through")).toBeInTheDocument();
     expect(screen.getByText("Subscribers")).toBeInTheDocument();
-    expect(screen.getByText("Bounce Rate")).toBeInTheDocument();
   });
 
-  it("shows mock stat values", () => {
-    wrap();
-    expect(screen.getByText("42.3%")).toBeInTheDocument();
-    expect(screen.getByText("8.7%")).toBeInTheDocument();
-    expect(screen.getByText("2,847")).toBeInTheDocument();
+  it("never shows a metric Pulse does not measure", () => {
+    const { container } = wrap();
+    expect(container.textContent).not.toMatch(/open rate|opens|bounce/i);
   });
 
-  it("shows the preview badge", () => {
+  it("says the numbers are a sample", () => {
     wrap();
-    expect(screen.getByText("Preview")).toBeInTheDocument();
+    expect(screen.getByText("Sample data")).toBeInTheDocument();
   });
 
   it("renders chart section titles", () => {
     wrap();
-    expect(screen.getByText("Opens this week")).toBeInTheDocument();
+    expect(screen.getByText("Views this week")).toBeInTheDocument();
     expect(screen.getByText("Subscriber growth")).toBeInTheDocument();
   });
 
