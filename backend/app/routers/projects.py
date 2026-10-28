@@ -60,13 +60,25 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 _PUBLISHES_UNREVIEWED = frozenset({AutopilotMode.AUTO, AutopilotMode.FULL})
 
 
+#: How much of a project slug the name may use: the column, less ``-NNNNN``
+#: and a ``-`` plus six hex characters.
+_SLUG_ROOM = Project.__table__.c.slug.type.length - 6 - 7
+
+
 def _unique_slug(db: Session, user_id: int, name: str, *, exclude_id: int | None = None) -> str:
     """A slug unique within this user's projects.
 
     Scoped per user rather than globally: two people registering a project
     called "Pulse" should both get ``pulse``.
     """
-    base = slugify(name)
+    # Truncated, because a name's length does not bound its slug's: NFKD turns
+    # one compatibility character into several letters (``ﬃ`` is ``ffi``, ``㏒``
+    # is ``log``), so a valid 120-character name slugged to 360 characters,
+    # PostgreSQL refused the 140-character column, and creating or renaming the
+    # project was a 500. SQLite does not enforce VARCHAR lengths, which is why
+    # no test saw it. The room left covers a ``-N`` from the loop below and the
+    # ``-xxxxxx`` the create and rename retries add on a collision.
+    base = slugify(name)[:_SLUG_ROOM].strip("-") or "untitled"
     candidate = base
     suffix = 2
     while True:
