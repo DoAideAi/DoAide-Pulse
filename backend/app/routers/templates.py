@@ -29,7 +29,12 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import ListOffset, QueryRowId, RowId, get_current_user, owned_project
-from app.models.content import Content, ContentStatus, unique_content_slug
+from app.models.content import (
+    BODY_MARKDOWN_MAX_LENGTH,
+    Content,
+    ContentStatus,
+    unique_content_slug,
+)
 from app.models.project import Project
 from app.models.template import ContentTemplate, TemplateMode
 from app.models.user import User
@@ -558,6 +563,16 @@ def use_template(
         if rendered.title:
             content.title = rendered.title
             content.slug = unique_content_slug(db, project.id, rendered.title)
+        # With no model reachable the generator falls back to a stub built from
+        # the project record, which knows nothing of the template — so every
+        # value the author had just filled in was dropped, and only the title
+        # survived (C104 M2). The brief goes into the stub instead, where it is
+        # what the rewrite the stub asks for will be written from.
+        if generated.is_fallback and rendered.body.strip():
+            content.body_markdown = (
+                f"{content.body_markdown}\n\n## The brief from “{template.name}”\n\n"
+                + "\n".join(f"> {line}" if line else ">" for line in rendered.body.splitlines())
+            )[:BODY_MARKDOWN_MAX_LENGTH]
     else:
         title = rendered.title or template.name
         keywords = seo.normalize_keywords(project.keywords or [])
