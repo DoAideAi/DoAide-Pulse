@@ -393,6 +393,18 @@ def docs_enabled() -> bool:
     return (not settings.is_production) or settings.debug
 
 
+def _body_not_sent_as_json(request: Request, exc: RequestValidationError) -> bool:
+    """Whether *exc* is FastAPI failing to read a body that was not sent as JSON."""
+    media = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if media == "application/json" or media.endswith("+json"):
+        return False
+    return any(
+        tuple(err.get("loc", ())) == ("body",)
+        and err.get("type") in ("model_attributes_type", "dict_type")
+        for err in exc.errors()
+    )
+
+
 def traceback_responses_enabled() -> bool:
     """Whether Starlette may return a traceback page instead of a clean 500.
 
@@ -615,6 +627,20 @@ def create_app() -> FastAPI:
     # fix. Same list shape otherwise, so nothing reading ``detail`` changes.
     async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
         assert isinstance(exc, RequestValidationError)
+        # A JSON object sent under another content type — ``text/plain``, a
+        # form, nothing at all — arrives as a body FastAPI did not parse, and
+        # its 422 said "Input should be a valid dictionary": about the body,
+        # which was fine, and silent on the header, which was not (M7). That
+        # one case is a 415 that names the header. A JSON request whose body
+        # really is the wrong shape keeps its 422.
+        if _body_not_sent_as_json(request, exc):
+            return JSONResponse(
+                {
+                    "detail": "Send the body as JSON, with the header "
+                    "'Content-Type: application/json'."
+                },
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            )
         errors = [
             {k: v for k, v in err.items() if k not in ("input", "url")}
             for err in exc.errors()

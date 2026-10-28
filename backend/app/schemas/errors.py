@@ -70,6 +70,11 @@ _CATALOGUE: dict[int, dict[str, Any]] = {
         "The request body is over the limit. Refused by middleware before any "
         "route sees it."
     ),
+    status.HTTP_415_UNSUPPORTED_MEDIA_TYPE: _response(
+        "The body was not sent as JSON. Send it with ``Content-Type: "
+        "application/json``; a ``+json`` type such as "
+        "``application/vnd.api+json`` is accepted too."
+    ),
     status.HTTP_422_UNPROCESSABLE_CONTENT: _response(
         "The body did not validate. FastAPI's own 422 carries a list of "
         "per-field problems; the ones raised by a route carry a single string."

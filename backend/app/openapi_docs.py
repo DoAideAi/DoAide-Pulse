@@ -62,16 +62,38 @@ def describe_common_parameters(openapi: dict[str, Any]) -> dict[str, Any]:
     return openapi
 
 
+def declare_media_type_refusal(openapi: dict[str, Any]) -> dict[str, Any]:
+    """Add 415 to every operation that takes a JSON body, in place.
+
+    The refusal comes from the app-wide validation handler (``app.main``), not
+    from any one route, so it is declared here rather than at forty
+    ``responses=errors(...)`` calls that would each have to remember it.
+    """
+    from app.schemas.errors import errors
+
+    entry = errors(415)[415]
+    for operations in openapi.get("paths", {}).values():
+        for operation in operations.values():
+            if not isinstance(operation, dict):
+                continue
+            content = operation.get("requestBody", {}).get("content", {})
+            if "application/json" in content:
+                operation.setdefault("responses", {}).setdefault("415", entry)
+    return openapi
+
+
 def install(app: FastAPI) -> None:
     """Have *app* generate its schema with the shared descriptions filled in."""
     generate = app.openapi
 
     def openapi() -> dict[str, Any]:
         if app.openapi_schema is None:
-            app.openapi_schema = describe_common_parameters(generate())
+            app.openapi_schema = declare_media_type_refusal(
+                describe_common_parameters(generate())
+            )
         return app.openapi_schema
 
     app.openapi = openapi  # type: ignore[method-assign]
 
 
-__all__ = ["describe_common_parameters", "install"]
+__all__ = ["declare_media_type_refusal", "describe_common_parameters", "install"]
