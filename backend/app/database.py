@@ -278,6 +278,27 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, futu
 install_slow_query_logging(engine, settings.db_slow_query_ms)
 
 
+def release_for_slow_work(db: Session, *instances: object) -> None:
+    """End a read-only transaction before slow work, keeping *instances* usable.
+
+    A request session holds its pool connection from its first query until the
+    transaction ends, so a handler that reads a row and then makes a model or
+    HTTP call keeps a connection idle in a transaction for the whole call.
+    Committing alone would not help: ``expire_on_commit`` empties the loaded
+    attributes, and the first one read during the slow call opens a new
+    transaction and takes the connection straight back.
+
+    So the instances the slow work needs are detached first — their loaded
+    columns stay readable; a lazy relationship on them would raise rather than
+    quietly query — and then the transaction is rolled back, which is what
+    returns the connection. Only for transactions that have written nothing:
+    anything pending is discarded.
+    """
+    for instance in instances:
+        db.expunge(instance)
+    db.rollback()
+
+
 def get_db() -> Generator[Session, None, None]:
     """FastAPI dependency that yields a request-scoped DB session."""
     db = SessionLocal()

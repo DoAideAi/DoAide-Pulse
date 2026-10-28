@@ -992,3 +992,29 @@ def test_bulk_publish_succeeds_for_connected_platform(client, auth, project, db,
 
     db.refresh(content)
     assert content.status == ContentStatus.APPROVED
+
+
+def test_generation_does_not_hold_a_db_transaction_open(client, auth, project, db, monkeypatch):
+    """H084: the model call ran inside the request's read transaction, so every
+    generation in flight pinned one of the pool's connections, idle, for as long
+    as the model took. The session must be out of its transaction by then — and
+    the project still readable, which is what a bare commit would have broken."""
+    from app.services import content_generator
+
+    real = content_generator.generate
+    seen = {}
+
+    def spy(project_arg, *args, **kwargs):
+        seen["in_transaction"] = db.in_transaction()
+        seen["name"] = project_arg.name
+        return real(project_arg, *args, **kwargs)
+
+    monkeypatch.setattr(content_generator, "generate", spy)
+    resp = client.post(
+        "/api/v1/content/generate",
+        headers=auth,
+        json={"project_id": project.id, "content_type": "feature_spotlight"},
+    )
+
+    assert resp.status_code == 201, resp.text
+    assert seen == {"in_transaction": False, "name": project.name}

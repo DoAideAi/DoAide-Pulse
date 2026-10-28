@@ -22,7 +22,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, defer, joinedload, selectinload
 
 from app.config import settings
-from app.database import get_db, refresh_all
+from app.database import get_db, refresh_all, release_for_slow_work
 from app.deps import ListOffset, QueryRowId, RowId, get_current_user, owned_project
 from app.models.content import Content, ContentIdea, ContentStatus, ContentType, unique_content_slug
 from app.models.mixins import utcnow
@@ -1851,6 +1851,13 @@ def generate_content(
     by every account on the install.
     """
     project = owned_project(payload.project_id, db, user)
+    # Give the connection back before the slow part. Everything below until
+    # the write is a GitHub request and a model call — seconds, minutes under
+    # retries — and the read above left this session's connection checked out
+    # and idle in a transaction for all of it. Each request in flight held one
+    # of the pool's fifteen, so a burst of generations starved every other
+    # page of connections.
+    release_for_slow_work(db, project)
 
     activity = None
     if payload.include_repo_activity and project.repo_full_name:
