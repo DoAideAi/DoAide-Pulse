@@ -819,7 +819,7 @@ export default function ContentEditor() {
             <PreviewLinksPanel contentId={data.id} />
           </SectionBoundary>
           <SectionBoundary name="editor:publications">
-            <PublicationsPanel content={data} onChanged={reload} />
+            <PublicationsPanel content={data} platforms={platforms} onChanged={reload} />
           </SectionBoundary>
           {locked && (
             <SectionBoundary name="editor:headlines">
@@ -1600,7 +1600,15 @@ function PreviewLinksPanel({ contentId }) {
   );
 }
 
-function PublicationsPanel({ content, onChanged }) {
+function PublicationsPanel({ content, platforms, onChanged }) {
+  // A row that failed because its connection is gone or was refused will fail
+  // the same way on Retry. The fix is in Settings, and the panel is where the
+  // user is standing when they find that out.
+  const tileFor = (platform) => platforms?.find((p) => p.platform === platform);
+  const needsConnection = (platform) => {
+    const tile = tileFor(platform);
+    return Boolean(tile) && (!tile.connection || tile.connection.status !== "connected");
+  };
   const toast = useToast();
   const [cancelling, setCancelling] = useState(false);
   // Rows that will still go out by themselves. The backend has always been able
@@ -1709,6 +1717,11 @@ function PublicationsPanel({ content, onChanged }) {
               <p className="mt-1 break-words rounded bg-bad-wash px-2 py-1 font-mono text-[10px] text-bad">
                 {publication.error}
               </p>
+            )}
+            {publication.status === "failed" && needsConnection(publication.platform) && (
+              <Link to="/settings" className="mt-1 block text-[11px] text-brand-600 hover:underline">
+                Reconnect {tileFor(publication.platform).display_name} in Settings, then retry
+              </Link>
             )}
             {publication.status === "failed" && (
               <button className="btn-quiet mt-1 -ml-2.5" onClick={() => retry(publication)}>

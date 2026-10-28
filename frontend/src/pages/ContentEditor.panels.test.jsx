@@ -599,6 +599,23 @@ describe("the publications panel", () => {
     expect(toast.success).toHaveBeenCalledWith("Retrying on Medium — the result will show here");
   });
 
+  it("points a failure on a broken connection at Settings, where the fix is", async () => {
+    await open(
+      {
+        publications: [
+          publication({ id: 12, status: "failed", error: "Dev.to rejected the credentials (401)" }),
+          publication({ id: 13, platform: "medium", status: "failed", error: "500" }),
+        ],
+      },
+      [platform("devto", { status: "invalid" }), platform("medium")],
+    );
+
+    const link = screen.getByRole("link", { name: /Reconnect Dev.to in Settings/ });
+    expect(link).toHaveAttribute("href", "/settings");
+    // Medium's connection is fine: its failure is not a Settings problem.
+    expect(screen.queryByRole("link", { name: /Reconnect Medium/ })).toBeNull();
+  });
+
   it("asks before retrying a post that may already be live", async () => {
     const user = userEvent.setup();
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
