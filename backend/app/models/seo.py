@@ -83,7 +83,12 @@ class SitemapRun(Base, TimestampMixin):
     sites_submitted: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     #: Site keys whose fetch or submission failed, with the first error line.
     problems: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
-    ran_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    #: Indexed: the run log and its pruning both read newest first. The
+    #: migration that created this table built the index; the model never
+    #: declared it, so the two disagreed.
+    ran_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
 
 
 class MetaAudit(Base, TimestampMixin):

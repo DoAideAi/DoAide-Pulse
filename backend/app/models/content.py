@@ -513,7 +513,11 @@ class ContentIdea(Base, TimestampMixin):
             "content.id",
             ondelete="SET NULL",
             name="fk_content_ideas_used_content_id_content",
-        )
+        ),
+        # Indexed for the ON DELETE SET NULL above as much as for the lists:
+        # deleting a draft makes the database find the ideas pointing at it,
+        # and without an index that is a scan of every idea per deleted row.
+        index=True,
     )
     #: The day the user plans to write it, set from the content calendar.
     #: Null means the idea sits in the backlog, not on a day.
