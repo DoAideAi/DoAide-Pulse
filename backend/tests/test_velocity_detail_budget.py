@@ -235,4 +235,4 @@ def test_a_publication_that_does_not_exist_is_the_same_404(client, auth, subject
     :func:`app.deps.owned_project`."""
     missing = client.get("/api/v1/analytics/velocity/999999", headers=auth)
     assert missing.status_code == 404
-    assert missing.json()["detail"] == "Publication not found"
+    assert missing.json()["detail"] == "Publication not found."
