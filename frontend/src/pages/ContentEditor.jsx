@@ -1754,6 +1754,17 @@ function HeadlinesPanel({ content, onChanged }) {
     () => api.headlinePerformance(content.id),
     [content.id],
   );
+  // The verdict only means something once there is more than one headline to
+  // compare, so it is not asked for before that. Without it the panel listed
+  // what each headline earned and left the comparison — and the decision the
+  // backend already makes, with its evidence and margin guards — to the reader.
+  const comparing = (windows?.length ?? 0) > 1;
+  // Re-read with `windows`, so a swap from either button refreshes it too.
+  const { data: verdict } = useApi(
+    () => (comparing ? api.headlineWinner(content.id) : Promise.resolve(null)),
+    [content.id, comparing, windows],
+  );
+  const [adopting, setAdopting] = useState(false);
 
   async function suggest() {
     setSuggesting(true);
@@ -1783,6 +1794,26 @@ function HeadlinesPanel({ content, onChanged }) {
   }
 
   const history = (windows ?? []).filter((w) => !w.current || windows.length > 1);
+
+  async function adoptWinner() {
+    setAdopting(true);
+    try {
+      const result = await api.adoptHeadlineWinner(content.id);
+      if (result.applied) {
+        toast.success(`Now live: “${result.title}” — the live posts are being retitled`);
+        onChanged();
+        reloadWindows();
+      } else {
+        toast.success(result.reason);
+      }
+    } catch (err) {
+      toast.error(`Could not adopt the winner: ${err.message}`);
+    } finally {
+      setAdopting(false);
+    }
+  }
+
+  const canAdopt = verdict?.confident && verdict.title && verdict.title !== content.title;
 
   return (
     <div className="panel space-y-3 p-5">
@@ -1818,6 +1849,20 @@ function HeadlinesPanel({ content, onChanged }) {
       {history.length > 0 && (
         <div className="border-t border-line pt-3">
           <h3 className="mb-1.5 text-xs font-medium text-ink-500">What each headline earned</h3>
+          {verdict && (
+            <div className="mb-2 rounded bg-ink-50 px-2 py-1.5 text-xs">
+              <p className="text-ink-700">{verdict.reason}</p>
+              {canAdopt && (
+                <button
+                  className="btn-quiet mt-1 -ml-2.5"
+                  onClick={adoptWinner}
+                  disabled={adopting || applying !== null}
+                >
+                  {adopting ? "Swapping…" : `Adopt “${verdict.title}”`}
+                </button>
+              )}
+            </div>
+          )}
           <ul className="space-y-1.5">
             {history.map((w) => (
               <li key={`${w.title}-${w.started_at}`} className="text-xs">
@@ -1828,6 +1873,16 @@ function HeadlinesPanel({ content, onChanged }) {
                 <span className="block font-mono text-[11px] text-ink-400">
                   {w.views.toLocaleString()} views · {w.engagement.toLocaleString()} interactions
                 </span>
+                {!w.current && w.title !== content.title && (
+                  <button
+                    className="btn-quiet -ml-2.5 text-[11px]"
+                    onClick={() => use(w.title)}
+                    disabled={applying !== null || adopting}
+                    aria-label={`Go back to “${w.title}”`}
+                  >
+                    {applying === w.title ? "Swapping…" : "Use again"}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -243,6 +243,11 @@ export const api = {
   applyHeadline: (id, title) =>
     request(`/content/${id}/headlines/apply`, { method: "POST", body: { title } }),
   headlinePerformance: (id) => request(`/content/${id}/headlines/performance`),
+  // Which headline is winning, with a reason and whether the lead is worth
+  // acting on (read-only), and the swap to the winner when it is.
+  headlineWinner: (id) => request(`/content/${id}/headlines/winner`),
+  adoptHeadlineWinner: (id) =>
+    request(`/content/${id}/headlines/auto-select`, { method: "POST" }),
   // Cancels every row that would still go out on its own (scheduled or
   // pending) without publishing anything; returns the rows it cancelled.
   unscheduleContent: (id) => request(`/content/${id}/schedule`, { method: "DELETE" }),

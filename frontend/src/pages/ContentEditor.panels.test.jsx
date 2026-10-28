@@ -41,6 +41,8 @@ vi.mock("../lib/api", () => ({
     suggestHeadlines: vi.fn(),
     applyHeadline: vi.fn(),
     headlinePerformance: vi.fn(),
+    headlineWinner: vi.fn(),
+    adoptHeadlineWinner: vi.fn(),
     unscheduleContent: vi.fn(),
     publishContent: vi.fn(),
     listRevisions: vi.fn(),
@@ -1202,6 +1204,7 @@ describe("the headline panel", () => {
   });
 
   it("shows what each headline earned once there is more than one", async () => {
+    api.headlineWinner.mockResolvedValue(null);
     api.headlinePerformance.mockResolvedValue([
       { title: "First headline", started_at: "2026-08-01T00:00:00Z", current: false, views: 1200, engagement: 40 },
       { title: "Saved title", started_at: "2026-08-03T00:00:00Z", current: true, views: 300, engagement: 9 },
@@ -1210,6 +1213,74 @@ describe("the headline panel", () => {
 
     expect(await screen.findByText("What each headline earned")).toBeInTheDocument();
     expect(screen.getByText("1,200 views · 40 interactions")).toBeInTheDocument();
+  });
+
+  const twoHeadlines = [
+    { title: "First headline", started_at: "2026-08-01T00:00:00Z", current: false, views: 1200, engagement: 40 },
+    { title: "Saved title", started_at: "2026-08-03T00:00:00Z", current: true, views: 300, engagement: 9 },
+  ];
+
+  it("says which headline is winning and adopts it", async () => {
+    api.headlinePerformance.mockResolvedValue(twoHeadlines);
+    api.headlineWinner.mockResolvedValue({
+      title: "First headline",
+      confident: true,
+      reason: "“First headline” earned 3.1× the views per day of the live one.",
+      applied: false,
+      ranked: [],
+    });
+    api.adoptHeadlineWinner.mockResolvedValue({
+      title: "First headline", confident: true, reason: "Swapped.", applied: true, ranked: [],
+    });
+    const user = userEvent.setup();
+    await open({ status: "published" });
+
+    expect(await screen.findByText(/earned 3.1× the views per day/)).toBeInTheDocument();
+    api.getContent.mockClear();
+    await user.click(screen.getByRole("button", { name: "Adopt “First headline”" }));
+
+    expect(api.adoptHeadlineWinner).toHaveBeenCalledWith(3);
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "Now live: “First headline” — the live posts are being retitled",
+      ),
+    );
+    // The piece is re-read, so the editor's title is the new one.
+    await waitFor(() => expect(api.getContent).toHaveBeenCalled());
+  });
+
+  it("explains a lead too small to act on, and offers no swap", async () => {
+    api.headlinePerformance.mockResolvedValue(twoHeadlines);
+    api.headlineWinner.mockResolvedValue({
+      title: "First headline",
+      confident: false,
+      reason: "The headline live now has not had a fair run yet — give it time before judging it against the others.",
+      applied: false,
+      ranked: [],
+    });
+    await open({ status: "published" });
+
+    expect(await screen.findByText(/has not had a fair run yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Adopt/ })).not.toBeInTheDocument();
+  });
+
+  it("can go back to an earlier headline", async () => {
+    api.headlinePerformance.mockResolvedValue(twoHeadlines);
+    api.headlineWinner.mockResolvedValue(null);
+    api.applyHeadline.mockResolvedValue({ id: 3 });
+    const user = userEvent.setup();
+    await open({ status: "published" });
+
+    await user.click(await screen.findByRole("button", { name: "Go back to “First headline”" }));
+
+    expect(api.applyHeadline).toHaveBeenCalledWith(3, "First headline");
+  });
+
+  it("does not ask for a verdict with only one headline to judge", async () => {
+    await open({ status: "published" });
+    await screen.findByRole("button", { name: "Suggest alternatives" });
+
+    expect(api.headlineWinner).not.toHaveBeenCalled();
   });
 });
 
