@@ -524,7 +524,11 @@ def deliver(db: Session, delivery: WebhookDelivery) -> WebhookDelivery:
             ):
                 status_code = response.status_code
                 is_redirect = response.is_redirect
-                response_text = _read_capped(response)
+                # The status is the answer; the body is only an excerpt for the
+                # log, so it gets what is left of one timeout and no more.
+                response_text = _read_capped(
+                    response, deadline=started + settings.webhook_timeout_seconds
+                )
         except httpx.HTTPError as exc:
             _record_failure(db, delivery, friendly_network_error(exc))
             return delivery
@@ -614,13 +618,18 @@ def _serialize(delivery: WebhookDelivery) -> str:
     return json.dumps(body, separators=(",", ":"), sort_keys=True)
 
 
-def _read_capped(response: httpx.Response) -> str:
+def _read_capped(response: httpx.Response, *, deadline: float | None = None) -> str:
     """Read at most :data:`_MAX_WEBHOOK_RESPONSE_BYTES` from a streaming response.
 
     A webhook endpoint is user-supplied. Without a cap, a malicious endpoint
     could return an unbounded body and exhaust worker memory before the timeout
     fires.  Only the first few kilobytes matter — :func:`_excerpt` truncates to
     200 characters anyway.
+
+    The byte cap is not a time cap: httpx's timeout bounds each read, so an
+    endpoint dripping one byte every nine seconds kept this loop — and the
+    publish it runs inline after — going for ten hours. Past *deadline*
+    (a :func:`time.monotonic` reading) whatever arrived is what is kept.
     """
     chunks: list[bytes] = []
     total = 0
@@ -628,6 +637,8 @@ def _read_capped(response: httpx.Response) -> str:
         chunks.append(chunk)
         total += len(chunk)
         if total >= _MAX_WEBHOOK_RESPONSE_BYTES:
+            break
+        if deadline is not None and time.monotonic() > deadline:
             break
     raw = b"".join(chunks)[:_MAX_WEBHOOK_RESPONSE_BYTES]
     return raw.decode("utf-8", "replace")
