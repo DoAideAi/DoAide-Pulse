@@ -164,6 +164,7 @@ class BodySizeLimitMiddleware:
         #: perfectly ordinary size, it is the shape that is refused.
         rejection: tuple[int, str] | None = None
         depth = _JSONDepthScanner() if _is_json(scope) else None
+        form = _FormNulScanner() if _is_form(scope) else None
 
         async def _counted_receive() -> Message:
             nonlocal read, rejection
@@ -185,7 +186,9 @@ class BodySizeLimitMiddleware:
                         f"Request body nested too deeply (limit is {MAX_JSON_DEPTH} levels)",
                     )
                     return {"type": "http.disconnect"}
-                if depth is not None and depth.has_nul:
+                if form is not None:
+                    form.feed(body)
+                if (depth is not None and depth.has_nul) or (form is not None and form.has_nul):
                     rejection = (
                         400,
                         "Request body contains a NUL character (\\u0000), "
@@ -241,6 +244,36 @@ def _is_json(scope: Scope) -> bool:
     declared = Headers(scope=scope).get("content-type", "")
     mime = declared.split(";")[0].strip().lower()
     return mime == "application/json" or mime.endswith("+json")
+
+
+def _is_form(scope: Scope) -> bool:
+    """Whether this request claims to be an URL-encoded form (the login)."""
+    declared = Headers(scope=scope).get("content-type", "")
+    return declared.split(";")[0].strip().lower() == "application/x-www-form-urlencoded"
+
+
+class _FormNulScanner:
+    """Notices a NUL in an URL-encoded body, raw or as ``%00``, across chunks.
+
+    The JSON scanner's NUL check, for the one other body shape a route here
+    parses into strings: ``POST /auth/login`` is an OAuth2 password form. A
+    ``username=a%00b`` reached ``find_by_email``, PostgreSQL's driver refused
+    the parameter with ``DataError``, and an unauthenticated caller got a 500
+    and a traceback in the log for a two-byte typo. Two bytes of tail are kept
+    so an escape split across chunks is still seen.
+    """
+
+    __slots__ = ("has_nul", "tail")
+
+    def __init__(self) -> None:
+        self.has_nul = False
+        self.tail = b""
+
+    def feed(self, chunk: bytes) -> None:
+        window = self.tail + chunk
+        if b"\x00" in window or b"%00" in window:
+            self.has_nul = True
+        self.tail = window[-2:]
 
 
 class ActingUserMiddleware:
