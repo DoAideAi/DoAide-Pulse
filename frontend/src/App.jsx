@@ -32,6 +32,7 @@ const Settings = lazyPage(() => import("./pages/Settings"));
 const Templates = lazyPage(() => import("./pages/Templates"));
 const TemplatesGallery = lazyPage(() => import("./pages/TemplatesGallery"));
 const Triggers = lazyPage(() => import("./pages/Triggers"));
+const Unsubscribe = lazyPage(() => import("./pages/Unsubscribe"));
 const PublicArticle = lazyPage(() => import("./pages/PublicArticle"));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 const SubjectLineTester = lazyPage(() => import("./pages/tools/SubjectLineTester"));
@@ -154,6 +155,7 @@ export default function App() {
       <Route path="/templates" element={<Unshelled section="templates"><TemplatesGallery /></Unshelled>} />
       <Route path="/gallery" element={<Unshelled section="gallery"><NewsletterGallery /></Unshelled>} />
       <Route path="/embed" element={<Unshelled section="embed"><Embed /></Unshelled>} />
+      <Route path="/unsubscribe" element={<Unshelled section="unsubscribe"><Unsubscribe /></Unshelled>} />
 
       <Route
         path="/dashboard"

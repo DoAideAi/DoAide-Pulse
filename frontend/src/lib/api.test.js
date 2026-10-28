@@ -623,6 +623,7 @@ describe("every endpoint's path and verb", () => {
 
     ["publicArticle", ["test-slug"], "/articles/test-slug", "GET"],
     ["subscribe", ["a@b.com"], "/subscribers", "POST"],
+    ["unsubscribe", ["a@b.com"], "/subscribers/unsubscribe", "POST"],
     ["generateContentIdeas", ["AI tools"], "/tools/content-ideas", "POST"],
 
     ["webhookEvents", [], "/webhooks/events", "GET"],

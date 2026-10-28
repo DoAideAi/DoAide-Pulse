@@ -51,6 +51,7 @@ vi.mock("./pages/Projects", () => ({ default: () => <p>page: Projects</p> }));
 vi.mock("./pages/Publish", () => ({ default: () => <p>page: Publish</p> }));
 vi.mock("./pages/AdminFeedback", () => ({ default: () => <p>page: AdminFeedback</p> }));
 vi.mock("./pages/Settings", () => ({ default: () => <p>page: Settings</p> }));
+vi.mock("./pages/Unsubscribe", () => ({ default: () => <p>page: Unsubscribe</p> }));
 vi.mock("./pages/Templates", () => ({ default: () => <p>page: Templates</p> }));
 vi.mock("./pages/TemplatesGallery", () => ({ default: () => <p>page: TemplatesGallery</p> }));
 vi.mock("./pages/NewsletterGallery", () => ({ default: () => <p>page: NewsletterGallery</p> }));
@@ -108,6 +109,7 @@ const PUBLIC = [
   ["/templates", "TemplatesGallery"],
   ["/gallery", "NewsletterGallery"],
   ["/article/test-slug", "PublicArticle"],
+  ["/unsubscribe", "Unsubscribe"],
 ];
 
 beforeEach(() => {
@@ -119,7 +121,7 @@ describe("the route table", () => {
     // A guard on the guards below, which are parametrised over these lists: a
     // route added to App.jsx and not to one of them is a route nothing here
     // checks, and the file would stay green while covering less of the table.
-    expect(PROTECTED.length + PUBLIC.length).toBe(17);
+    expect(PROTECTED.length + PUBLIC.length).toBe(18);
   });
 
   it.each(PROTECTED)("renders %s as the %s page", async (path, name) => {

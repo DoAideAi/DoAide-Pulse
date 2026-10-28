@@ -93,6 +93,16 @@ export default function SubscribeForm({
       >
         {message}
       </p>
+      {state === "done" && (
+        // Leaving has to be as easy as joining. A plain link, not a router
+        // one: this form is also drawn where no router is mounted.
+        <p className="mt-1 text-xs text-ink-400">
+          Changed your mind?{" "}
+          <a href="/unsubscribe" className="text-brand-500 hover:underline">
+            Unsubscribe
+          </a>
+        </p>
+      )}
     </div>
   );
 }

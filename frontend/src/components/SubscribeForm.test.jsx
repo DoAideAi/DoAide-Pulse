@@ -26,6 +26,8 @@ describe("SubscribeForm", () => {
     await userEvent.click(screen.getByRole("button", { name: "Subscribe" }));
     expect(api.subscribe).toHaveBeenCalledWith("reader@example.com", "article", undefined);
     expect(await screen.findByRole("status")).toHaveTextContent("You're subscribed");
+    // Leaving is offered as soon as joining is done.
+    expect(screen.getByRole("link", { name: "Unsubscribe" })).toHaveAttribute("href", "/unsubscribe");
     expect(screen.queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
   });
 

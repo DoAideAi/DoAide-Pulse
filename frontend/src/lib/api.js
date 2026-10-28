@@ -477,6 +477,9 @@ export const api = {
       body: article ? { email, source, article } : { email, source },
       auth: false,
     }),
+  // Deletes the address. The same answer whether or not it was on the list.
+  unsubscribe: (email) =>
+    request("/subscribers/unsubscribe", { method: "POST", body: { email }, auth: false }),
   generateContentIdeas: (niche, count = 5) =>
     request("/tools/content-ideas", { method: "POST", body: { niche, count }, auth: false }),
 
