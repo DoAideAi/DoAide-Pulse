@@ -13,6 +13,7 @@ feature in Pulse follows too.
 """
 from __future__ import annotations
 
+import codecs
 import io
 import logging
 import re
@@ -118,7 +119,21 @@ def extract_text(filename: str, data: bytes) -> str:
 
 
 def _decode(data: bytes) -> str:
-    for encoding in ("utf-8-sig", "utf-16"):
+    """Text from bytes whose encoding nobody told us.
+
+    UTF-16 only when the file says so with a byte-order mark. It was tried on
+    anything that was not UTF-8, and almost any even-length run of bytes *is*
+    valid UTF-16 — so a Windows-1252 notes file ("Café menu — naïve résumé")
+    came back as CJK-looking noise and went to the model as the brief (C104
+    M6). Windows-1252 is what a non-UTF-8 text file from the wild usually is;
+    Latin-1 takes the five bytes it leaves undefined, and never fails.
+    """
+    if data.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+        try:
+            return data.decode("utf-16")
+        except UnicodeDecodeError:
+            pass
+    for encoding in ("utf-8-sig", "cp1252"):
         try:
             return data.decode(encoding)
         except UnicodeDecodeError:
