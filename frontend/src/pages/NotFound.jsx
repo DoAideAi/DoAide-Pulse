@@ -17,6 +17,23 @@ import { useAuth } from "../hooks/useAuth";
  * Not a server 404 — the SPA cannot set a status code — so search engines are
  * told not to index it instead.
  */
+/**
+ * The address as the visitor typed it, for display.
+ *
+ * ``pathname`` arrives percent-encoded — ``/café`` is ``/caf%C3%A9`` — which
+ * hides the typo this page quotes the address to reveal. Decoding is for the
+ * eye only (React escapes the result), and a malformed escape such as ``%E0%A4``
+ * makes ``decodeURIComponent`` throw, so those are shown as they came rather
+ * than taking the not-found page down with them.
+ */
+export function displayPath(pathname) {
+  try {
+    return decodeURIComponent(pathname);
+  } catch {
+    return pathname;
+  }
+}
+
 export default function NotFound() {
   const { pathname } = useLocation();
   const { user } = useAuth();
@@ -43,7 +60,7 @@ export default function NotFound() {
         <h1 className="page-title mb-3">We couldn&rsquo;t find that page</h1>
         <p className="mb-2 text-ink-500">
           Nothing lives at{" "}
-          <code className="break-all font-mono text-sm text-ink-700">{pathname}</code>.
+          <code className="break-all font-mono text-sm text-ink-700">{displayPath(pathname)}</code>.
         </p>
         <p className="mb-8 text-ink-500">
           The link may be old, or mistyped. Check the address, or carry on from here.
