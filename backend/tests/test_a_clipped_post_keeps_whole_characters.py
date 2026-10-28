@@ -58,6 +58,8 @@ def test_ordinary_text_is_still_cut_at_a_word():
 
 
 def test_a_bluesky_post_of_emoji_ends_on_a_whole_one():
-    post = compose_social(text="🇮🇳" * 400, url="https://example.com/p", tags=[], limit=BLUESKY_LIMIT)
+    post = compose_social(
+        text="🇮🇳" * 400, url="https://example.com/p", tags=[], limit=BLUESKY_LIMIT
+    )
     hook = post.split(" https://")[0].removesuffix("…")
     assert len(hook) % 2 == 0 and hook == "🇮🇳" * (len(hook) // 2)

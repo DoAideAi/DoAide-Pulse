@@ -384,9 +384,9 @@ def safe_cut(text: str, at: int) -> int:
     A cut by code point can land inside one: half a flag (🇮🇳 is two code
     points, and 🇮 alone renders as a boxed letter), a decomposed accent left
     off its letter, a skin tone or emoji presentation dropped, a ZWJ family cut
-    down to some of its members, a conjunct left ending on its virama (C104 M2). Not the full grapheme algorithm,
-    which needs data Pulse does not ship — the clusters that occur in text
-    people write.
+    down to some of its members, a conjunct left ending on its virama (C104
+    M2). Not the full grapheme algorithm, which needs data Pulse does not ship
+    — the clusters that occur in text people write.
     """
     cut = max(0, min(at, len(text)))
     while 0 < cut < len(text):
