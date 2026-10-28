@@ -176,6 +176,32 @@ describe("a project card", () => {
   });
 });
 
+describe("a project's ideas", () => {
+  it("says the ideas could not load, not 'No ideas yet', and retries", async () => {
+    api.listProjects.mockResolvedValue([project()]);
+    api.listIdeas.mockRejectedValueOnce(new Error("offline"));
+    api.listIdeas.mockResolvedValueOnce([{ id: 7, headline: "Why retries need budgets" }]);
+    const user = userEvent.setup();
+    draw();
+
+    expect(await screen.findByText("Could not load ideas.")).toBeInTheDocument();
+    expect(screen.queryByText("No ideas yet")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("Why retries need budgets")).toBeInTheDocument();
+  });
+
+  it("does not claim there are none while the list is still loading", async () => {
+    api.listProjects.mockResolvedValue([project()]);
+    api.listIdeas.mockReturnValue(new Promise(() => {}));
+    draw();
+
+    expect(await screen.findByText("Loading ideas…")).toBeInTheDocument();
+    expect(screen.queryByText("No ideas yet")).not.toBeInTheDocument();
+  });
+});
+
 describe("scanning a repo", () => {
   it("reports what the scan found and reloads", async () => {
     api.listProjects.mockResolvedValue([project()]);

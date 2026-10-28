@@ -636,7 +636,10 @@ function QuickProjectDialog({ onClose, onSaved, onAdvanced, onError }) {
 function IdeasPanel({ projectId }) {
   const toast = useToast();
   const navigate = useNavigate();
-  const { data: ideas, reload } = useApi(() => api.listIdeas(projectId), [projectId]);
+  const { data: ideas, error, loading, reload } = useApi(
+    () => api.listIdeas(projectId),
+    [projectId],
+  );
   const [refreshing, setRefreshing] = useState(false);
   const [writing, setWriting] = useState(null);
 
@@ -663,6 +666,23 @@ function IdeasPanel({ projectId }) {
     } finally {
       setWriting(null);
     }
+  }
+
+  // Neither of these is "No ideas yet": that line sits next to a button that
+  // spends a model call, and it used to show while the list was still on its
+  // way and again when it had failed to arrive.
+  if (!ideas && loading) {
+    return <p className="text-xs text-ink-400">Loading ideas…</p>;
+  }
+  if (!ideas && error) {
+    return (
+      <div role="alert" className="flex items-center gap-2 text-xs text-bad">
+        <span>Could not load ideas.</span>
+        <button className="btn-quiet text-xs" onClick={reload}>
+          Retry
+        </button>
+      </div>
+    );
   }
 
   if (!ideas || ideas.length === 0) {
