@@ -203,3 +203,21 @@ class LLMKeyIn(BaseModel):
     @classmethod
     def _strip(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("api_key")
+    @classmethod
+    def _sendable(cls, value: str) -> str:
+        """An LLM key is an ASCII token, and it travels as a header value.
+
+        One carrying a typographic quote or a lookalike letter — what a
+        password manager or a chat paste leaves behind — made httpx raise
+        ``UnicodeEncodeError`` while verifying it, which nothing caught: a 500.
+        A line break inside one failed as a network error. Refused here, with
+        the reason, and without quoting the key back.
+        """
+        if not all(33 <= ord(ch) <= 126 for ch in value):
+            raise ValueError(
+                "The key contains a space, a line break or a character that is "
+                "not plain ASCII. Copy it again from the provider's dashboard."
+            )
+        return value
