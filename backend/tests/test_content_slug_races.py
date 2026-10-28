@@ -198,3 +198,98 @@ def test_commit_new_retries_once_with_a_suffixed_slug(db, project, collide_once)
     assert piece.id is not None
     assert piece.slug.startswith("direct-")
     assert piece.slug != "direct"
+
+
+@pytest.fixture
+def fail_commits(db, monkeypatch):
+    """Make the next *times* commits raise IntegrityError with *message*."""
+
+    def _install(times: int, message: str = "uq_content_project_slug"):
+        real = db.commit
+        calls = {"n": 0}
+
+        def flaky(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] <= times:
+                db.rollback()
+                raise IntegrityError("INSERT INTO content", {}, Exception(message))
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(db, "commit", flaky)
+        return calls
+
+    return _install
+
+
+def _piece(project, slug="direct"):
+    return Content(
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        status=ContentStatus.DRAFT,
+        title="Direct",
+        slug=slug,
+        body_markdown="Body.",
+    )
+
+
+def test_two_collisions_in_a_row_still_land_the_piece(db, project, fail_commits):
+    from app.services import content_store
+
+    calls = fail_commits(content_store.MAX_ATTEMPTS - 1)
+    piece = _piece(project)
+    content_store.commit_new(db, piece)
+
+    assert calls["n"] == content_store.MAX_ATTEMPTS
+    # Suffixed once, from the stem — not "direct-abc123-def456".
+    stem, _, suffix = piece.slug.rpartition("-")
+    assert stem == "direct" and len(suffix) == 6
+
+
+def test_the_retry_budget_runs_out_rather_than_looping(db, project, fail_commits):
+    from app.services import content_store
+
+    calls = fail_commits(content_store.MAX_ATTEMPTS + 5)
+    with pytest.raises(IntegrityError):
+        content_store.commit_new(db, _piece(project))
+    assert calls["n"] == content_store.MAX_ATTEMPTS
+
+
+def test_an_error_that_is_not_a_slug_collision_is_not_retried(db, project, fail_commits):
+    """A new slug cannot fix a foreign key to a project deleted mid-request."""
+    from app.services import content_store
+
+    calls = fail_commits(5, message="FOREIGN KEY constraint failed")
+    piece = _piece(project)
+    with pytest.raises(IntegrityError):
+        content_store.commit_new(db, piece)
+    assert calls["n"] == 1
+    assert piece.slug == "direct"
+
+
+@pytest.mark.parametrize(
+    ("message", "collision"),
+    [
+        ('duplicate key value violates unique constraint "uq_content_project_slug"', True),
+        ("UNIQUE constraint failed: content.project_id, content.slug", True),
+        ("FOREIGN KEY constraint failed", False),
+        ('new row violates check constraint "ck_content_word_count_nonneg"', False),
+    ],
+)
+def test_only_the_slug_constraint_counts_as_a_collision(message, collision):
+    from app.services import content_store
+
+    exc = IntegrityError("INSERT", {}, Exception(message))
+    assert content_store.is_slug_collision(exc) is collision
+
+
+def test_postgres_names_the_constraint_on_diag():
+    from types import SimpleNamespace
+
+    from app.services import content_store
+
+    orig = Exception("whatever the message says")
+    orig.diag = SimpleNamespace(constraint_name="uq_content_project_slug")
+    assert content_store.is_slug_collision(IntegrityError("INSERT", {}, orig))
+    orig.diag = SimpleNamespace(constraint_name="content_project_id_fkey")
+    assert not content_store.is_slug_collision(IntegrityError("INSERT", {}, orig))
+
