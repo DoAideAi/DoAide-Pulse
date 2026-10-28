@@ -794,14 +794,38 @@ def requeue(db: Session, delivery: WebhookDelivery) -> WebhookDelivery:
         raise RequeueError(
             "The endpoint is switched off. Re-enable it before redelivering."
         )
-    delivery.status = DeliveryStatus.PENDING
-    delivery.attempts = 0
-    delivery.error = None
-    delivery.response_status = None
-    delivery.delivered_at = None
-    delivery.next_attempt_at = utcnow()
+    # The check above read the row as this request loaded it. Two clicks on
+    # "Redeliver" both load it FAILED; the first re-arms it and its inline
+    # ``deliver`` claims it and starts the POST, and the second — still holding
+    # the FAILED it read — used to write PENDING, ``attempts=0`` and a due
+    # ``next_attempt_at`` over that live claim, so its own ``deliver`` claimed
+    # the row again and the receiver got the event twice. The re-arm is a
+    # conditional UPDATE on the state the check approved, so only one of them
+    # can move a settled row back to pending.
+    db.flush()
+    result = db.execute(
+        update(WebhookDelivery)
+        .where(
+            WebhookDelivery.id == delivery.id,
+            WebhookDelivery.status != DeliveryStatus.PENDING,
+        )
+        .values(
+            status=DeliveryStatus.PENDING,
+            attempts=0,
+            error=None,
+            response_status=None,
+            delivered_at=None,
+            next_attempt_at=utcnow(),
+        )
+        .execution_options(synchronize_session=False)
+    )
     db.commit()
     db.refresh(delivery)
+    if result.rowcount != 1:
+        raise RequeueError(
+            "This delivery is still being attempted. "
+            "Wait for it to finish before redelivering."
+        )
     return delivery
 
 

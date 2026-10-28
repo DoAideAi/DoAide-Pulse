@@ -25,6 +25,7 @@ from app.models.webhook import (
     WebhookEvent,
 )
 from app.services import link_check, webhooks
+from tests.conftest import TestSession
 
 _URL = "https://hooks.example.test/pulse"
 
@@ -1074,3 +1075,42 @@ def test_the_count_is_this_account_s_alone(client, auth, db, user):
 def test_a_limit_outside_the_range_is_refused(client, auth, limit):
     resp = client.get(f"/api/v1/webhooks?limit={limit}", headers=auth)
     assert resp.status_code == 422, resp.text
+
+
+def test_a_second_redeliver_does_not_rearm_a_delivery_already_in_flight(
+    db, webhook, endpoint
+):
+    """M3: a double-clicked "Redeliver" sends the event once.
+
+    Both requests load the row FAILED. The first re-arms and claims it; the
+    second still holds the FAILED it read, and must not write PENDING and a
+    fresh budget over the live claim — that made the row due again and its
+    own ``deliver`` POSTed a second copy.
+    """
+    endpoint.status = 400
+    delivery = _delivery(db, webhook)
+    webhooks.deliver(db, delivery)
+    assert delivery.status == DeliveryStatus.FAILED
+
+    # The second request has loaded the row, and holds it as FAILED.
+    stale = db.get(WebhookDelivery, delivery.id)
+    assert stale.status == DeliveryStatus.FAILED
+
+    # The first click, committed by another request: re-armed and claimed.
+    other = TestSession()
+    try:
+        first = other.get(WebhookDelivery, delivery.id)
+        webhooks.requeue(other, first)
+        assert webhooks.claim(other, first) is True
+    finally:
+        other.close()
+    assert stale.status == DeliveryStatus.FAILED  # still the stale read
+
+    with pytest.raises(webhooks.RequeueError):
+        webhooks.requeue(db, stale)
+
+    db.refresh(stale)
+    assert stale.status == DeliveryStatus.PENDING
+    assert stale.attempts == 1
+    assert as_aware(stale.next_attempt_at) > utcnow()
+    assert webhooks.due_deliveries(db) == []
