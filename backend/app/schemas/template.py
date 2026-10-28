@@ -17,9 +17,18 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    AllowInfNan,
+    Strict,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from app.models.content import ContentType
 from app.models.template import TemplateMode
@@ -191,10 +200,17 @@ class BuiltinOut(BaseModel):
     description: str
 
 
+#: What one variable may be filled with. A value is text in a post, so it is
+#: text or a number. A nested object, a list or a boolean would render as
+#: Python's repr of it (``{'a': 1}``, ``True``) — nothing an author meant to
+#: publish. Strict, so ``true`` is not quietly read as ``1.0`` either.
+TemplateValue = str | StrictInt | Annotated[float, Strict(), AllowInfNan(False)] | None
+
+
 class RenderRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    values: dict[str, Any] = Field(default_factory=dict, max_length=MAX_VARIABLES)
+    values: dict[str, TemplateValue] = Field(default_factory=dict, max_length=MAX_VARIABLES)
     #: Which project's facts fill ``{{project.*}}``. Falls back to the
     #: template's default project, then to blanks.
     project_id: BoundedId | None = None
