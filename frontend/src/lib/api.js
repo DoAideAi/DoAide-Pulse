@@ -253,6 +253,13 @@ export const api = {
   unscheduleContent: (id) => request(`/content/${id}/schedule`, { method: "DELETE" }),
   // When Pulse would publish this on each of `platforms`, and why — the
   // learned cadence, or the platform's published guidance. Changes nothing.
+  // What each platform will refuse or quietly change about this piece — a
+  // title over Dev.to's limit, a post Bluesky will shorten, tags dropped —
+  // before anything is sent. Changes nothing.
+  platformCheck: (id, platforms, asDraft = false) =>
+    request(
+      `/content/${id}/platform-check${qs({ platforms: platforms.join(","), as_draft: asDraft ? "true" : null })}`,
+    ),
   scheduleSuggestions: (id, platforms) =>
     request(
       `/content/${id}/schedule/suggestions?${new URLSearchParams(platforms.map((p) => ["platforms", p]))}`,

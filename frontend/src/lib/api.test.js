@@ -606,6 +606,12 @@ describe("every endpoint's path and verb", () => {
     ["headlineWinner", [3], "/content/3/headlines/winner", "GET"],
     ["adoptHeadlineWinner", [3], "/content/3/headlines/auto-select", "POST"],
     [
+      "platformCheck",
+      [3, ["devto", "bluesky"], true],
+      "/content/3/platform-check?platforms=devto%2Cbluesky&as_draft=true",
+      "GET",
+    ],
+    [
       "scheduleSuggestions",
       [3, ["devto", "mastodon"]],
       "/content/3/schedule/suggestions?platforms=devto&platforms=mastodon",

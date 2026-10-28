@@ -2184,6 +2184,21 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
   // date field, while the calendar and the SEO page offered the times the
   // account's own results (or the platform's guidance) point to — so the one
   // place most pieces are scheduled from was the one place without the answer.
+  // What each ticked platform will refuse or change, asked before sending.
+  // The checks (Dev.to's title limit, Bluesky's 300 graphemes, tags a
+  // platform drops) existed server-side and nothing showed them, so the first
+  // anyone heard was a failed row or a post that went out shortened.
+  const { data: checks } = useApi(
+    () =>
+      selected.length
+        ? api.platformCheck(content.id, selected, asDraft).catch(() => null)
+        : Promise.resolve(null),
+    [content.id, selected.join(","), asDraft],
+  );
+  const findings = (checks?.platforms ?? []).flatMap((check) =>
+    check.findings.map((finding) => ({ ...finding, platform: check.platform })),
+  );
+
   const { data: slots } = useApi(
     () =>
       selected.length
@@ -2284,6 +2299,26 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
           );
         })}
       </div>
+
+      {findings.length > 0 && (
+        <ul className="space-y-1.5" aria-label="Before you publish">
+          {findings.map((finding, i) => (
+            <li
+              key={`${finding.platform}-${i}`}
+              className={`rounded px-2.5 py-1.5 text-xs ${
+                finding.level === "error" ? "bg-bad-wash text-bad" : "bg-warn-wash text-warn"
+              }`}
+            >
+              <span className="font-medium">
+                {platforms.find((p) => p.platform === finding.platform)?.display_name ??
+                  finding.platform}
+                :
+              </span>{" "}
+              {finding.message}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div>
         <label className="label" htmlFor="pub-when">

@@ -45,6 +45,7 @@ vi.mock("../lib/api", () => ({
     adoptHeadlineWinner: vi.fn(),
     unscheduleContent: vi.fn(),
     scheduleSuggestions: vi.fn(),
+    platformCheck: vi.fn(),
     publishContent: vi.fn(),
     listRevisions: vi.fn(),
     restoreRevision: vi.fn(),
@@ -137,6 +138,7 @@ beforeEach(() => {
   api.listRevisions.mockResolvedValue({ items: [], total: 0, retained: 50 });
   api.headlinePerformance.mockResolvedValue([]);
   api.scheduleSuggestions.mockResolvedValue([]);
+  api.platformCheck.mockResolvedValue(null);
   api.listLanguages.mockResolvedValue([]);
   api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
   // The auto-save is on a real 2-second timer in this file, and several tests
@@ -737,6 +739,37 @@ describe("the publish dialog", () => {
 
     expect(screen.getByRole("button", { name: "Publish now" })).toBeEnabled();
     expect(screen.queryByText("Suggested")).not.toBeInTheDocument();
+  });
+
+  it("says what each ticked platform will refuse or change, before anything is sent", async () => {
+    api.platformCheck.mockResolvedValue({
+      content_id: 3,
+      publishable: false,
+      platforms: [
+        {
+          platform: "devto",
+          publishable: false,
+          findings: [
+            { level: "error", message: "Dev.to takes titles up to 128 characters and this one is 140.", limit: 128, actual: 140 },
+          ],
+        },
+        {
+          platform: "bluesky",
+          publishable: true,
+          findings: [{ level: "warning", message: "42 characters over Bluesky's 300, so the post will be shortened." }],
+        },
+      ],
+    });
+    const user = await openDialog({}, [platform("devto"), platform("bluesky")]);
+    expect(api.platformCheck).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("checkbox", { name: /Dev\.to/ }));
+    await user.click(screen.getByRole("checkbox", { name: /bluesky/ }));
+
+    const list = await screen.findByRole("list", { name: "Before you publish" });
+    expect(within(list).getByText(/titles up to 128 characters/)).toBeInTheDocument();
+    expect(within(list).getByText(/will be shortened/)).toBeInTheDocument();
+    expect(api.platformCheck).toHaveBeenLastCalledWith(3, ["devto", "bluesky"], false);
   });
 
   it("will not publish with nothing selected", async () => {
