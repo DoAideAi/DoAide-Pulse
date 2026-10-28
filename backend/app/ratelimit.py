@@ -58,6 +58,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
+import time
 
 from limits import parse_many
 from slowapi import Limiter
@@ -245,6 +247,28 @@ def login_locked(email: str) -> bool:
         return False
 
 
+def login_lock_detail(email: str) -> str:
+    """What a locked address is told: the lock, and how long it lasts.
+
+    It used to add "or reset your password", and there is no page to do that
+    from — the one way out it offered was not one. The wait is read from the
+    same counter the lock is, rounded up as every other 429 here is.
+    """
+    base = "Too many failed sign-ins for this account."
+    key = _account_bucket(email)
+    waits = []
+    try:
+        for item in _LOGIN_FAILURES:
+            if not limiter._limiter.test(item, "login-failures", key):
+                reset_at, _ = limiter._limiter.get_window_stats(item, "login-failures", key)
+                waits.append(reset_at - time.time())
+    except Exception:  # noqa: BLE001 - the wording is best effort
+        waits = []
+    if not waits:
+        return f"{base} Wait a while and try again."
+    return f"{base} Try again in {_describe_wait(max(waits))}."
+
+
 def record_login_failure(email: str) -> None:
     """Count one failed sign-in against *email*'s budget."""
     if not limiter.enabled:
@@ -277,6 +301,48 @@ def clear_login_failures(email: str) -> None:
         logger.warning("login failure counter unavailable; not cleared", exc_info=True)
 
 
+def _describe_limit(item) -> str:
+    """``10 per minute``, ``100 per 3 hours`` — the limit as a sentence."""
+    unit = item.GRANULARITY.name
+    if item.multiples == 1:
+        return f"{item.amount} per {unit}"
+    return f"{item.amount} per {item.multiples} {unit}s"
+
+
+def _describe_wait(seconds: float) -> str:
+    """Seconds until the window resets, rounded up to a unit a person reads."""
+    seconds = max(1, math.ceil(seconds))
+    if seconds < 60:
+        return f"{seconds} second{'s' if seconds != 1 else ''}"
+    minutes = math.ceil(seconds / 60)
+    if minutes < 60:
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+    hours = math.ceil(minutes / 60)
+    return f"{hours} hour{'s' if hours != 1 else ''}"
+
+
+def too_many_requests_detail(current_limit) -> str:
+    """What a 429 says: which limit, and how long until it lifts.
+
+    "Slow down and try again shortly" was all it said, while the response's
+    own ``Retry-After`` knew exactly how long — so the person reading the toast
+    was the one party not told. Falls back to that sentence when the limiter
+    cannot say (no limit on the request, or a storage error).
+    """
+    fallback = "Too many requests — slow down and try again shortly."
+    if not current_limit:
+        return fallback
+    item, args = current_limit
+    try:
+        reset_at, _remaining = limiter.limiter.get_window_stats(item, *args)
+    except Exception:  # noqa: BLE001 - the wording is best effort
+        return fallback
+    return (
+        f"Too many requests — this is limited to {_describe_limit(item)}. "
+        f"Try again in {_describe_wait(reset_at - time.time())}."
+    )
+
+
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """429 in FastAPI's shape.
 
@@ -284,14 +350,13 @@ def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Res
     API is ``{"detail": ...}`` and that is what the frontend reads, so a
     rate-limited login would otherwise surface as a blank toast.
     """
+    current = getattr(request.state, "view_rate_limit", None)
     response = JSONResponse(
-        {"detail": "Too many requests — slow down and try again shortly."},
+        {"detail": too_many_requests_detail(current)},
         status_code=429,
     )
     # Adds Retry-After / X-RateLimit-* so a client can back off sensibly.
-    return request.app.state.limiter._inject_headers(
-        response, getattr(request.state, "view_rate_limit", None)
-    )
+    return request.app.state.limiter._inject_headers(response, current)
 
 
 def reset() -> None:
@@ -306,6 +371,7 @@ __all__ = [
     "client_key",
     "PulseLimiter",
     "limiter",
+    "login_lock_detail",
     "login_locked",
     "rate_limit_exceeded_handler",
     "record_login_failure",

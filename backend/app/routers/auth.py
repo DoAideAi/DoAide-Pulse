@@ -39,6 +39,7 @@ from app.ratelimit import (
     clear_login_failures,
     client_key,
     limiter,
+    login_lock_detail,
     login_locked,
     record_login_failure,
 )
@@ -224,8 +225,7 @@ def login(
         _refused(request, "too many failed sign-ins for this address")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many failed sign-ins for this account. Wait a while and "
-            "try again, or reset your password.",
+            detail=login_lock_detail(form.username),
         )
     user = accounts.find_by_email(db, form.username)
 

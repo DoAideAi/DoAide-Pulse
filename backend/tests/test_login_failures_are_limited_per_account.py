@@ -151,7 +151,11 @@ def _trust_forwarded_for(monkeypatch):
 
 
 def test_a_completed_password_reset_lifts_the_lock(client, user, db):
-    """The 429 says "reset your password"; after a reset, signing in works."""
+    """A completed reset lifts the lock; signing in with the new password works.
+
+    The 429 no longer suggests a reset — there is no page to start one from
+    yet — but a reset done through the API still ends the lockout.
+    """
     from app.services import password_reset
 
     for n in range(BUDGET):
@@ -180,3 +184,17 @@ def test_a_failed_reset_does_not_lift_the_lock(client, user):
     assert resp.status_code == 400
 
     assert login_locked(user.email)
+
+
+def test_the_lockout_says_how_long_it_lasts_and_offers_no_dead_end(client, user):
+    for n in range(BUDGET):
+        _login(client, user.email, "wrong-password", f"203.0.113.{n}")
+
+    detail = _login(client, user.email, "hunter2hunter2", "198.51.100.9").json()["detail"]
+    assert detail.startswith("Too many failed sign-ins for this account.")
+    assert "Try again in" in detail
+    assert "minute" in detail or "hour" in detail
+    # No page exists to reset a password from; the message must not send people
+    # looking for one.
+    assert "reset" not in detail.lower()
+
