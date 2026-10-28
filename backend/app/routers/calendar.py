@@ -1,7 +1,7 @@
 """Content calendar: what is going out, when, and where there is room for more."""
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import or_, select
@@ -40,6 +40,26 @@ WINDOW_INVERTED = (
     "end is before start. Swap them, or give an end on or after the start."
 )
 
+#: The ends of the range a ``datetime`` can hold, as UTC instants.
+_EARLIEST = datetime.min.replace(tzinfo=UTC)
+_LATEST = datetime.max.replace(tzinfo=UTC)
+
+
+def _shifted(moment: datetime, span: timedelta) -> datetime:
+    """*moment* moved by *span*, stopping at the edge of the representable range.
+
+    A one-sided window is measured from the bound that was given, and a bound
+    near either end of the calendar — ``start=9999-12-31``, ``end=0001-01-01``
+    — put the other one past what ``datetime`` holds: the arithmetic raised
+    ``OverflowError`` and the request was a 500. Nothing can be scheduled out
+    there either way, so the window simply stops at the edge.
+    """
+    try:
+        return moment + span
+    except OverflowError:
+        return _LATEST if span > timedelta(0) else _EARLIEST
+
+
 @router.get(
     "",
     response_model=CalendarOut,
@@ -73,10 +93,10 @@ def get_calendar(
     default_span = timedelta(days=60)
     if start and not end:
         window_start = as_aware(start)
-        window_end = window_start + default_span
+        window_end = _shifted(window_start, default_span)
     elif end and not start:
         window_end = as_aware(end)
-        window_start = window_end - default_span
+        window_start = _shifted(window_end, -default_span)
     else:
         window_start = as_aware(start) if start else (utcnow() - timedelta(days=30))
         window_end = as_aware(end) if end else (utcnow() + timedelta(days=30))

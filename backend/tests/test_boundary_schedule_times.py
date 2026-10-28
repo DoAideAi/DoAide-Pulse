@@ -135,3 +135,43 @@ def test_schedule_asks_for_a_time_or_optimize_and_not_both(client, auth, piece):
     both = _send(client, auth, piece, "schedule", scheduled_for=_soon_naive("07-01") + "Z", optimize=True)
     assert both.status_code == 400 and "not both" in both.text
 
+
+
+#: Instants at the edge of the calendar that their offset carries off it: the
+#: first is before year 1 in UTC, the second after year 9999. Converting them
+#: raised ``OverflowError`` and every scheduling route answered 500.
+OFF_THE_CALENDAR = ["0001-01-01T00:00:00+14:00", "9999-12-31T23:59:59-12:00"]
+
+
+@pytest.mark.parametrize("endpoint", ENDPOINTS)
+@pytest.mark.parametrize("when", OFF_THE_CALENDAR, ids=["before-year-1", "after-year-9999"])
+def test_a_time_off_the_calendar_is_refused(client, auth, piece, endpoint, when):
+    resp = _send(client, auth, piece, endpoint, scheduled_for=when)
+    assert resp.status_code == 422, resp.text
+    assert "check the year" in resp.text
+
+
+@pytest.mark.parametrize("when", OFF_THE_CALENDAR, ids=["before-year-1", "after-year-9999"])
+def test_a_batch_scheduled_off_the_calendar_fails_each_piece(client, auth, piece, when):
+    resp = client.post(
+        "/api/v1/content/bulk/publish",
+        headers=auth,
+        json={"content_ids": [piece], "platforms": ["devto"], "scheduled_for": when},
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["succeeded"] == []
+    assert "check the year" in body["failed"][0]["reason"]
+
+
+@pytest.mark.parametrize(
+    "params",
+    [{"start": "9999-12-31T00:00:00Z"}, {"end": "0001-01-01T00:00:00Z"}],
+    ids=["start-at-the-last-day", "end-at-the-first-day"],
+)
+def test_a_calendar_window_at_the_edge_stops_there(client, auth, params):
+    # A one-sided window runs 60 days from the bound given, which past either
+    # end of the calendar used to raise ``OverflowError`` as a 500.
+    resp = client.get("/api/v1/calendar", headers=auth, params=params)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["entries"] == []

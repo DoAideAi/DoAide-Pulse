@@ -212,10 +212,21 @@ def normalize(
 
     moment = now or utcnow()
     zone = resolve_zone(tz)
-    if zone is not None and when.tzinfo is None:
-        aware = in_zone(when, zone)
-    else:
-        aware = as_aware(when).astimezone(UTC)
+    try:
+        if zone is not None and when.tzinfo is None:
+            aware = in_zone(when, zone)
+        else:
+            aware = as_aware(when).astimezone(UTC)
+    except OverflowError:
+        # An instant at the edge of the calendar that its offset carries off
+        # it: ``0001-01-01T00:00+14:00`` is before year 1 in UTC and
+        # ``9999-12-31T23:59-12:00`` after year 9999, and the conversion raised
+        # out of here as a 500. Either is a mistyped year, so it is answered
+        # the way the past and the horizon below are.
+        raise ScheduleError(
+            f"{when.isoformat()} is outside the dates that can be scheduled — "
+            "check the year."
+        ) from None
 
     grace = timedelta(seconds=settings.schedule_past_grace_seconds)
     if aware < moment - grace:
