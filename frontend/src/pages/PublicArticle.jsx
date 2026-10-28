@@ -130,6 +130,7 @@ export default function PublicArticle() {
             <div className="mt-8">
               <SubscribeForm
                 source="article"
+                article={data.slug}
                 heading={
                   data.project_name
                     ? `Get the next ${data.project_name} update by email`

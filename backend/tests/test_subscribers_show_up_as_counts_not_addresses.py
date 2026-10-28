@@ -11,8 +11,20 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
+
+from app.config import settings
 from app.models.mixins import utcnow
 from app.models.subscriber import Subscriber
+
+
+@pytest.fixture(autouse=True)
+def _single_user_install(monkeypatch):
+    """The install as shipped: registration closed, so the one account runs it
+    and sees the unattributed widget sign-ups too. The multi-account rule is
+    pinned in test_subscriber_counts_stay_with_their_account.py."""
+    monkeypatch.setattr(settings, "registration_enabled", False)
+    monkeypatch.setattr(settings, "product_activity_admin_emails", "")
 
 
 def _seed(db, project, *, days_ago_counts: dict[int, int]) -> int:
@@ -69,7 +81,8 @@ def test_no_address_leaves_the_table(client, auth, db, project):
 
 
 def test_another_users_project_subscribers_stay_theirs(client, auth, db, project):
-    """Unattributed sign-ups are shared; project-attributed ones are scoped."""
+    """Project-attributed sign-ups are scoped. Unattributed ones go to the
+    install's operator, which on a single-user install is this account."""
     from app.models.project import Project
     from app.models.user import User
     from app.security import hash_password

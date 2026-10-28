@@ -11,12 +11,20 @@ import { api } from "../lib/api";
 describe("SubscribeForm", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  it("passes the article it sits on, so the sign-up is attributed to its project", async () => {
+    api.subscribe.mockResolvedValue({ ok: true });
+    render(<SubscribeForm source="article" article="pulse-2-0" />);
+    await userEvent.type(screen.getByLabelText("Email address"), "reader@example.com");
+    await userEvent.click(screen.getByRole("button", { name: "Subscribe" }));
+    expect(api.subscribe).toHaveBeenCalledWith("reader@example.com", "article", "pulse-2-0");
+  });
+
   it("subscribes with the page's source tag and confirms", async () => {
     api.subscribe.mockResolvedValue({ ok: true });
     render(<SubscribeForm source="article" />);
     await userEvent.type(screen.getByLabelText("Email address"), " reader@example.com ");
     await userEvent.click(screen.getByRole("button", { name: "Subscribe" }));
-    expect(api.subscribe).toHaveBeenCalledWith("reader@example.com", "article");
+    expect(api.subscribe).toHaveBeenCalledWith("reader@example.com", "article", undefined);
     expect(await screen.findByRole("status")).toHaveTextContent("You're subscribed");
     expect(screen.queryByRole("button", { name: "Subscribe" })).not.toBeInTheDocument();
   });

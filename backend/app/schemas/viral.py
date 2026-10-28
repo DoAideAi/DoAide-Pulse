@@ -31,6 +31,10 @@ class SubscribeIn(BaseModel):
 
     email: EmailStr
     source: str = Field(default="embed", max_length=SOURCE_MAX_LENGTH)
+    #: The slug of the public article the form sits on, when it sits on one.
+    #: Attributes the sign-up to that article's project, so it is counted for
+    #: the account that owns it rather than pooled for the install.
+    article: str | None = Field(default=None, max_length=320)
 
     @field_validator("source", mode="before")
     @classmethod

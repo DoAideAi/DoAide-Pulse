@@ -7,7 +7,11 @@ import trackEvent from "../lib/trackEvent";
  * embed widget. `source` is recorded with the subscriber, so the analytics
  * panel can tell an article sign-up from a widget one.
  */
-export default function SubscribeForm({ source = "article", heading = "Get the next one by email" }) {
+export default function SubscribeForm({
+  source = "article",
+  heading = "Get the next one by email",
+  article = undefined,
+}) {
   const [email, setEmail] = useState("");
   // idle | busy | done | error
   const [state, setState] = useState("idle");
@@ -26,7 +30,7 @@ export default function SubscribeForm({ source = "article", heading = "Get the n
     setState("busy");
     setMessage("");
     try {
-      await api.subscribe(value, source);
+      await api.subscribe(value, source, article);
       setState("done");
       setMessage("You're subscribed. Thanks for reading!");
       setEmail("");

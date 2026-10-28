@@ -43,6 +43,7 @@ import logging
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -127,3 +128,23 @@ def email_taken(db: Session, email: str) -> bool:
 
 
 __all__ = ["email_taken", "find_by_email", "normalize_email"]
+
+
+def is_operator(user: User) -> bool:
+    """Whether *user* runs this install, as opposed to merely having an account on it.
+
+    The listed ``PRODUCT_ACTIVITY_ADMIN_EMAILS`` when there are any. With none
+    listed, every account counts — Pulse is single-user by default — unless
+    registration is open, because then "every account" is whoever signed up.
+    For the few things that belong to the install rather than to an account:
+    the cross-product dashboards, and newsletter sign-ups nobody attributed to
+    a project.
+    """
+    admins = {
+        e.strip().lower()
+        for e in settings.product_activity_admin_emails.split(",")
+        if e.strip()
+    }
+    if admins:
+        return (user.email or "").lower() in admins
+    return not settings.registration_enabled

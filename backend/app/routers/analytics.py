@@ -30,7 +30,7 @@ from app.schemas.analytics import (
     VelocitySummaryOut,
 )
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
-from app.services import alerts, analytics_service, digest, mailer, velocity
+from app.services import accounts, alerts, analytics_service, digest, mailer, velocity
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -60,7 +60,9 @@ def subscriber_growth(
     user: User = Depends(get_current_user),
 ) -> dict:
     """Total sign-ups, the last 30 days, a per-day series, and sources."""
-    return analytics_service.subscriber_growth(db, user.id, days=days)
+    return analytics_service.subscriber_growth(
+        db, user.id, days=days, include_unattributed=accounts.is_operator(user)
+    )
 
 
 @router.get(

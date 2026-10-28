@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import PublicArticle from "./PublicArticle";
@@ -52,6 +52,30 @@ describe("PublicArticle", () => {
     // always said sign-ups come from here, and before this there was no form.
     expect(screen.getByText("Get the next My Project update by email")).toBeInTheDocument();
     expect(screen.getByLabelText("Email address")).toBeInTheDocument();
+  });
+
+  it("attributes a sign-up to the article it was made on", async () => {
+    api.publicArticle.mockResolvedValue({
+      title: "Test Article",
+      slug: "test-article",
+      body_markdown: "Hello world",
+      excerpt: "",
+      meta_description: "",
+      tags: [],
+      word_count: 100,
+      read_minutes: 1,
+      project_name: "My Project",
+      published_at: "2026-10-01T00:00:00",
+    });
+    api.subscribe.mockResolvedValue({ ok: true });
+    wrap();
+    fireEvent.change(await screen.findByLabelText("Email address"), {
+      target: { value: "reader@example.com" },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Subscribe" }));
+    });
+    expect(api.subscribe).toHaveBeenCalledWith("reader@example.com", "article", "test-article");
   });
 
   it("shows error state for missing article", async () => {

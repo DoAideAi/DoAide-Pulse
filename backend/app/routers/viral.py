@@ -110,7 +110,11 @@ def subscribe(
     db: Session = Depends(get_db),
 ) -> SubscribeOut:
     """Collect an email from the embed widget or public pages. Unauthenticated."""
-    sub = Subscriber(email=payload.email.lower(), source=payload.source)
+    sub = Subscriber(
+        email=payload.email.lower(),
+        source=payload.source,
+        project_id=_article_project(db, payload.article),
+    )
     db.add(sub)
     try:
         db.commit()
@@ -120,6 +124,24 @@ def subscribe(
         # Not the address: a subscriber list is PII, and the log is not where it lives.
         logger.debug("duplicate subscriber ignored: source=%s", payload.source or "direct")
     return SubscribeOut(ok=True)
+
+
+def _article_project(db: Session, slug: str | None) -> int | None:
+    """The project behind a *published* article slug, or ``None``.
+
+    The same first-published rule as :func:`get_public_article`, so a sign-up
+    is attributed to the project whose article the reader was actually shown.
+    Anything else — no slug, an unpublished one, a typo — leaves it
+    unattributed rather than refusing a reader over an optional field.
+    """
+    if not slug:
+        return None
+    return db.scalar(
+        select(Content.project_id)
+        .where(Content.slug == slug, Content.status == ContentStatus.PUBLISHED)
+        .order_by(Content.published_at.asc().nulls_last(), Content.id.asc())
+        .limit(1)
+    )
 
 
 _IDEA_TYPES = frozenset(

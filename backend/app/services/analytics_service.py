@@ -1433,12 +1433,20 @@ def pipeline(db: Session, user_id: int) -> dict:
     }
 
 
-def subscriber_growth(db: Session, user_id: int, *, days: int = 90) -> dict:
+def subscriber_growth(
+    db: Session, user_id: int, *, days: int = 90, include_unattributed: bool = False
+) -> dict:
     """Newsletter sign-ups: total, last 30 days, per-day series, and sources.
 
-    Sign-ups arrive unauthenticated (see ``routers/viral.py``) and the widget
-    rarely attributes them to a project, so the pool is: subscribers on this
-    user's projects, plus the unattributed ones. Only counts leave this
+    Sign-ups arrive unauthenticated (see ``routers/viral.py``). The pool is the
+    subscribers on this user's projects — and, only when
+    *include_unattributed*, the ones attributed to no project. That pool used
+    to be added for everyone, and since the sign-up endpoint never attributed
+    anything it was *every* subscriber: on an install with a second account,
+    each one saw the whole install's audience — totals, the daily series and
+    the free-text ``source`` labels the embedding pages chose. Unattributed
+    sign-ups belong to the install, so they go to its operator
+    (:func:`app.services.accounts.is_operator`). Only counts leave this
     function — addresses stay in the table.
 
     Every day in the window is present, zeros included, for the same reason
@@ -1449,7 +1457,11 @@ def subscriber_growth(db: Session, user_id: int, *, days: int = 90) -> dict:
     for accounts older than the window.
     """
     owned = select(Project.id).where(Project.user_id == user_id)
-    mine = or_(Subscriber.project_id.is_(None), Subscriber.project_id.in_(owned))
+    mine = (
+        or_(Subscriber.project_id.is_(None), Subscriber.project_id.in_(owned))
+        if include_unattributed
+        else Subscriber.project_id.in_(owned)
+    )
 
     since = window_start(days)
     # Three counts over the same rows, so one scan: they were three separate

@@ -23,15 +23,9 @@ from app.models.user import User
 from app.ratelimit import client_key, limiter
 from app.schemas.errors import AUTHENTICATED, errors
 from app.schemas.product_activity import ProductDashboardOut, ProductEventBatchIn
-from app.services import product_activity
+from app.services import accounts, product_activity
 
 router = APIRouter(prefix="/products", tags=["product activity"])
-
-
-def _admin_emails() -> set[str]:
-    return {
-        e.strip().lower() for e in settings.product_activity_admin_emails.split(",") if e.strip()
-    }
 
 
 def require_product_admin(user: User = Depends(get_current_user)) -> User:
@@ -41,12 +35,7 @@ def require_product_admin(user: User = Depends(get_current_user)) -> User:
     default — unless registration is open, in which case "every account" is
     whoever signed up, and the list becomes mandatory.
     """
-    admins = _admin_emails()
-    if admins:
-        allowed = user.email.lower() in admins
-    else:
-        allowed = not settings.registration_enabled
-    if not allowed:
+    if not accounts.is_operator(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Cross-product activity is limited to PRODUCT_ACTIVITY_ADMIN_EMAILS.",

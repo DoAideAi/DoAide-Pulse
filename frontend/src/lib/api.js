@@ -439,8 +439,14 @@ export const api = {
 
   // ---- viral / public ----
   publicArticle: (slug) => request(`/articles/${slug}`, { auth: false }),
-  subscribe: (email, source = "embed") =>
-    request("/subscribers", { method: "POST", body: { email, source }, auth: false }),
+  // `article` — the slug of the public article the form sits on, when there is
+  // one — attributes the sign-up to that article's project.
+  subscribe: (email, source = "embed", article = undefined) =>
+    request("/subscribers", {
+      method: "POST",
+      body: article ? { email, source, article } : { email, source },
+      auth: false,
+    }),
   generateContentIdeas: (niche, count = 5) =>
     request("/tools/content-ideas", { method: "POST", body: { niche, count }, auth: false }),
 
