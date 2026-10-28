@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.models.mixins import utcnow
@@ -35,14 +35,26 @@ def verify_all(db: Session) -> dict:
 
     Each connection is handled independently: one dead token must not stop
     the rest from being checked.
+
+    Each outcome is written with a conditional UPDATE that matches the
+    ciphertext this sweep decrypted, and committed on its own. The verify call
+    goes to the network and a sweep can take minutes, and the row loaded at the
+    start was written back regardless: a user who reconnected meanwhile —
+    exactly what "your token expired" invites — had the *new* credentials
+    marked INVALID because the old ones were refused, and a connection removed
+    meanwhile failed the single commit at the end, losing every other result.
+    An outcome about credentials the row no longer holds is dropped.
     """
-    connections = list(
-        db.scalars(
-            select(PlatformConnection).where(
-                PlatformConnection.status == ConnectionStatus.CONNECTED,
-            )
-        )
-    )
+    # Read as plain values: the rows are not written through the ORM below, so
+    # holding them would only invite reading stale state after a commit.
+    connections = db.execute(
+        select(
+            PlatformConnection.id,
+            PlatformConnection.user_id,
+            PlatformConnection.platform,
+            PlatformConnection.encrypted_credentials,
+        ).where(PlatformConnection.status == ConnectionStatus.CONNECTED)
+    ).all()
 
     valid = 0
     invalid = 0
@@ -51,26 +63,32 @@ def verify_all(db: Session) -> dict:
     for connection in connections:
         adapter = publishers.get_adapter(connection.platform)
         credentials: dict = {}
-        previous_status = connection.status
+        values: dict
 
         try:
             credentials = decrypt_credentials(connection.encrypted_credentials)
-            connection.display_name = adapter.verify(credentials)
-            connection.status = ConnectionStatus.CONNECTED
-            connection.last_verified_at = utcnow()
-            connection.last_error = None
+            values = {
+                "display_name": adapter.verify(credentials),
+                "status": ConnectionStatus.CONNECTED,
+                "last_verified_at": utcnow(),
+                "last_error": None,
+            }
             valid += 1
         except (CredentialError, CredentialEncryptionError) as exc:
-            connection.status = ConnectionStatus.INVALID
-            connection.last_verified_at = utcnow()
-            connection.last_error = clip_error(
-                redact(str(exc), publishers.secret_values(adapter, credentials))
-            )
+            values = {
+                "status": ConnectionStatus.INVALID,
+                "last_verified_at": utcnow(),
+                "last_error": clip_error(
+                    redact(str(exc), publishers.secret_values(adapter, credentials))
+                ),
+            }
             invalid += 1
         except (PublishError, NotImplementedAdapter) as exc:
-            connection.last_error = clip_error(
-                redact(str(exc), publishers.secret_values(adapter, credentials))
-            )
+            values = {
+                "last_error": clip_error(
+                    redact(str(exc), publishers.secret_values(adapter, credentials))
+                )
+            }
             unreachable += 1
             # The status is left alone, so the status-change line below never
             # fires for this branch and the sweep's summary was the only trace:
@@ -80,7 +98,7 @@ def verify_all(db: Session) -> dict:
                 connection.id,
                 connection.platform.value,
                 connection.user_id,
-                connection.last_error,
+                values["last_error"],
             )
         except Exception:
             logger.exception(
@@ -92,17 +110,36 @@ def verify_all(db: Session) -> dict:
             unreachable += 1
             continue
 
-        if connection.status != previous_status:
+        written = db.execute(
+            update(PlatformConnection)
+            .where(
+                PlatformConnection.id == connection.id,
+                PlatformConnection.status == ConnectionStatus.CONNECTED,
+                PlatformConnection.encrypted_credentials == connection.encrypted_credentials,
+            )
+            .values(**values)
+            .execution_options(synchronize_session=False)
+        ).rowcount
+        db.commit()
+
+        if not written:
+            logger.info(
+                "connection %d (%s, user %d) was replaced or removed while it was "
+                "being verified; result discarded",
+                connection.id,
+                connection.platform.value,
+                connection.user_id,
+            )
+        elif values.get("status") == ConnectionStatus.INVALID:
             logger.warning(
                 "connection %d (%s, user %d) status changed: %s -> %s",
                 connection.id,
                 connection.platform.value,
                 connection.user_id,
-                previous_status.value,
-                connection.status.value,
+                ConnectionStatus.CONNECTED.value,
+                ConnectionStatus.INVALID.value,
             )
 
-    db.commit()
     return {
         "checked": len(connections),
         "valid": valid,

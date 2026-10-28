@@ -202,3 +202,67 @@ def test_an_unreachable_platform_is_named_in_the_log(db, user, monkeypatch, capl
     assert lines == [
         f"connection {conn.id} (devto, user {user.id}) could not be verified: Connection timed out"
     ]
+
+
+def _refusing_adapter(monkeypatch, during):
+    """An adapter that refuses the credentials, after running *during*."""
+
+    def _refuse(self, credentials):
+        during()
+        raise CredentialError("401 token revoked")
+
+    monkeypatch.setattr(
+        "app.services.connection_verify.publishers.get_adapter",
+        lambda _p: type("A", (), {"verify": _refuse, "credential_fields": []})(),
+    )
+
+
+def test_credentials_replaced_mid_sweep_are_not_marked_invalid(db, user, monkeypatch):
+    """C105 M3: a reconnect during the verify call is not overwritten.
+
+    The refusal was about the credentials the sweep decrypted. Writing it to the
+    row loaded at the start marked the user's fresh credentials INVALID, and
+    every publish after that failed as not connected.
+    """
+    conn = _connection(db, user)
+    fresh = encrypt_credentials({"api_key": "fresh-key"})
+
+    def reconnect():
+        db.execute(
+            PlatformConnection.__table__.update()
+            .where(PlatformConnection.id == conn.id)
+            .values(encrypted_credentials=fresh)
+        )
+        db.commit()
+
+    _refusing_adapter(monkeypatch, reconnect)
+    result = connection_verify.verify_all(db)
+
+    assert result["invalid"] == 1
+    db.refresh(conn)
+    assert conn.status == ConnectionStatus.CONNECTED
+    assert conn.encrypted_credentials == fresh
+    assert conn.last_error is None
+
+
+def test_a_connection_removed_mid_sweep_does_not_lose_the_others(db, user, monkeypatch):
+    """C105 M3: one commit at the end failed on the deleted row, for everyone."""
+    gone = _connection(db, user, platform=Platform.DEVTO)
+    kept = _connection(db, user, platform=Platform.MASTODON)
+    gone_id = gone.id
+    removed = []
+
+    def remove_once():
+        if not removed:
+            db.execute(
+                PlatformConnection.__table__.delete().where(PlatformConnection.id == gone_id)
+            )
+            db.commit()
+            removed.append(True)
+
+    _refusing_adapter(monkeypatch, remove_once)
+    connection_verify.verify_all(db)
+
+    db.expire_all()
+    assert db.get(PlatformConnection, gone_id) is None
+    assert db.get(PlatformConnection, kept.id).status == ConnectionStatus.INVALID
