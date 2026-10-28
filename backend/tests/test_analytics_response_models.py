@@ -401,7 +401,8 @@ def test_no_analytics_endpoint_still_answers_an_untyped_object():
     platform breakdown) were added after; generation-cost was removed (cross-
     tenant leak — token spend is install-wide, served via /metrics). Thirteen with
     the pipeline (content by status, publish success rates), fourteen with
-    subscriber growth. The count is the guard on the walk, so it moves when the
+    subscriber growth, fifteen with feature usage (C103 M15). The count is the
+    guard on the walk, so it moves when the
     surface does; what must not move is ``untyped``.
     """
     from fastapi.routing import APIRoute
@@ -422,7 +423,7 @@ def test_no_analytics_endpoint_still_answers_an_untyped_object():
         if "analytics" in (route.tags or [])
     ]
 
-    assert len(analytics_routes) == 14
+    assert len(analytics_routes) == 15
     untyped = [r.path for r in analytics_routes if r.response_model is None]
     assert untyped == []
 
