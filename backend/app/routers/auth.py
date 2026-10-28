@@ -354,6 +354,14 @@ def request_password_reset(
         raw_token = password_reset.issue(db, user)
         subject, body = password_reset.build_email(raw_token)
         background.add_task(_send_reset_email, user.email, subject, body)
+        logger.info("password reset requested for user %s from %s", user.id, client_key(request))
+    else:
+        # The answer is the same either way; the journal need not be. A run of
+        # these from one address is somebody guessing which addresses exist.
+        # The address itself stays out of the line, as it does on login.
+        logger.info(
+            "password reset requested for no active account from %s", client_key(request)
+        )
 
     return MessageOut(detail=_RESET_REQUESTED)
 
@@ -496,6 +504,12 @@ def delete_me(
     are typing into. Rate limited like a login, because it is a password check.
     """
     if not verify_password(payload.password, current_user.hashed_password):
+        # A password check like a login, refused like one — and logged like
+        # one, so a stolen session guessing at the password is in the journal.
+        logger.warning(
+            "account erase refused for user %s from %s: wrong password",
+            current_user.id, client_key(request),
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="That password is not right, so nothing was deleted.",

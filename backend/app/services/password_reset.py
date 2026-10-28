@@ -108,6 +108,7 @@ def consume(db: Session, raw_token: str, new_password: str) -> User | None:
         )
     )
     if row is None:
+        logger.info("password reset with an unknown token")
         return None
     if row.used_at is not None:
         logger.info("password reset token %s replayed", row.id)
@@ -118,6 +119,7 @@ def consume(db: Session, raw_token: str, new_password: str) -> User | None:
 
     user = db.get(User, row.user_id)
     if user is None or not user.is_active:
+        logger.info("password reset token %s belongs to no active account", row.id)
         return None
 
     now = utcnow()
