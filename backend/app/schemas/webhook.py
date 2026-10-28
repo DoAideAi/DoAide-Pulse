@@ -11,6 +11,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.webhook import SUBSCRIBABLE_EVENTS, DeliveryStatus, WebhookEvent
+from app.schemas.text import visible_label
 
 
 def _validate_events(events: list[WebhookEvent]) -> list[WebhookEvent]:
@@ -31,12 +32,24 @@ def _validate_events(events: list[WebhookEvent]) -> list[WebhookEvent]:
     return list(dict.fromkeys(events))
 
 
+def _label(value: str | None) -> str | None:
+    """A one-line label a reader can see — see :mod:`app.schemas.text`.
+
+    Optional, so nothing visible left is ``""`` rather than a refusal; what it
+    must not be is a zero-width space that lists as a blank row, or a bidi
+    override that draws the label backwards.
+    """
+    return None if value is None else visible_label(value)
+
+
 class WebhookCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     url: str = Field(min_length=8, max_length=700)
     events: list[WebhookEvent] = Field(max_length=20)
     description: str = Field(default="", max_length=200)
+
+    _description = field_validator("description")(_label)
 
     _events = field_validator("events")(_validate_events)
 
@@ -47,6 +60,8 @@ class WebhookUpdate(BaseModel):
     url: str | None = Field(default=None, min_length=8, max_length=700)
     events: list[WebhookEvent] | None = Field(default=None, max_length=20)
     description: str | None = Field(default=None, max_length=200)
+
+    _description = field_validator("description")(_label)
     is_active: bool | None = None
 
     @field_validator("events")

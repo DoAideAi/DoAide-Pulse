@@ -16,12 +16,13 @@ import re
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.content import ContentType
 from app.models.project import GITHUB_FULL_NAME_RE
 from app.models.trigger import TriggerEventStatus, TriggerKind
 from app.schemas.limits import BoundedId
+from app.schemas.text import visible_label
 
 #: Keys each kind understands, and which of them it cannot work without.
 #: Unknown keys are refused rather than ignored — a typo'd ``feed_uri`` that is
@@ -240,6 +241,16 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
     return body
 
 
+def _label(value: str | None) -> str | None:
+    """A one-line label a reader can see — see :mod:`app.schemas.text`.
+
+    Optional, so nothing visible left is ``""`` rather than a refusal; what it
+    must not be is a zero-width space that lists as a blank row, or a bidi
+    override that draws the label backwards.
+    """
+    return None if value is None else visible_label(value)
+
+
 class TriggerCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -248,6 +259,8 @@ class TriggerCreate(BaseModel):
     name: str = Field(default="", max_length=120)
     config: dict[str, Any] = Field(default_factory=dict, max_length=20)
     is_active: bool = True
+
+    _name = field_validator("name")(_label)
 
     @model_validator(mode="after")
     def _check_config(self) -> TriggerCreate:
@@ -261,6 +274,8 @@ class TriggerUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     config: dict[str, Any] | None = Field(default=None, max_length=20)
     is_active: bool | None = None
+
+    _name = field_validator("name")(_label)
 
 
 class TriggerOut(BaseModel):

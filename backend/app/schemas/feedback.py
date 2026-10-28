@@ -11,6 +11,7 @@ from app.models.feedback import (
     PAGE_URL_MAX_LENGTH,
     FeedbackCategory,
 )
+from app.schemas.text import visible_label
 
 
 class FeedbackIn(BaseModel):
@@ -33,7 +34,9 @@ class FeedbackIn(BaseModel):
     @classmethod
     def _message_has_words(cls, value: str) -> str:
         message = value.strip()
-        if not message:
+        # Judged on what is visible, stored as written: a message keeps its
+        # line breaks, but ten zero-width spaces are not something written.
+        if not visible_label(message):
             raise ValueError("Write something before sending.")
         return message
 

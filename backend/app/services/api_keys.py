@@ -48,6 +48,7 @@ from app.models.api_key import ApiKey, ApiKeyScope
 from app.models.mixins import as_aware, utcnow
 from app.models.project import Project
 from app.models.user import User
+from app.schemas.text import visible_label
 
 logger = logging.getLogger(__name__)
 
@@ -184,7 +185,10 @@ def mint(
     That is the whole of the denormalisation's correctness: there is one writer,
     and it reads the owner off the row it is attaching to.
     """
-    clean = name.strip()
+    # ``visible_label``, not ``strip``: ``"\u200b"`` passed the emptiness check
+    # and listed as a key with no name, and the key list is where a person
+    # decides which credential to revoke.
+    clean = visible_label(name)
     if not clean:
         raise ApiKeyError("Give the key a name.")
 
