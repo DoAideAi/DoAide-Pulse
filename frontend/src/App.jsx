@@ -1,6 +1,7 @@
 import { Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ErrorFallback, PAGE_MESSAGE, RouteErrorBoundary } from "./components/ErrorBoundary";
+import FeedbackWidget from "./components/FeedbackWidget";
 import InstallPrompt from "./components/InstallPrompt";
 import Shell from "./components/Shell";
 import { useAuth } from "./hooks/useAuth";
@@ -11,6 +12,7 @@ import lazyPage from "./lib/lazyPage";
 // The landing page is the cold entry for nearly every visit and the place a
 // signed-out redirect lands, so it ships in the entry chunk. Everything else
 // is fetched when its route is first matched.
+const AdminFeedback = lazyPage(() => import("./pages/AdminFeedback"));
 const Analytics = lazyPage(() => import("./pages/Analytics"));
 const Blog = lazyPage(() => import("./pages/Blog"));
 const BlogPost = lazyPage(() => import("./pages/BlogPost"));
@@ -250,6 +252,14 @@ export default function App() {
           </Protected>
         }
       />
+      <Route
+        path="/admin/feedback"
+        element={
+          <Protected>
+            <AdminFeedback />
+          </Protected>
+        }
+      />
 
       {/* A page that says it is not there, rather than a redirect that made a
           dead link look like it had worked. See pages/NotFound. */}
@@ -262,6 +272,9 @@ export default function App() {
         }
       />
     </Routes>
+    {/* On every page, signed in or not — see FeedbackWidget for the two
+        pages it stays off. */}
+    <FeedbackWidget />
     <InstallPrompt />
     </>
   );

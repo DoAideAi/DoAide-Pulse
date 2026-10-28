@@ -12,6 +12,7 @@ from app.models.content import (
     ContentStatus,
     ContentType,
 )
+from app.models.feedback import Feedback, FeedbackCategory
 from app.models.llm_usage import LLMUsage
 from app.models.metrics import ContentMetric
 from app.models.password_reset import PasswordResetToken
@@ -41,6 +42,8 @@ __all__ = [
     "SUBSCRIBABLE_EVENTS",
     "TARGET_WORDS",
     "ActivityEvent",
+    "Feedback",
+    "FeedbackCategory",
     "ProductEvent",
     "ApiKey",
     "ApiKeyScope",

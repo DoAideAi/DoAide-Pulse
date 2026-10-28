@@ -364,6 +364,16 @@ export const api = {
   productActivity: (days, { refresh = false } = {}) =>
     request(`/products/activity${qs({ days, refresh: refresh ? "true" : null })}`),
 
+  // ---- feedback ----
+  // Sent without the token: the endpoint takes feedback from anyone, so there
+  // is nothing for it to authenticate, and a stale token answering 401 would
+  // sign the person out for having said something.
+  submitFeedback: (payload) =>
+    request("/feedback", { method: "POST", body: payload, auth: false }),
+  // Operator only. Filters: category, feature, since, until (YYYY-MM-DD).
+  listFeedback: (params = {}) => request(`/feedback${qs(params)}`),
+  feedbackFeatures: () => request("/feedback/features"),
+
   // ---- SEO (every DoAide site; product admins only) ----
   // Read from what Pulse stored — cheap. `tz` sets the calendar's day boundaries.
   seoHealth: (tz) => request(`/seo/health${qs({ tz })}`),

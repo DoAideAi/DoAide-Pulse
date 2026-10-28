@@ -106,8 +106,10 @@ def test_the_two_sweeps_are_the_size_they_should_be():
     134 and 67 since the SEO tooling, cross-product activity, calendar ideas
     and personal-LLM-key routes landed; every one of them passes the error
     shape checks below, which is why the pin moved rather than the routes.
+    136 with the feedback list and its feature-area options, the two
+    operator-only reads behind the feedback widget.
     """
-    assert len(AUTHENTICATED) == 134
+    assert len(AUTHENTICATED) == 136
     assert len(BY_ID) == 67
 
 

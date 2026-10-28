@@ -52,6 +52,9 @@ FINITE_BY_CONSTRUCTION = {
         "?platforms before computing anything, so repeating a name adds nothing"
     ),
     ("GET", "/projects/{project_id}/ideas"): "a literal .limit(12) in the query",
+    ("GET", "/feedback/features"): (
+        "distinct feature-area labels, and a literal .limit(200) in the query"
+    ),
     # Everything below answers with the publications of exactly one piece, so
     # the ceiling is platforms-per-piece — one row per Platform at the very
     # most, and the same closed enum as the first entries here.

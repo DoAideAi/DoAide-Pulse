@@ -33,6 +33,7 @@ from app.routers import (
     auth,
     calendar,
     content,
+    feedback,
     machine,
     metrics,
     misc,
@@ -780,6 +781,7 @@ def create_app() -> FastAPI:
     # about the scope of ``POST /tags/rename``.
     app.include_router(tags.router, prefix=prefix)
     app.include_router(api_keys.router, prefix=prefix)
+    app.include_router(feedback.router, prefix=prefix)
     # Last, and deliberately apart from the rest: everything above authenticates
     # a person with a bearer token, and this one authenticates a machine with a
     # scoped credential. See app.routers.machine.

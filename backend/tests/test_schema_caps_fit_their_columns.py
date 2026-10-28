@@ -26,6 +26,7 @@ from sqlalchemy import String, inspect
 
 from app.models.api_key import ApiKey
 from app.models.content import Content, ContentIdea
+from app.models.feedback import Feedback
 from app.models.platform_connection import PlatformConnection
 from app.models.project import Project
 from app.models.template import ContentTemplate
@@ -36,6 +37,7 @@ from app.models.webhook import Webhook
 from app.schemas.api_key import ApiKeyCreate, MachineIdeaCreate
 from app.schemas.auth import PreferencesUpdate, UserCreate
 from app.schemas.content import ContentCreate, ContentUpdate, HeadlineApplyIn
+from app.schemas.feedback import FeedbackIn
 from app.schemas.project import ProjectBase, ProjectCreate, ProjectUpdate
 from app.schemas.settings import ConnectionCreate
 from app.schemas.template import TemplateBase, TemplateCreate, TemplateUpdate
@@ -49,6 +51,7 @@ from app.schemas.webhook import WebhookCreate, WebhookUpdate
 #: silence.
 WRITE_PAIRS: list[tuple[type[BaseModel], type]] = [
     (ContentCreate, Content),
+    (FeedbackIn, Feedback),
     (ContentUpdate, Content),
     (HeadlineApplyIn, Content),
     (ProjectBase, Project),
