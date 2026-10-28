@@ -20,7 +20,11 @@
   --c-ink-900:      17  24  39;
   --c-ink-700:      55  65  81;
   --c-ink-500:     107 114 128;
-  --c-ink-400:     156 163 175;
+  /* Was 156 163 175 — 2.4:1 on paper. ink-400 is the label, eyebrow and
+     placeholder colour, all at 10–14px, where WCAG AA asks 4.5:1. This is the
+     lightest step of the same grey that clears it on canvas and paper (4.6:1).
+     doaideTheme.contrast.test.js holds every text token to it. */
+  --c-ink-400:     109 114 122;
   --c-line:        229 231 235;
   --c-line-strong: 209 213 219;
   --c-brand-300:    94 234 212;
@@ -112,7 +116,9 @@
   --c-ink-900:     229 231 235;
   --c-ink-700:     209 213 219;
   --c-ink-500:     156 163 175;
-  --c-ink-400:     107 114 128;
+  /* Was 107 114 128 — 3.6:1 on paper. Dimmest step that clears 4.5:1 on both
+     dark surfaces. */
+  --c-ink-400:     126 134 150;
   --c-line:         42  42  45;
   --c-line-strong:  51  51  54;
   --c-brand-300:    94 234 212;
