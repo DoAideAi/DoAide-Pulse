@@ -44,6 +44,7 @@ from app.services.publishers import breaker, formatting
 from app.services.publishers.base import (
     CredentialError,
     NotImplementedAdapter,
+    OutcomeUnknown,
     PublishError,
     PublishRequest,
     PublishResult,
@@ -877,6 +878,15 @@ def execute(db: Session, publication: Publication) -> Publication:
             publication.platform, user_id, retry_after=exc.retry_after
         )
         _defer(db, publication, exc)
+        return publication
+    except OutcomeUnknown as exc:
+        # Sent, and then no usable answer: the post may be live. Retrying on the
+        # row's own schedule is the one thing not to do — for a newsletter it is
+        # a second email to the whole list — so it stops here, terminal, with an
+        # error that says to look before pressing Retry. Still evidence about
+        # the route, so the breaker hears about it.
+        breaker.record_failure(publication.platform, user_id)
+        _fail(db, publication, str(exc), terminal=True)
         return publication
     except PublishError as exc:
         # The one that is evidence about the route: "something went wrong while

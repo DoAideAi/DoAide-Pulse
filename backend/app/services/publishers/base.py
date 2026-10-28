@@ -132,6 +132,21 @@ class RateLimited(PublishError):
         self.retry_after = retry_after
 
 
+class OutcomeUnknown(PublishError):
+    """A write reached the platform and then failed in a way that says nothing
+    about whether it took effect: a read timeout, a dropped connection, or a
+    500/502/504 after a POST.
+
+    :func:`_is_retryable` already refuses to replay these in-process, because
+    replaying a send that landed is a duplicate. This type is what lets the
+    layer above refuse too: a plain :class:`PublishError` is retried on the
+    publication's own schedule, which turned "nobody knows whether the
+    newsletter went out" into a second newsletter to the whole list some
+    minutes later. Not retried automatically — a person checks the platform
+    first, then retries if it did not go out.
+    """
+
+
 class NotImplementedAdapter(PublishError):
     """The platform is known but its adapter is not finished.
 
@@ -561,6 +576,15 @@ class Adapter(ABC):
 
             attempt += 1
             if attempt > budget or not _is_retryable(method, error, response):
+                if _outcome_unknown(method, error, response):
+                    ambiguous = OutcomeUnknown(
+                        f"{error} — the request reached {self.display_name}, so it "
+                        f"may already have gone out. Check {self.display_name} "
+                        "before retrying."
+                    )
+                    ambiguous.status_code = error.status_code
+                    ambiguous.__cause__ = error.__cause__ or error
+                    raise ambiguous
                 raise error
 
             delay = _backoff_delay(attempt, error)
@@ -766,6 +790,25 @@ def _is_retryable(
     return isinstance(error.__cause__, httpx.ConnectError | httpx.ConnectTimeout)
 
 
+def _outcome_unknown(
+    method: str, error: PublishError, response: httpx.Response | None
+) -> bool:
+    """Whether a failed non-idempotent call may nonetheless have taken effect.
+
+    The complement of the "safe to replay" cases in :func:`_is_retryable`, for
+    a write: the request was sent (not a connect failure), and the answer was
+    neither a refusal that says it was never processed (429, 503) nor a
+    definite rejection (4xx, a credential error, an unsupported option).
+    """
+    if method.upper() in _IDEMPOTENT_METHODS:
+        return False
+    if isinstance(error, CredentialError | NotImplementedAdapter | UnsupportedOption | RateLimited):
+        return False
+    if response is not None:
+        return response.status_code in _TRANSIENT_STATUSES - _REJECTED_WITHOUT_PROCESSING
+    return not isinstance(error.__cause__, httpx.ConnectError | httpx.ConnectTimeout)
+
+
 def _backoff_delay(attempt: int, error: PublishError) -> float:
     """How long to wait before retry number *attempt* (1-based).
 
@@ -893,6 +936,7 @@ __all__ = [
     "CredentialField",
     "MetricsSnapshot",
     "NotImplementedAdapter",
+    "OutcomeUnknown",
     "PublishError",
     "PublishRequest",
     "PublishResult",
