@@ -27,6 +27,7 @@ from fastapi import (
     Response,
     status,
 )
+from fastapi.responses import StreamingResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -449,9 +450,15 @@ def update_me(
 
 @router.get(
     "/me/export",
-    response_model=AccountExportOut,
+    # Documented, not validated: the body is streamed (see
+    # ``account_export.stream``), and a response model would make FastAPI build
+    # and check the whole document in memory, which is what streaming avoids.
+    response_class=StreamingResponse,
     summary="Download everything the account has written",
-    responses=errors(*AUTHENTICATED, status.HTTP_429_TOO_MANY_REQUESTS),
+    responses={
+        200: {"model": AccountExportOut, "description": "The account, as JSON."},
+        **errors(*AUTHENTICATED, status.HTTP_429_TOO_MANY_REQUESTS),
+    },
 )
 @limiter.limit(settings.rate_limit_account_export, key_func=account_key)
 def export_me(
@@ -459,7 +466,7 @@ def export_me(
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> dict:
+) -> StreamingResponse:
     """The profile, projects, every piece with its body and where it went
     live, templates and ideas, as one JSON document — the way to take the work
     out before erasing the account, or at any time.
@@ -468,11 +475,16 @@ def export_me(
     account's own LLM key are left out on purpose. Sent as an attachment so the
     browser saves it rather than showing it.
     """
-    response.headers["Content-Disposition"] = (
-        f'attachment; filename="pulse-export-{utcnow().date().isoformat()}.json"'
-    )
     logger.info("account export for user %s", current_user.id)
-    return account_export.build(db, current_user)
+    return StreamingResponse(
+        account_export.stream(db, current_user),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="pulse-export-{utcnow().date().isoformat()}.json"'
+            ),
+        },
+    )
 
 
 @router.delete(

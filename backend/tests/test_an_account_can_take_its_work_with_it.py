@@ -161,3 +161,38 @@ def test_the_export_keeps_a_scheduled_date(client, auth, db, account):
     [exported] = client.get(URL, headers=auth).json()["content"]
     assert exported["scheduled_for"] is not None
     assert exported["translations"] == []
+
+
+def test_a_long_export_streams_every_piece_across_batches(
+    client, auth, db, account, project, monkeypatch
+):
+    """Streamed a batch at a time, so the whole account is never in memory at
+    once — and nothing is dropped or repeated at a batch boundary."""
+    from app.services import account_export
+
+    monkeypatch.setattr(account_export, "STREAM_BATCH", 2)
+    for i in range(5):
+        db.add(
+            Content(
+                project_id=project.id,
+                content_type=ContentType.TUTORIAL,
+                title=f"Batch piece {i}",
+                slug=f"batch-piece-{i}",
+                body_markdown="Body. " * 20,
+            )
+        )
+    db.commit()
+
+    resp = client.get("/api/v1/auth/me/export", headers=auth)
+
+    assert resp.status_code == 200
+    ids = [piece["id"] for piece in resp.json()["content"]]
+    assert ids == sorted(set(ids))
+    titles = {piece["title"] for piece in resp.json()["content"]}
+    assert {f"Batch piece {i}" for i in range(5)} <= titles
+
+
+def test_the_export_is_still_documented_as_the_account_shape(client):
+    spec = client.get("/openapi.json").json()
+    ok = spec["paths"]["/api/v1/auth/me/export"]["get"]["responses"]["200"]
+    assert ok["content"]["application/json"]["schema"]["$ref"].endswith("AccountExportOut")
