@@ -63,8 +63,18 @@ def send_weekly_digests() -> dict:
             # attribute needs and the ``PendingRollbackError`` would raise from
             # inside the arm written to absorb the failure.
             user_id = user.id
+            previous = user.digest_sent_at
+            # Claimed before the send, so a second copy of this sweep — a
+            # redelivered task, one that outlived the visibility timeout, a
+            # second beat — skips a user this one has reached (M9).
+            claimed = digest.claim_week(db, user_id)
+            if claimed is None:
+                logger.info("digest for user %s skipped: already sent this week", user_id)
+                continue
+            delivered = False
             try:
-                if digest.send(db, user):
+                delivered = digest.send(db, user)
+                if delivered:
                     sent += 1
             except SoftTimeLimitExceeded:
                 logger.warning(
@@ -81,6 +91,14 @@ def send_weekly_digests() -> dict:
                 # user blaming each of them for the first one's error.
                 db.rollback()
                 logger.exception("weekly digest failed for user %s", user_id)
+            finally:
+                if not delivered:
+                    # Nothing reached the inbox, so this week is still owed.
+                    try:
+                        digest.release_week(db, user_id, claimed, previous)
+                    except Exception:
+                        db.rollback()
+                        logger.exception("could not release digest claim for user %s", user_id)
     finally:
         db.close()
 

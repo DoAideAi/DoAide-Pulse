@@ -50,6 +50,14 @@ class User(Base, TimestampMixin):
     tokens_valid_from: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+    #: When this week's digest was claimed for sending — the latch that makes
+    #: the weekly sweep idempotent (M9). Tasks are acked late, so a worker
+    #: killed mid-sweep (a deploy restart) has the sweep redelivered, and a
+    #: sweep that outlives the broker's visibility timeout is handed to a second
+    #: worker while the first is still mailing: without this, everyone already
+    #: reached got the week again. Claimed by a conditional UPDATE before the
+    #: send and released if nothing went out. See ``app.services.digest``.
+    digest_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     projects: Mapped[list[Project]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

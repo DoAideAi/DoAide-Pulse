@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from html import escape
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -647,4 +647,59 @@ def send(
     )
 
 
-__all__ = ["Digest", "Movement", "build", "render_html", "render_text", "send"]
+#: The shortest gap between two weekly digests to one person. A week less a
+#: day, so a beat that fires a little early next Monday is not refused by
+#: this Monday's claim, while a rerun of the same sweep always is.
+MIN_INTERVAL = timedelta(days=6)
+
+
+def claim_week(db: Session, user_id: int, *, now: datetime | None = None) -> datetime | None:
+    """Claim this week's digest for *user_id*. Returns the claim, or ``None``.
+
+    A conditional UPDATE: it moves ``digest_sent_at`` to *now* only if nothing
+    was claimed in the last :data:`MIN_INTERVAL`, so of two sweeps reaching the
+    same user — a redelivered task, an overlapping one — exactly one sees a row
+    change. Commits, so the claim is visible to the other sweep before either
+    sends anything.
+    """
+    moment = now or utcnow()
+    result = db.execute(
+        update(User)
+        .where(
+            User.id == user_id,
+            or_(User.digest_sent_at.is_(None), User.digest_sent_at <= moment - MIN_INTERVAL),
+        )
+        .values(digest_sent_at=moment)
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+    return moment if result.rowcount == 1 else None
+
+
+def release_week(db: Session, user_id: int, claimed: datetime, previous: datetime | None) -> None:
+    """Undo a claim whose send did not happen, if the claim is still ours.
+
+    An empty week, a mailer that refused, a crash: none of those reached the
+    inbox, so none should stop the next run from trying. Conditional on the
+    claim being unchanged, so a release never undoes somebody else's send.
+    """
+    db.execute(
+        update(User)
+        .where(User.id == user_id, User.digest_sent_at == claimed)
+        .values(digest_sent_at=previous)
+        .execution_options(synchronize_session=False)
+    )
+    db.commit()
+
+
+__all__ = [
+    "MIN_INTERVAL",
+    "Digest",
+    "Movement",
+    "build",
+    "claim_week",
+    "release_week",
+    "render_html",
+    "render_text",
+    "send",
+]

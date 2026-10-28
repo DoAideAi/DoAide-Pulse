@@ -658,3 +658,79 @@ def test_building_a_digest_costs_the_same_for_one_row_as_for_five(
     five = len([s for s in sql_log if s.startswith("SELECT")])
 
     assert one == five, f"{five - one} extra queries for 4 extra failures"
+
+
+# --------------------------------------------------------------------------- #
+# M9: one digest a week, however many times the sweep runs                     #
+# --------------------------------------------------------------------------- #
+
+
+def test_a_redelivered_sweep_does_not_mail_the_week_twice(
+    db, user, piece, publication, sent_mail, monkeypatch
+):
+    """Tasks are acked late: a worker killed mid-sweep has it redelivered, and
+    a sweep outliving the visibility timeout runs twice at once. Without a
+    latch, everyone already reached got the same digest again."""
+    _snapshot(db, publication, days_ago=1, views=500)
+    monkeypatch.setattr("app.tasks.digest_tasks.SessionLocal", _no_close(db))
+
+    assert send_weekly_digests() == {"considered": 1, "sent": 1}
+    assert send_weekly_digests() == {"considered": 1, "sent": 0}
+
+    assert len(sent_mail) == 1
+    db.refresh(user)
+    assert user.digest_sent_at is not None
+
+
+def test_next_weeks_sweep_mails_again(
+    db, user, piece, publication, sent_mail, monkeypatch
+):
+    from datetime import timedelta
+
+    from app.models.mixins import utcnow
+
+    _snapshot(db, publication, days_ago=1, views=500)
+    user.digest_sent_at = utcnow() - timedelta(days=7)
+    db.commit()
+    monkeypatch.setattr("app.tasks.digest_tasks.SessionLocal", _no_close(db))
+
+    assert send_weekly_digests() == {"considered": 1, "sent": 1}
+    assert len(sent_mail) == 1
+
+
+def test_a_send_that_failed_leaves_the_week_owed(
+    db, user, piece, publication, monkeypatch
+):
+    """The claim is released when nothing reached the inbox, so a retry tries."""
+    _snapshot(db, publication, days_ago=1, views=500)
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+    monkeypatch.setattr(mailer, "send", lambda **kwargs: False)
+    monkeypatch.setattr("app.tasks.digest_tasks.SessionLocal", _no_close(db))
+
+    assert send_weekly_digests() == {"considered": 1, "sent": 0}
+    db.refresh(user)
+    assert user.digest_sent_at is None
+
+
+def test_a_crash_mid_send_leaves_the_week_owed(
+    db, user, piece, publication, monkeypatch
+):
+    _snapshot(db, publication, days_ago=1, views=500)
+    monkeypatch.setattr(mailer, "configured", lambda: True)
+
+    def boom(**kwargs):
+        raise RuntimeError("smtp fell over")
+
+    monkeypatch.setattr(mailer, "send", boom)
+    monkeypatch.setattr("app.tasks.digest_tasks.SessionLocal", _no_close(db))
+
+    assert send_weekly_digests()["sent"] == 0
+    db.refresh(user)
+    assert user.digest_sent_at is None
+
+
+def test_only_one_of_two_claims_on_the_same_week_wins(db, user):
+    first = digest.claim_week(db, user.id)
+    second = digest.claim_week(db, user.id)
+    assert first is not None
+    assert second is None
