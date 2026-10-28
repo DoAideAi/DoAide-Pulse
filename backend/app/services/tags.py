@@ -400,12 +400,15 @@ class Suggestion:
         return {"tag": self.tag, "score": self.score, "reason": self.reason}
 
 
-def _terms(content: Content) -> Counter[str]:
-    """Significant words of a piece, counted.
+def _terms(content: Content) -> tuple[Counter[str], Counter[str], set[str]]:
+    """Significant words of a piece: weighted, actually counted, and in the title.
 
-    Title words count triple: a word in the title is what the piece is about by
-    the author's own declaration, and a body long enough to say anything says
-    most words at least once.
+    Title words count triple in the weight: a word in the title is what the
+    piece is about by the author's own declaration, and a body long enough to
+    say anything says most words at least once. The weight is for ranking only.
+    It used to be the number a suggestion quoted too, so a word written once,
+    in the title, read "Used 3 times in this piece" — which is why the real
+    count comes back beside it.
 
     Reuses :func:`app.services.dedup.tokens` for the tokenizing and the stopword
     list rather than growing a second one. That function exists to decide when
@@ -414,14 +417,28 @@ def _terms(content: Content) -> Counter[str]:
     keep in step.
     """
     counts: Counter[str] = Counter()
+    mentions: Counter[str] = Counter()
+    in_title: set[str] = set()
     body = seo.strip_markdown(content.body_markdown or "")
     for word in _WORD.findall(body.casefold()):
         if word not in dedup.STOPWORDS and not word.isdigit():
             counts[word] += 1
+            mentions[word] += 1
     for word in dedup.tokens(content.title or ""):
         if not word.isdigit():
             counts[word] += 3
-    return counts
+            mentions[word] += 1
+            in_title.add(word)
+    return counts, mentions, in_title
+
+
+def _usage(word: str, mentions: Counter[str], in_title: set[str]) -> str:
+    """Why a word the piece keeps using is proposed, in true numbers."""
+    n = mentions[word]
+    times = "once" if n == 1 else f"{n} times"
+    if word in in_title:
+        return f"In the title, and used {times} in this piece."
+    return f"Used {times} in this piece."
 
 
 def suggest(
@@ -456,7 +473,7 @@ def suggest(
     why the sources are walked in this order.
     """
     already = set(expand(normalize_all(list(content.tags or []))))
-    counts = _terms(content)
+    counts, mentions, in_title = _terms(content)
     proposals: dict[str, Suggestion] = {}
 
     def propose(raw: str, score: int, reason: str) -> None:
@@ -493,7 +510,7 @@ def suggest(
     # (4) Whatever the piece keeps saying.
     for word, count in counts.most_common(limit * 3):
         if count >= MIN_TERM_FREQUENCY:
-            propose(word, 30 + min(count, 20), f"Used {count} times in this piece.")
+            propose(word, 30 + min(count, 20), _usage(word, mentions, in_title))
 
     ranked = sorted(proposals.values(), key=lambda s: (-s.score, s.tag))
     return ranked[:limit]
