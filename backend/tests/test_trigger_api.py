@@ -345,3 +345,54 @@ def test_the_event_log_shows_what_the_trigger_did(client, auth, project, db):
     assert event["headline"] == "Something shipped"
     assert event["status"] == "generated"
     assert event["content_id"] is not None
+
+
+def _raw(client, method, url, auth, body: str):
+    """Send *body* verbatim: ``json=`` would refuse to encode a lone surrogate."""
+    return getattr(client, method)(
+        url, content=body, headers={**auth, "Content-Type": "application/json"}
+    )
+
+
+def test_a_lone_surrogate_in_a_setting_is_refused_and_nothing_is_stored(
+    client, auth, project, db
+):
+    """M19: ``config`` is ``dict[str, Any]``, so Pydantic never checked its text.
+
+    ``"\\ud800"`` was stored, the response then failed to serialize it, and
+    every later ``GET /triggers`` for the account was a 500.
+    """
+    body = (
+        '{"project_id": %d, "kind": "schedule", "name": "n", '
+        '"config": {"topic": "release\\ud800 notes", "every_hours": 24}}' % project.id
+    )
+    resp = _raw(client, "post", API, auth, body)
+
+    assert resp.status_code == 422, resp.text
+    assert "unpaired surrogate" in resp.text
+    assert db.query(Trigger).count() == 0
+    assert client.get(API, headers=auth).status_code == 200
+
+
+def test_a_lone_surrogate_is_refused_on_update_too(client, auth, project, db):
+    created = _create(client, auth, project, kind="schedule", topic="t", every_hours=24)
+    assert created.status_code == 201, created.text
+    url = f"{API}/{created.json()['id']}"
+
+    resp = _raw(
+        client, "patch", url, auth,
+        '{"config": {"topic": "t", "every_hours": 24, "instructions": "\\udfff"}}',
+    )
+
+    assert resp.status_code == 422, resp.text
+    assert client.get(API, headers=auth).status_code == 200
+    db.expire_all()
+    assert "instructions" not in db.get(Trigger, created.json()["id"]).config
+
+
+def test_real_text_in_a_setting_is_kept_whole(client, auth, project):
+    """Emoji sequences and other scripts are not what the check is about."""
+    topic = "Releases 🚀 👨‍👩‍👧 — nouveautés, 新機能"
+    resp = _create(client, auth, project, kind="schedule", topic=topic, every_hours=24)
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["config"]["topic"] == topic

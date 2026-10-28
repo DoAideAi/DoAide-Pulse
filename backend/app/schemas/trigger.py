@@ -12,6 +12,7 @@ the response that creates it and the one that rotates it, and in no other.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -86,6 +87,23 @@ _TEXT_CONFIG: tuple[str, ...] = (
 )
 _NUMBER_CONFIG: tuple[str, ...] = ("every_hours", "hour_utc", "commit_threshold")
 
+#: An unpaired UTF-16 surrogate. ``config`` is ``dict[str, Any]``, so the
+#: string checks Pydantic runs on a typed field — which refuse these — never
+#: see its values. ``json.loads`` decodes ``"\\ud800"`` happily; nothing can
+#: encode it to UTF-8 afterwards.
+_SURROGATE = re.compile("[\ud800-\udfff]")
+
+
+def _has_surrogate(value: object) -> bool:
+    if isinstance(value, str):
+        return bool(_SURROGATE.search(value))
+    if isinstance(value, dict):
+        return any(_has_surrogate(k) or _has_surrogate(v) for k, v in value.items())
+    if isinstance(value, list):
+        return any(_has_surrogate(item) for item in value)
+    return False
+
+
 #: ``owner/name`` — see :data:`app.models.project.GITHUB_FULL_NAME_RE`.
 _REPO_RE = GITHUB_FULL_NAME_RE
 
@@ -100,6 +118,17 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
         raise ValueError(
             f"A {kind.value} trigger has no setting called "
             f"{', '.join(unknown)}. It accepts: {', '.join(sorted(allowed))}."
+        )
+
+    # Before anything reads a value. SQLite stored such a row and the response
+    # then failed to serialize it, so the trigger existed and every later
+    # ``GET /triggers`` for the account was a 500; PostgreSQL refuses it at the
+    # write. Either way the caller got a 500 for text this check could name.
+    if _has_surrogate(body):
+        raise ValueError(
+            "Trigger settings contain an invalid character (an unpaired "
+            "surrogate, usually from a bad copy and paste). Retype the text "
+            "and try again."
         )
 
     missing = [key for key in REQUIRED_CONFIG[kind] if not str(body.get(key) or "").strip()]
