@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import PublicArticle from "./PublicArticle";
@@ -86,5 +86,23 @@ describe("PublicArticle", () => {
     expect(
       await screen.findByText("Published with DoAide Pulse"),
     ).toBeInTheDocument();
+  });
+});
+
+describe("PublicArticle's main landmark", () => {
+  it.each([
+    ["while the article is still loading", () => new Promise(() => {})],
+    ["when the article is not found", () => Promise.reject(Object.assign(new Error("Not found"), { status: 404 }))],
+    ["when the request fails", () => Promise.reject(Object.assign(new Error("down"), { status: 503 }))],
+  ])("is there for the skip link %s", async (_state, answer) => {
+    api.publicArticle.mockImplementation(answer);
+    wrap("my-post");
+    await act(async () => {});
+
+    expect(screen.getByRole("main")).toHaveAttribute("id", "main");
+    expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute(
+      "href",
+      "#main",
+    );
   });
 });

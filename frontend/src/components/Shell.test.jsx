@@ -309,3 +309,58 @@ describe("the account", () => {
     expect(screen.getByTestId("where")).toHaveTextContent("/login");
   });
 });
+
+describe("the skip link's target", () => {
+  it("exists while the page inside is still loading", async () => {
+    // A lazy page that never resolves: the Suspense fallback is all there is.
+    const { Suspense, lazy } = await import("react");
+    const Never = lazy(() => new Promise(() => {}));
+    render(
+      <MemoryRouter future={ROUTER_FUTURE} initialEntries={["/projects"]}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <Shell>
+                <Suspense fallback={<p>Loading…</p>}>
+                  <Never />
+                </Suspense>
+              </Shell>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await act(async () => {});
+
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    const main = screen.getByRole("main");
+    expect(main).toHaveAttribute("id", "main");
+    // Focusable without joining the tab order, so following the link lands
+    // focus on the content rather than only scrolling to it.
+    expect(main).toHaveAttribute("tabindex", "-1");
+    expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute(
+      "href",
+      "#main",
+    );
+  });
+
+  it("is the same element after the content changes underneath it", async () => {
+    await draw("/projects");
+    const before = screen.getByRole("main");
+
+    await userEvent.click(screen.getByRole("link", { name: "Calendar" }));
+
+    expect(screen.getByRole("main")).toBe(before);
+    expect(document.querySelectorAll("#main")).toHaveLength(1);
+  });
+
+  it("takes focus when the skip link is followed", async () => {
+    await draw("/projects");
+    const main = screen.getByRole("main");
+    // jsdom does not move focus on a fragment link, so do what the browser
+    // does: tabindex=-1 is what makes this call succeed on a <main>.
+    main.focus();
+    expect(main).toHaveFocus();
+  });
+});
