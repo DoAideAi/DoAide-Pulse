@@ -1463,6 +1463,19 @@ def sync_content_status(content: Content) -> None:
     if not publications:
         return
 
+    if content.status == ContentStatus.ARCHIVED:
+        # **Archived is the user's word, not a derived state.** Leaving the
+        # archive is a deliberate act (``PATCH`` with another status), and this
+        # function is called by workers that may have claimed a row before the
+        # piece was archived: a publish already in flight succeeded and then
+        # moved the piece back to ``published``, undoing the archive the user
+        # had just made. The post did go live, so its date is still recorded.
+        if content.published_at is None and any(
+            p.status == PublicationStatus.PUBLISHED for p in publications
+        ):
+            content.published_at = utcnow()
+        return
+
     if any(p.status == PublicationStatus.PUBLISHED for p in publications):
         content.status = ContentStatus.PUBLISHED
         if content.published_at is None:
