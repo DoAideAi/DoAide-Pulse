@@ -133,6 +133,11 @@ def _storable(value: object) -> object:
     return value
 
 
+def _kind_value(kind: TriggerKind | str) -> str:
+    """A trigger's kind as its wire string, whether the row holds the enum or not."""
+    return kind.value if isinstance(kind, TriggerKind) else str(kind)
+
+
 def _owned(trigger_id: RowId, db: Session, user: User) -> Trigger:
     """Fetch a trigger, 404ing if its project isn't this user's."""
     trigger = db.get(Trigger, trigger_id)
@@ -301,6 +306,12 @@ def create_trigger(
     db.add(trigger)
     db.commit()
     db.refresh(trigger)
+    # Deletion was logged and creation was not, though an inbound trigger is a
+    # new public URL that can write drafts into the project.
+    logger.info(
+        "trigger %s (%s/%s) created on project %s by user %s",
+        trigger.id, _kind_value(trigger.kind), trigger.name, trigger.project_id, user.id,
+    )
     return TriggerCreated(**_to_out(trigger).model_dump(), secret=secret)
 
 
@@ -327,6 +338,7 @@ def update_trigger(
     kind = (
         trigger.kind if isinstance(trigger.kind, TriggerKind) else TriggerKind(trigger.kind)
     )
+    changed = sorted(payload.model_dump(exclude_none=True))
 
     if payload.name is not None:
         trigger.name = payload.name.strip()
@@ -347,6 +359,10 @@ def update_trigger(
 
     db.commit()
     db.refresh(trigger)
+    if changed:
+        logger.info(
+            "trigger %s changed by user %s: %s", trigger.id, user.id, ", ".join(changed)
+        )
     return _to_out(trigger)
 
 
@@ -378,7 +394,7 @@ def delete_trigger(
     logger.info(
         "trigger %s (%s/%s) deleted by user %s — %s event(s) went with it",
         trigger.id,
-        trigger.kind.value if hasattr(trigger.kind, "value") else trigger.kind,
+        _kind_value(trigger.kind),
         trigger.name,
         user.id,
         events,

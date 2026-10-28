@@ -178,6 +178,12 @@ def create_webhook(
     db.add(webhook)
     db.commit()
     db.refresh(webhook)
+    # Deletion was logged and creation was not, though a new endpoint is the
+    # one that starts receiving every piece's payload. Host only, as below.
+    logger.info(
+        "webhook %s (%s) created by user %s for %d event(s)",
+        webhook.id, url_for_log(webhook.url), user.id, len(webhook.events),
+    )
     return WebhookCreated(**WebhookOut.model_validate(webhook).model_dump(), secret=secret)
 
 
@@ -199,6 +205,8 @@ def update_webhook(
     counter — see below for why that is not merely tidy.
     """
     webhook = _owned(webhook_id, db, user)
+    changed = sorted(payload.model_dump(exclude_none=True))
+    previous_host = url_for_log(webhook.url)
 
     if payload.url is not None:
         webhook.url = _validated(payload.url)
@@ -218,6 +226,14 @@ def update_webhook(
 
     db.commit()
     db.refresh(webhook)
+    if changed:
+        # Pointing an endpoint somewhere else is as consequential as creating
+        # one, so the hosts either side are in the line.
+        logger.info(
+            "webhook %s changed by user %s: %s%s",
+            webhook.id, user.id, ", ".join(changed),
+            f" ({previous_host} -> {url_for_log(webhook.url)})" if "url" in changed else "",
+        )
     return WebhookOut.model_validate(webhook)
 
 
