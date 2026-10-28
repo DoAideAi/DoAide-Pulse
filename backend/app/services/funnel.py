@@ -33,7 +33,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only, raiseload
 
 from app.models.content import Content, ContentStatus
 from app.models.mixins import as_aware, utcnow
@@ -109,6 +109,22 @@ def funnel(
         select(Content)
         .join(Project, Project.id == Content.project_id)
         .where(Project.user_id == user_id, Content.created_at >= since)
+        # The columns this reads and no more. A whole row carries the body —
+        # up to 200,000 characters a piece — and ``publications`` is
+        # ``selectin``, so a 90-day window loaded every body and every
+        # publication row just to look at a status and a source (C104 M8).
+        .options(
+            load_only(
+                Content.id,
+                Content.title,
+                Content.status,
+                Content.source,
+                Content.created_at,
+                Content.updated_at,
+                Content.published_at,
+            ),
+            raiseload(Content.publications),
+        )
     ).all()
 
     overall = _empty()
