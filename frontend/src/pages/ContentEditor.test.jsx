@@ -347,10 +347,12 @@ describe("length figures", () => {
     // writing, which is all of the time it is being looked at.
     draw();
     const body = await screen.findByLabelText(/^Body/i);
-    expect(screen.getByText("2 words")).toBeInTheDocument();
+    // findBy: the count is computed from a deferred copy of the body (M8), so
+    // it can land a render after the field does — under load, reliably so.
+    expect(await screen.findByText("2 words")).toBeInTheDocument();
 
     await userEvent.type(body, " and then some more");
-    expect(screen.getByText("6 words")).toBeInTheDocument();
+    expect(await screen.findByText("6 words")).toBeInTheDocument();
     expect(api.updateContent).not.toHaveBeenCalled();
   });
 
