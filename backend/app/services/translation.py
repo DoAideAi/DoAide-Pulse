@@ -42,9 +42,10 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.orm import Session
@@ -88,7 +89,14 @@ def _still_there(db: Session, row: ContentTranslation) -> bool:
 
 
 class TranslationInProgress(TranslationError):
-    """Another request created this (piece, language) row a moment ago."""
+    """Another request is already translating this (piece, language)."""
+
+
+#: How long a ``PENDING`` row is taken to have somebody working on it. Past
+#: this, the request that set it is presumed dead — a worker recycled or a
+#: deploy mid-call — and a new request may take the row over. Generous against
+#: the model call, which can walk the whole provider chain at 90s a hop.
+PENDING_STALE_AFTER = timedelta(minutes=10)
 
 
 #: The longest body this will translate.
@@ -562,9 +570,37 @@ def upsert_pending(db: Session, content: Content, language: str) -> ContentTrans
     if row is None:
         row = ContentTranslation(content_id=content.id, language=language)
         db.add(row)
-    row.status = TranslationStatus.PENDING
-    row.error = ""
-    row.quality_issues = []
+        row.status = TranslationStatus.PENDING
+        row.error = ""
+        row.quality_issues = []
+        return row
+    # An existing row is claimed by a conditional write, the way a new one is
+    # claimed by the unique constraint. Only the insert used to be guarded: a
+    # second request for a language that already had a row — a retry pressed
+    # twice, two tabs — set it PENDING again, paid for a second model call, and
+    # whichever finished last silently replaced the other. A PENDING row old
+    # enough to have been abandoned can be taken over, or it would never leave
+    # that state.
+    now = utcnow()
+    claimed = db.execute(
+        update(ContentTranslation)
+        .where(
+            ContentTranslation.id == row.id,
+            or_(
+                ContentTranslation.status != TranslationStatus.PENDING,
+                ContentTranslation.updated_at <= now - PENDING_STALE_AFTER,
+            ),
+        )
+        .values(status=TranslationStatus.PENDING, error="", quality_issues=[], updated_at=now)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not claimed:
+        db.rollback()
+        raise TranslationInProgress(
+            "This piece is already being translated into that language. "
+            "Reload in a moment to see it."
+        )
+    db.refresh(row)
     return row
 
 
