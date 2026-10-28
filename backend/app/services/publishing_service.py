@@ -1003,11 +1003,18 @@ def execute(db: Session, publication: Publication) -> Publication:
     # otherwise trip the breaker early on the next unrelated blip.
     breaker.record_success(publication.platform, user_id)
 
-    # Captured before the sync, because the interesting moment is the
-    # *transition* — a piece already live on Dev.to going out on Mastodon is
-    # not news, and firing "published" per platform would make the event mean
-    # something different from its name.
-    was_published = content.status == ContentStatus.PUBLISHED
+    # The interesting moment is the *transition* — a piece already live on
+    # Dev.to going out on Mastodon is not news, and firing "published" per
+    # platform would make the event mean something different from its name.
+    #
+    # Decided inside ``_record``, not here. Two platforms finishing together
+    # both read the piece as not yet published before their calls; the second
+    # to commit loses the version check, and ``_commit_outcome`` re-runs
+    # ``_record`` against the piece as the first left it — already published.
+    # A verdict taken up here survived that reload, and both workers announced
+    # the same piece. The last run of ``_record`` is the one that committed,
+    # and the version check lets only one commit make the transition.
+    became_published = False
     published_at = utcnow()
     # The headline the reader will actually see, which is the request's and not
     # necessarily the piece's: a translated publication carries the translated
@@ -1016,6 +1023,7 @@ def execute(db: Session, publication: Publication) -> Publication:
     live_title = request.title[:300]
 
     def _record(publication: Publication) -> None:
+        nonlocal became_published
         publication.status = PublicationStatus.PUBLISHED
         publication.published_at = published_at
         publication.external_id = _recorded(
@@ -1033,11 +1041,15 @@ def execute(db: Session, publication: Publication) -> Publication:
         publication.live_title = live_title
         publication.error = None
         _adopt_canonical(publication.content, publication, result)
+        was_published = publication.content.status == ContentStatus.PUBLISHED
         sync_content_status(publication.content)
+        became_published = (
+            not was_published and publication.content.status == ContentStatus.PUBLISHED
+        )
 
     _commit_outcome(db, publication, _record)
     content = publication.content
-    if not was_published and content.status == ContentStatus.PUBLISHED:
+    if became_published:
         _notify_published(db, content, publication)
     logger.info(
         "published content %s to %s in %dms: %s",
