@@ -78,7 +78,7 @@ def transport(monkeypatch):
                 raise outcome
             return outcome
 
-        monkeypatch.setattr(base.httpx, "request", fake_request)
+        monkeypatch.setattr(base, "_exchange", fake_request)
         return calls
 
     return install
@@ -181,7 +181,7 @@ def test_post_is_not_replayed_after_a_read_timeout(probe, transport):
         httpx.ReadTimeout("timed out", request=httpx.Request("POST", _URL)),
         _response(200),
     )
-    with pytest.raises(PublishError, match="request failed"):
+    with pytest.raises(PublishError, match="took too long"):
         probe._request("POST", _URL)
     assert len(calls) == 1
 
