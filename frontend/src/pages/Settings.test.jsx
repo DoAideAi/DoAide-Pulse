@@ -31,6 +31,8 @@ vi.mock("../lib/api", () => ({
     deleteWebhook: vi.fn(),
     updateWebhook: vi.fn(),
     pingWebhook: vi.fn(),
+    webhookDeliveries: vi.fn(),
+    redeliverWebhook: vi.fn(),
     listApiKeys: vi.fn(),
     apiKeyScopes: vi.fn(),
     createApiKey: vi.fn(),
@@ -830,6 +832,36 @@ describe("outbound webhooks", () => {
     draw();
 
     expect(await screen.findByText("Connection refused")).toBeInTheDocument();
+  });
+
+  it("lists recent deliveries on demand, and redelivers a failed one", async () => {
+    const delivery = (overrides) => ({
+      id: 1, webhook_id: 1, event: "content.published", status: "delivered", attempts: 1,
+      response_status: 200, error: null, created_at: "2026-08-01T10:00:00Z", payload: {},
+      ...overrides,
+    });
+    api.listWebhooks.mockResolvedValue([webhook()]);
+    api.webhookDeliveries.mockResolvedValue([
+      delivery({ id: 7, status: "failed", response_status: 503, error: "Returned 503" }),
+      delivery({ id: 6 }),
+    ]);
+    api.redeliverWebhook.mockResolvedValue(delivery({ id: 8 }));
+    const user = userEvent.setup();
+    draw();
+
+    const toggle = await screen.findByRole("button", { name: "Recent deliveries" });
+    // Nothing is fetched until somebody asks.
+    expect(api.webhookDeliveries).not.toHaveBeenCalled();
+    await user.click(toggle);
+
+    expect(await screen.findByText("Returned 503")).toBeInTheDocument();
+    // Only the failed one offers to go again.
+    const redeliver = screen.getAllByRole("button", { name: "Redeliver" });
+    expect(redeliver).toHaveLength(1);
+    await user.click(redeliver[0]);
+
+    expect(api.redeliverWebhook).toHaveBeenCalledWith(webhook().id, 7);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Redelivered"));
   });
 
   it("pings a webhook and shows success", async () => {

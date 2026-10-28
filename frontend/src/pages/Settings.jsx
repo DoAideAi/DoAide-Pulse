@@ -625,6 +625,87 @@ function ChoicesFailed({ what, onRetry }) {
   );
 }
 
+/**
+ * A webhook's recent deliveries, opened on demand, with Redeliver on the ones
+ * that failed. The API has listed and re-sent deliveries all along; the page
+ * showed only the last error, so an event an endpoint missed while it was down
+ * could not be recovered from here once its retries were spent.
+ */
+function WebhookDeliveries({ webhook, onChanged }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(null);
+  const { data, error, loading, reload } = useApi(
+    () => (open ? api.webhookDeliveries(webhook.id, { limit: 10 }) : Promise.resolve(null)),
+    [webhook.id, open],
+  );
+
+  async function redeliver(delivery) {
+    setBusy(delivery.id);
+    try {
+      const result = await api.redeliverWebhook(webhook.id, delivery.id);
+      if (result.status === "delivered") toast.success("Redelivered");
+      else toast.error(`Redelivery failed${result.error ? `: ${result.error}` : ""}`);
+      reload();
+      onChanged?.();
+    } catch (err) {
+      toast.error(`Could not redeliver: ${err.message}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        className="btn-quiet -ml-2.5 text-xs"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? "Hide deliveries" : "Recent deliveries"}
+      </button>
+      {open &&
+        (loading && !data ? (
+          <Skeleton rows={2} />
+        ) : error ? (
+          <ErrorBanner message={`Could not load deliveries: ${error}`} onRetry={reload} />
+        ) : !data?.length ? (
+          <p className="text-xs text-ink-400">Nothing sent yet.</p>
+        ) : (
+          <ul className="mt-1 space-y-1.5" aria-label={`Deliveries to ${webhook.url}`}>
+            {data.map((delivery) => (
+              <li key={delivery.id} className="flex items-start justify-between gap-2 text-xs">
+                <span className="min-w-0">
+                  <span className="font-medium text-ink-800">{titleize(delivery.event)}</span>{" "}
+                  <span className="text-ink-400">
+                    {formatWhen(delivery.created_at)} · {delivery.status}
+                    {delivery.response_status ? ` · ${delivery.response_status}` : ""}
+                  </span>
+                  {delivery.error && (
+                    <span className="block break-words font-mono text-[11px] text-bad">
+                      {delivery.error}
+                    </span>
+                  )}
+                </span>
+                {delivery.status === "failed" && (
+                  <button
+                    type="button"
+                    className="btn-quiet shrink-0 text-xs"
+                    onClick={() => redeliver(delivery)}
+                    disabled={busy !== null}
+                  >
+                    {busy === delivery.id ? "Sending…" : "Redeliver"}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        ))}
+    </div>
+  );
+}
+
 function WebhooksSection() {
   const toast = useToast();
   const { data, error, loading, reload } = useApi(() => api.listWebhooks(), []);
@@ -726,6 +807,7 @@ function WebhooksSection() {
                       {webhook.last_error}
                     </p>
                   )}
+                  <WebhookDeliveries webhook={webhook} onChanged={reload} />
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button className="btn-quiet" onClick={() => setEditing(webhook)}>

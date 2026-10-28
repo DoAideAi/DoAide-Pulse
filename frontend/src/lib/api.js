@@ -515,6 +515,10 @@ export const api = {
   pingWebhook: (id) => request(`/webhooks/${id}/ping`, { method: "POST" }),
   webhookDeliveries: (id, params = {}) =>
     request(`/webhooks/${id}/deliveries${qs(params)}`),
+  // Send a past delivery again — the one way to recover an event an endpoint
+  // missed while it was down, once its own retries are spent.
+  redeliverWebhook: (webhookId, deliveryId) =>
+    request(`/webhooks/${webhookId}/deliveries/${deliveryId}/redeliver`, { method: "POST" }),
 
   // ---- API keys ----
   apiKeyScopes: () => request("/api-keys/scopes"),
