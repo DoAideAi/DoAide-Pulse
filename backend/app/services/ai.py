@@ -552,7 +552,12 @@ def as_str(value: Any, default: str = "") -> str:
     if isinstance(value, str):
         return value.strip()
     if isinstance(value, list):
-        return " ".join(as_str(v) for v in value).strip()
+        return " ".join(part for part in (as_str(v) for v in value) if part).strip()
+    if isinstance(value, dict):
+        # An object where text was asked for is not text, and its ``str()`` is
+        # Python's repr — ``{'a': 1}`` — which then landed in a title, a body or
+        # a translation as though the model had written it.
+        return default
     return str(value).strip()
 
 

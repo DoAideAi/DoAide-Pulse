@@ -477,6 +477,18 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
         )
         raise TranslationSourceGone("This piece was deleted while it was being translated.")
 
+    # An answer with no body is a provider failure, not a translation: storing
+    # it replaced whatever translation the row already had with an empty one,
+    # where the docstring promises a failed retry keeps the old text.
+    if not ai.as_str(payload.get("body_markdown") if isinstance(payload, dict) else None):
+        row.status = TranslationStatus.FAILED
+        row.error = "The model answered without a translation."
+        db.commit()
+        logger.warning("translation of content %s into %s came back empty", content.id, code)
+        raise TranslationUnavailable(
+            f"No provider returned a usable {entry.name} translation. Try again shortly."
+        )
+
     try:
         title = ai.as_str(payload.get("title"))[:300]
         translated_body = ai.as_str(payload.get("body_markdown"))
