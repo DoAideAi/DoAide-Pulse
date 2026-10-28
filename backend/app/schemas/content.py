@@ -18,6 +18,7 @@ from app.models.project import Tone
 from app.models.publication import Platform, PublicationStatus
 from app.schemas.limits import BoundedId, Keyword, MarketingImageUrl, Tag, Timezone
 from app.schemas.text import visible_label
+from app.schemas.urls import check_http_url
 from app.services import inline_edit
 from app.services.publishers.base import is_outcome_unknown
 
@@ -74,7 +75,25 @@ def _absolute_image_url(value: str | None) -> str | None:
             "must be an absolute http(s) URL — the platforms fetch this image "
             "from their own servers"
         )
-    return url
+    return check_http_url(url)
+
+
+def _absolute_image_urls(values: list[str] | None) -> list[str] | None:
+    """``marketing_images``: each entry held to the cover image's rule.
+
+    The list had a length cap per entry and nothing else, so ``javascript:``,
+    ``data:`` and ``file:`` entries saved alongside the uploads the editor puts
+    there — which are absolute http(s) URLs (``routers/uploads.py``). Blank
+    entries are dropped rather than refused, as a blank cover is.
+    """
+    if values is None:
+        return None
+    out: list[str] = []
+    for value in values:
+        url = _absolute_image_url(value)
+        if url is not None:
+            out.append(url)
+    return out
 
 
 def unique_platforms(value: list[Platform] | None) -> list[Platform] | None:
@@ -124,7 +143,7 @@ def _absolute_canonical_url(value: str | None) -> str | None:
             "must be an absolute http(s) URL — it is sent to the platforms as "
             "rel=canonical, and anything else resolves against their host"
         )
-    return url
+    return check_http_url(url)
 
 
 #: The statuses a caller may set directly. ``published`` and ``failed`` are
@@ -209,6 +228,7 @@ class ContentCreate(BaseModel):
         return title
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
+    _check_gallery = field_validator("marketing_images")(_absolute_image_urls)
     _check_canonical = field_validator("canonical_url")(_absolute_canonical_url)
     _normalise_tags = field_validator("tags")(_clean_tags)
 
@@ -246,6 +266,7 @@ class ContentUpdate(BaseModel):
         return title
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
+    _check_gallery = field_validator("marketing_images")(_absolute_image_urls)
     _check_canonical = field_validator("canonical_url")(_absolute_canonical_url)
     _normalise_tags = field_validator("tags")(_clean_tags)
 

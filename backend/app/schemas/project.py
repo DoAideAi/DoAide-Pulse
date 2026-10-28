@@ -9,6 +9,7 @@ from app.models.project import AutopilotMode, Tone
 from app.models.publication import Platform
 from app.schemas.limits import Keyword, TechStackEntry
 from app.schemas.text import visible_label
+from app.schemas.urls import check_http_url
 
 
 def _publishable(platform: Platform) -> Platform:
@@ -60,10 +61,10 @@ def _project_url(value: str | None) -> str | None:
         return None
     lower = url.lower()
     if lower.startswith(("http://", "https://")):
-        return url
+        return check_http_url(url)
     head = url.split("/", 1)[0]
     if ":" not in head and "." in head and " " not in url:
-        return f"https://{url}"
+        return check_http_url(f"https://{url}")
     raise ValueError("must be an http(s) URL, like https://example.com")
 
 
