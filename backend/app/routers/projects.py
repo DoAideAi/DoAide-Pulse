@@ -1,6 +1,7 @@
 """Project registry: register what Pulse should write about."""
 from __future__ import annotations
 
+import hashlib
 import logging
 import secrets
 import time
@@ -664,7 +665,31 @@ def project_feed(
         f"/projects/{project.id}/feed.xml"
     )
     xml = rss.build_feed(project, items, self_url=self_url)
-    return Response(content=xml, media_type="application/rss+xml")
+    # Feed readers poll on a timer, most of them hourly or faster, and nearly
+    # every poll is asking "anything new?" of a feed that has not changed. It
+    # went out ``no-store`` like the account data, so each poll was the full
+    # XML and nothing between here and the reader could keep it (C104 M8).
+    # Everything in it is already public and published, so: a short public
+    # lifetime, and an ETag a reader can send back for a 304 with no body.
+    # The rate limit above still counts the poll; this saves the bytes.
+    etag = '"' + hashlib.sha256(xml.encode("utf-8")).hexdigest()[:32] + '"'
+    headers = {"ETag": etag, "Cache-Control": f"public, max-age={FEED_MAX_AGE_SECONDS}"}
+    sent = _etags(request.headers.get("if-none-match", ""))
+    if etag in sent or "*" in sent:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    return Response(content=xml, media_type="application/rss+xml", headers=headers)
+
+
+#: How long a reader or a proxy may keep a copy of a feed. Short, because an
+#: archived piece leaves the feed and should not linger in it for long.
+FEED_MAX_AGE_SECONDS = 300
+
+
+def _etags(header: str) -> set[str]:
+    """The entity tags in an ``If-None-Match`` header, weak or not."""
+    if header.strip() == "*":
+        return {"*"}
+    return {tag.strip().removeprefix("W/") for tag in header.split(",") if tag.strip()}
 
 
 #: The spellings pydantic parses as a true ``bool`` query param. Mirrored here
