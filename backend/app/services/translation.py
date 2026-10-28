@@ -48,7 +48,7 @@ from typing import Any
 from sqlalchemy import or_, select, update
 from sqlalchemy.exc import IntegrityError, InvalidRequestError
 from sqlalchemy.orm.exc import StaleDataError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.models.content import Content
 from app.models.mixins import utcnow
@@ -627,10 +627,28 @@ def listing(db: Session, content: Content) -> list[ContentTranslation]:
     Ordered by code rather than by status or recency: this list is a language
     picker, and a picker whose entries move when a translation finishes is one
     users mis-click.
+
+    Without the text. Every caller renders a picker entry — status, issues,
+    staleness — and a translated body is as long as the piece, so loading
+    whole rows read one full copy of the article per language to draw a row
+    of flags.
     """
     return list(
         db.scalars(
             select(ContentTranslation)
+            .options(
+                load_only(
+                    ContentTranslation.id,
+                    ContentTranslation.content_id,
+                    ContentTranslation.language,
+                    ContentTranslation.status,
+                    ContentTranslation.source_version,
+                    ContentTranslation.quality_issues,
+                    ContentTranslation.error,
+                    ContentTranslation.translated_at,
+                    ContentTranslation.updated_at,
+                )
+            )
             .where(ContentTranslation.content_id == content.id)
             .order_by(ContentTranslation.language.asc())
         )

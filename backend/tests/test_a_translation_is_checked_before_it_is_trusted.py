@@ -654,3 +654,25 @@ def _session_of(instance):
     from sqlalchemy.orm import object_session
 
     return object_session(instance)
+
+
+def test_the_listing_reads_no_translated_text(client, auth, db, piece, sql_log):
+    """M8: the language picker leaves every translated body in the database.
+
+    It loaded whole rows — one full copy of the article per language — and
+    the response schema dropped the text.
+    """
+    _translated(db, piece, language="fr")
+    _translated(db, piece, language="de", version=piece.version - 1)
+    db.expire_all()
+    sql_log.clear()
+
+    response = client.get(f"{V1}/content/{piece.id}/translations", headers=auth)
+
+    assert response.status_code == 200
+    items = {item["language"]: item for item in response.json()["items"]}
+    assert items["fr"]["publishable"] is True
+    assert items["de"]["stale"] is True
+    reads = [s for s in sql_log if s.startswith("SELECT") and "FROM content_translations" in s]
+    assert reads, sql_log
+    assert not any("content_translations.body_markdown" in s for s in reads), reads
