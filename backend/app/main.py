@@ -11,6 +11,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.exc import DBAPIError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -394,6 +396,32 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("database pool disposed — shutting down")
 
 
+#: SQLSTATE classes that mean "the database could not serve this", not "this
+#: query is wrong": connection exceptions, insufficient resources (too many
+#: connections, out of disk), and operator intervention (shutting down).
+_UNAVAILABLE_SQLSTATE_CLASSES = frozenset({"08", "53", "57"})
+
+
+def database_unavailable(exc: BaseException) -> bool:
+    """Whether *exc* means the database was unreachable rather than the query wrong."""
+    if isinstance(exc, PoolTimeoutError):
+        return True  # every pooled connection busy for pool_timeout seconds
+    if not isinstance(exc, DBAPIError):
+        return False
+    if exc.connection_invalidated:
+        return True
+    orig = exc.orig
+    sqlstate = getattr(orig, "sqlstate", None) or getattr(
+        getattr(orig, "diag", None), "sqlstate", None
+    )
+    if sqlstate:
+        return sqlstate[:2] in _UNAVAILABLE_SQLSTATE_CLASSES
+    # psycopg raises a bare OperationalError, with no SQLSTATE, when it cannot
+    # connect at all. SQLite's OperationalError never has one either, and
+    # covers schema mistakes, so only the PostgreSQL driver's counts.
+    return isinstance(exc, OperationalError) and type(orig).__module__.startswith("psycopg")
+
+
 def create_app() -> FastAPI:
     """Build the FastAPI application: logging, middleware, routers, lifespan.
 
@@ -450,6 +478,30 @@ def create_app() -> FastAPI:
         )
 
     app.add_exception_handler(Exception, _unhandled_exception)
+
+    # A database that cannot be reached is not a bug, and saying "something went
+    # wrong on our end" sent people to report one — while the useful facts are
+    # that nothing was saved and it is worth trying again shortly. Classified
+    # narrowly (see database_unavailable): an OperationalError is also what
+    # SQLite raises for a missing column, and that is a 500.
+    async def _database_unavailable(request: Request, exc: Exception) -> JSONResponse:
+        if not database_unavailable(exc):
+            return await _unhandled_exception(request, exc)
+        request_id = getattr(request.state, "request_id", "unknown")
+        logger.warning(
+            "database unavailable [request_id=%s]: %s", request_id, type(exc).__name__
+        )
+        return JSONResponse(
+            {
+                "detail": "The database is unavailable for a moment, so nothing was "
+                "saved. Try again in a few seconds."
+            },
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            headers={"X-Request-ID": request_id, "Retry-After": "5"},
+        )
+
+    app.add_exception_handler(DBAPIError, _database_unavailable)
+    app.add_exception_handler(PoolTimeoutError, _database_unavailable)
 
     # A row was written by somebody else between this request loading it and
     # committing. SQLAlchemy raises this from ``session.commit()`` for any
