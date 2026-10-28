@@ -172,3 +172,29 @@ def test_exactly_one_draft_exists_after_a_retried_write(
 
     drafts = db.query(Content).filter_by(status=ContentStatus.DRAFT).all()
     assert len(drafts) == 1
+
+
+# --------------------------------------------------------------------------- #
+# The retry itself, outside any router                                         #
+# --------------------------------------------------------------------------- #
+
+
+def test_commit_new_retries_once_with_a_suffixed_slug(db, project, collide_once):
+    """The service both routers now call, exercised directly."""
+    from app.services import content_store
+
+    calls = collide_once()
+    piece = Content(
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        status=ContentStatus.DRAFT,
+        title="Direct",
+        slug="direct",
+        body_markdown="Body.",
+    )
+    content_store.commit_new(db, piece)
+
+    assert calls["n"] == 2
+    assert piece.id is not None
+    assert piece.slug.startswith("direct-")
+    assert piece.slug != "direct"

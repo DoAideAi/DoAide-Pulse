@@ -34,6 +34,7 @@ from app.models.project import Project
 from app.models.template import ContentTemplate, TemplateMode
 from app.models.user import User
 from app.ratelimit import account_key, limiter
+from app.routers._content_views import to_detail
 from app.schemas.content import ContentDetail
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
 from app.schemas.template import (
@@ -47,7 +48,7 @@ from app.schemas.template import (
     TemplateUseRequest,
     TemplateVariable,
 )
-from app.services import content_generator, seo
+from app.services import content_generator, content_store, seo
 from app.services import templates as template_service
 from app.services.templates import BUILTINS
 
@@ -450,8 +451,6 @@ def use_template(
     loses nothing real by it — sixty finished drafts an hour is far past what
     the deterministic path is for, and it writes a row either way.
     """
-    from app.routers.content import _commit_content, _to_detail
-
     template = _owned(template_id, db, user)
     project = _resolve_project(template, payload.project_id, db, user)
     if project is None:
@@ -551,6 +550,6 @@ def use_template(
         )
 
     template.use_count = ContentTemplate.use_count + 1
-    _commit_content(db, content)
+    content_store.commit_new(db, content)
     db.commit()
-    return _to_detail(content)
+    return to_detail(content)

@@ -31,6 +31,7 @@ from app.models.project import Project
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.user import User
 from app.ratelimit import account_key, limiter
+from app.routers._content_views import to_detail, to_out
 from app.routers._patch import reject_nulls
 from app.schemas.content import (
     ArchiveOldIn,
@@ -66,11 +67,9 @@ from app.schemas.content import (
     PublicationSkipOut,
     PublicPreviewOut,
     PublishRequestIn,
-    QualityOut,
     RepurposeOut,
     RetryResultOut,
     ScheduleContentIn,
-    SeoIssueOut,
     SlotOut,
     SocialCardsOut,
 )
@@ -79,7 +78,7 @@ from app.services import (
     content_engagement,
     content_generator,
     content_pipeline,
-    formats,
+    content_store,
     github_client,
     headlines,
     inline_edit,
@@ -457,78 +456,6 @@ def _owned_content_map(
     return {content.id: content for content in db.scalars(stmt).unique()}
 
 
-def _to_out(content: Content) -> ContentOut:
-    """A listing row. Reads no article text — see the ``defer`` on its callers.
-
-    ``word_count`` and ``read_minutes`` both come off the stored count now, so
-    the only field here that would touch ``body_markdown`` is one nobody added.
-    The paged callers below defer that column so a listing of 500 pieces stops
-    shipping 500 article bodies to render 500 word counts; ``_to_detail``, which
-    genuinely wants the text, does not defer it.
-    """
-    return ContentOut(
-        **{
-            key: getattr(content, key)
-            for key in (
-                "id", "project_id", "content_type", "status", "title", "slug",
-                "excerpt", "meta_description", "keywords", "tags", "canonical_url",
-                "cover_image_url", "marketing_images", "focus_keyword", "version",
-                "confidence", "generated_by_provider", "generated_by_model",
-                "source", "scheduled_for", "published_at", "created_at", "updated_at",
-            )
-        },
-        project_name=content.project.name if content.project else None,
-        word_count=content.word_count,
-        read_minutes=content.read_minutes,
-        content_format=formats.format_of(content.content_type).value,
-        publications=[PublicationOut.model_validate(p) for p in content.publications],
-    )
-
-
-def _to_detail(content: Content) -> ContentDetail:
-    issues = seo.audit(
-        title=content.title,
-        body_markdown=content.body_markdown,
-        meta_description=content.meta_description,
-        keywords=list(content.keywords or []),
-        cover_image_url=content.cover_image_url,
-        focus_keyword=getattr(content, "focus_keyword", "") or "",
-        slug=content.slug,
-    )
-    qr = quality.report_for(content)
-    out = _to_out(content)
-    out.seo_score = qr.seo_score
-    return ContentDetail(
-        **out.model_dump(),
-        body_markdown=content.body_markdown,
-        seo_issues=[
-            SeoIssueOut(level=i.level, field=i.field, message=i.message) for i in issues
-        ],
-        format_issues=formats.problems(content.body_markdown, content.content_type),
-        quality=QualityOut(**qr.as_dict()),
-    )
-
-
-def _commit_content(db: Session, content: Content) -> None:
-    """Add and commit, retrying once on a slug collision.
-
-    ``unique_content_slug`` prevents most collisions, but two concurrent
-    requests can race past the check. The database-level unique constraint
-    catches the loser; we regenerate the slug and retry rather than surfacing a
-    500. The retry appends random hex rather than re-running the count query,
-    which would be open to the same race a second time.
-    """
-    db.add(content)
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        content.slug = f"{content.slug}-{secrets.token_hex(3)}"
-        db.add(content)
-        db.commit()
-    db.refresh(content)
-
-
 # --------------------------------------------------------------------------- #
 # Reading                                                                      #
 # --------------------------------------------------------------------------- #
@@ -607,7 +534,7 @@ def list_content(
         .limit(limit)
     )
 
-    return [_to_out(c) for c in db.scalars(query)]
+    return [to_out(c) for c in db.scalars(query)]
 
 
 # NB: the literal paths under /content (``/queue/...``) are declared here,
@@ -648,7 +575,7 @@ def review_queue(
         .offset(offset)
         .limit(limit)
     )
-    return [_to_out(c) for c in rows]
+    return [to_out(c) for c in rows]
 
 
 @router.get(
@@ -1524,7 +1451,7 @@ def apply_content_headline(
     db.commit()
     db.refresh(content)
     _dispatch_headline_sync(content.id)
-    return _to_out(content)
+    return to_out(content)
 
 
 @router.get(
@@ -1688,7 +1615,7 @@ def get_content(
     """
     content = _owned_content(content_id, db, user)
     response.headers["ETag"] = _etag(content)
-    return _to_detail(content)
+    return to_detail(content)
 
 
 @router.get(
@@ -1918,8 +1845,8 @@ def generate_content(
             "fallback": generated.is_fallback,
         },
     )
-    _commit_content(db, content)
-    return _to_detail(content)
+    content_store.commit_new(db, content)
+    return to_detail(content)
 
 
 def _manual_source(user: User, campaign_key: str | None) -> dict:
@@ -1967,8 +1894,8 @@ def create_content(
         marketing_images=payload.marketing_images,
         source=_manual_source(user, payload.campaign_key),
     )
-    _commit_content(db, content)
-    return _to_detail(content)
+    content_store.commit_new(db, content)
+    return to_detail(content)
 
 
 @router.patch(
@@ -2191,7 +2118,7 @@ def update_content(
         content_pipeline.release_approved(db, content)
     db.refresh(content)
     response.headers["ETag"] = _etag(content)
-    return _to_detail(content)
+    return to_detail(content)
 
 
 @router.delete(
@@ -2299,7 +2226,7 @@ def approve_content(
     db.commit()
     content_pipeline.release_approved(db, content)
     db.refresh(content)
-    return _to_out(content)
+    return to_out(content)
 
 
 class _PublishError(Exception):
@@ -2992,7 +2919,7 @@ def set_content_status(
         content_pipeline.release_approved(db, content)
     db.refresh(content)
     response.headers["ETag"] = _etag(content)
-    return _to_detail(content)
+    return to_detail(content)
 
 
 @router.post(
@@ -3071,7 +2998,7 @@ def write_from_idea(
         if existing is not None:
             # 200, not the route's 201: the replay creates nothing.
             response.status_code = status.HTTP_200_OK
-            return _to_detail(existing)
+            return to_detail(existing)
         # ``used_content_id`` is not a FK: the draft this idea produced can be
         # deleted and the idea outlives it. With nothing left to return to,
         # writing it again is the useful answer rather than a dead reference.
@@ -3101,4 +3028,4 @@ def write_from_idea(
     idea.used_content_id = content.id
     db.commit()
     db.refresh(content)
-    return _to_detail(content)
+    return to_detail(content)

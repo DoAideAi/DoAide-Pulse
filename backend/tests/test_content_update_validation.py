@@ -182,7 +182,7 @@ def test_creating_with_a_relative_canonical_is_refused(client, auth, project):
 # ``String(500)``. On SQLite that is invisible — VARCHAR lengths are not
 # enforced, so the value went in and every assertion about it passed. On
 # PostgreSQL it is a ``StringDataRightTruncation``, which is a ``DataError`` and
-# not an ``IntegrityError``, so the retry in ``_commit_content`` does not catch
+# not an ``IntegrityError``, so the retry in ``content_store.commit_new`` does not catch
 # it and neither does anything else: the caller gets a 500 for a body the API
 # had already validated.
 #
