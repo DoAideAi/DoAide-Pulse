@@ -72,6 +72,30 @@ def test_a_focus_keyword_sent_in_the_same_patch_is_not_overwritten(client, auth,
     assert body["keywords"] == ["fastapi", "sqlalchemy"]
 
 
+def test_a_focus_keyword_chosen_earlier_survives_a_keywords_only_save(
+    client, auth, db, piece
+):
+    """The editor re-sends keywords on every auto-save and never the focus.
+
+    A focus picked in the SEO panel, which is not the first keyword, used to be
+    replaced by the first keyword on the editor's first save.
+    """
+    piece.keywords = ["gst", "gst late fee", "gstr-3b"]
+    piece.focus_keyword = "gst late fee"
+    db.commit()
+
+    resp = client.patch(
+        f"{API}/{piece.id}", headers=auth, json={"keywords": ["gst", "gst late fee", "gstr-3b"]}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["focus_keyword"] == "gst late fee"
+
+    resp = client.patch(
+        f"{API}/{piece.id}", headers=auth, json={"keywords": ["gstr-3b", "gst"]}
+    )
+    assert resp.json()["focus_keyword"] == "gst late fee"
+
+
 def test_clearing_the_keywords_leaves_the_focus_keyword_alone(client, auth, piece):
     """An empty list is not a new first keyword to sync to."""
     resp = client.patch(f"{API}/{piece.id}", headers=auth, json={"keywords": []})

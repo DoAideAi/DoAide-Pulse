@@ -2093,8 +2093,17 @@ def update_content(
         content.slug = unique_content_slug(db, content.project_id, data["title"])
     if "keywords" in data and data["keywords"] is not None:
         data["keywords"] = seo.normalize_keywords(data["keywords"])
-        # Keep focus_keyword in sync unless the caller set it explicitly.
-        if "focus_keyword" not in data and data["keywords"]:
+        # Keep focus_keyword in sync unless the caller set it explicitly — in
+        # this request or before it. The editor re-sends ``keywords`` on every
+        # save and never sends ``focus_keyword``, so following the first keyword
+        # unconditionally overwrote a focus chosen in the SEO panel or over the
+        # API on the first auto-save. A focus follows the list only when it was
+        # not chosen against one: empty, set while there were no keywords, or
+        # the old first keyword.
+        stored_focus = (content.focus_keyword or "").strip()
+        old_keywords = list(content.keywords or [])
+        derived = not stored_focus or not old_keywords or stored_focus == old_keywords[0]
+        if "focus_keyword" not in data and data["keywords"] and derived:
             data["focus_keyword"] = data["keywords"][0]
 
     for key, value in data.items():
