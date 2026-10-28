@@ -96,7 +96,17 @@ def test_anonymous_relay_skips_login(smtp, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "error", [smtplib.SMTPAuthenticationError(535, b"nope"), OSError("connection refused")]
+    "error",
+    [
+        smtplib.SMTPAuthenticationError(535, b"nope"),
+        OSError("connection refused"),
+        # The recipient refused outright: nothing was delivered.
+        smtplib.SMTPRecipientsRefused({"dev@example.com": (550, b"no such user")}),
+        # Dropped mid-conversation.
+        smtplib.SMTPServerDisconnected("Connection unexpectedly closed"),
+        TimeoutError("timed out"),
+    ],
+    ids=["auth", "refused-connection", "recipient-refused", "disconnected", "timeout"],
 )
 def test_send_failures_are_reported_not_raised(smtp, monkeypatch, error):
     """The caller answers the same either way, so a raise would only be a 500."""
@@ -111,3 +121,22 @@ def test_from_address_falls_back_to_the_host(smtp, monkeypatch):
     monkeypatch.setattr(settings, "smtp_from", "")
     mailer.send(to="dev@example.com", subject="s", body="b")
     assert smtp.instances[0].message["From"] == "pulse@smtp.example.com"
+
+
+def test_a_password_smtplib_cannot_encode_fails_like_a_bad_password(smtp, monkeypatch):
+    """smtplib encodes the login as ASCII; an accented password raised
+    UnicodeEncodeError out of a function documented never to raise (C104 M5)."""
+
+    def login(self, user, password):
+        password.encode("ascii")
+
+    monkeypatch.setattr(_FakeSMTP, "login", login, raising=False)
+    monkeypatch.setattr(settings, "smtp_password", "pässwörd")
+
+    assert mailer.send(to="dev@example.com", subject="s", body="b") is False
+
+
+@pytest.mark.parametrize("subject", ["Weekly\r\nBcc: everyone@example.com", "two\nlines"])
+def test_a_subject_that_would_inject_a_header_is_refused_not_raised(smtp, subject):
+    assert mailer.send(to="dev@example.com", subject=subject, body="b") is False
+    assert smtp.instances == []  # nothing was opened

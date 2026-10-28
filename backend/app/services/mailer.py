@@ -51,15 +51,22 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
         )
         return False
 
-    message = EmailMessage()
-    message["From"] = _from_address()
-    message["To"] = to
-    message["Subject"] = subject
-    message.set_content(body)
-    if html:
-        # Added second, so it becomes the preferred alternative while the text
-        # part stays the fallback.
-        message.add_alternative(html, subtype="html")
+    try:
+        message = EmailMessage()
+        message["From"] = _from_address()
+        message["To"] = to
+        message["Subject"] = subject
+        message.set_content(body)
+        if html:
+            # Added second, so it becomes the preferred alternative while the
+            # text part stays the fallback.
+            message.add_alternative(html, subtype="html")
+    except ValueError as exc:
+        # A header value with a line break in it — the one way a header is
+        # injected. Refused by ``email`` itself, and it was refused by raising
+        # out of a function documented never to (C104 M5).
+        logger.error("refusing to send %r to %s: %s", subject, mask_email(to), exc)
+        return False
 
     timeout = settings.smtp_timeout_seconds
     try:
@@ -75,9 +82,12 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
             if settings.smtp_user:
                 client.login(settings.smtp_user, settings.smtp_password)
             client.send_message(message)
-    except (OSError, smtplib.SMTPException) as exc:
+    except (OSError, smtplib.SMTPException, UnicodeError) as exc:
         # Includes auth failures, DNS, TLS and timeouts. The caller cannot act
         # on any of them and must not leak which one happened to the requester.
+        # ``UnicodeError`` is the operator's: smtplib encodes the login as
+        # ASCII, so a password with an accent in it raised out of here on every
+        # send instead of failing like any other bad credential.
         logger.error("SMTP send to=%s subject=%r failed: %s", mask_email(to), subject, exc)
         return False
 
