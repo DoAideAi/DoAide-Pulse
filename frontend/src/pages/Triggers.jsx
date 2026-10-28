@@ -608,10 +608,15 @@ function ConfigField({ field, value, onChange }) {
  */
 function SecretDialog({ trigger, onClose }) {
   const toast = useToast();
+  // Until the secret has been copied, Escape and a backdrop click do not close
+  // this — a stray one used to throw away the only copy. "I've saved it" still
+  // closes it at any time.
+  const [secretCopied, setSecretCopied] = useState(false);
 
   async function copy(text, what) {
     try {
       await navigator.clipboard.writeText(text);
+      if (text === trigger.secret) setSecretCopied(true);
       toast.success(`${what} copied`);
     } catch {
       toast.error("Could not copy — select it and copy manually.");
@@ -622,6 +627,7 @@ function SecretDialog({ trigger, onClose }) {
     <Dialog
       label="Webhook trigger credentials"
       onClose={onClose}
+      closable={secretCopied}
       width="xl"
     >
       <h2 className="font-display text-2xl text-ink-900">Your trigger is ready</h2>
@@ -665,7 +671,7 @@ function SecretDialog({ trigger, onClose }) {
       </div>
 
       <div className="flex justify-end pt-2">
-        <button className="btn-primary" onClick={onClose}>
+        <button type="button" className="btn-primary" onClick={onClose}>
           I&rsquo;ve saved it
         </button>
       </div>

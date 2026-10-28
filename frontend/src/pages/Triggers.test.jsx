@@ -549,6 +549,29 @@ describe("the signing secret", () => {
     expect(screen.queryByText("s3cr3t-value")).not.toBeInTheDocument();
   });
 
+  it("survives a stray Escape until the secret has been copied", async () => {
+    api.createTrigger.mockResolvedValue({
+      ...trigger({ kind: "webhook", config: {} }),
+      inbound_url: "https://pulse.test/api/v1/triggers/inbound/tok",
+      secret: "s3cr3t-value",
+    });
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue() } });
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Add trigger" }));
+    const dialog = screen.getByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("radio", { name: /Webhook/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Create trigger" }));
+    await screen.findByText("s3cr3t-value");
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByText("s3cr3t-value")).toBeInTheDocument();
+
+    const copies = screen.getAllByRole("button", { name: "Copy" });
+    await userEvent.click(copies[copies.length - 1]);
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByText("s3cr3t-value")).not.toBeInTheDocument();
+  });
+
   it("is not shown for a kind that has no inbound URL", async () => {
     api.createTrigger.mockResolvedValue(trigger());
     draw();
