@@ -15,7 +15,14 @@ import { applyPageMeta } from "../lib/pageMeta";
 
 export default function PublicArticle() {
   const { slug } = useParams();
-  const { data, error, loading } = useApi(() => api.publicArticle(slug), [slug]);
+  const { data, error, errorStatus, loading, reload } = useApi(
+    () => api.publicArticle(slug),
+    [slug],
+  );
+  // Only a 404 means there is no such article. A dropped connection or a 429
+  // used to get the same "removed or unpublished" page, which is a dead end
+  // for a reader whose link is fine.
+  const missing = errorStatus === 404;
 
   const firedRef = useRef(false);
 
@@ -59,7 +66,20 @@ export default function PublicArticle() {
           </div>
         )}
 
-        {error && (
+        {error && !loading && !missing && (
+          <div className="panel p-8 text-center" role="alert">
+            <p className="text-ink-500">
+              {errorStatus === 429
+                ? "Too many requests just now. Wait a moment and try again."
+                : "The article couldn't be loaded. Check your connection and try again."}
+            </p>
+            <button type="button" className="btn-primary mt-4" onClick={reload}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {error && !loading && missing && (
           <div className="panel p-8 text-center">
             <p className="text-ink-500">
               This article isn't available — it may have been removed or unpublished.

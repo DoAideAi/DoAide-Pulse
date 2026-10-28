@@ -55,11 +55,21 @@ describe("PublicArticle", () => {
   });
 
   it("shows error state for missing article", async () => {
-    api.publicArticle.mockRejectedValue(new Error("Not found"));
+    api.publicArticle.mockRejectedValue(
+      Object.assign(new Error("Not found"), { status: 404 }),
+    );
     wrap("nonexistent");
     expect(
       await screen.findByText(/this article isn't available/i),
     ).toBeInTheDocument();
+  });
+
+  it("offers a retry, not 'unpublished', when the load itself failed", async () => {
+    api.publicArticle.mockRejectedValue(new TypeError("Failed to fetch"));
+    wrap("flaky");
+    expect(await screen.findByText(/couldn't be loaded/)).toBeInTheDocument();
+    expect(screen.queryByText(/removed or unpublished/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("shows Published with DoAide Pulse branding", async () => {
