@@ -117,7 +117,8 @@ def subscribe(
         logger.info("new subscriber: source=%s", payload.source or "direct")
     except IntegrityError:
         db.rollback()
-        logger.debug("duplicate subscriber ignored: %s", payload.email.lower())
+        # Not the address: a subscriber list is PII, and the log is not where it lives.
+        logger.debug("duplicate subscriber ignored: source=%s", payload.source or "direct")
     return SubscribeOut(ok=True)
 
 

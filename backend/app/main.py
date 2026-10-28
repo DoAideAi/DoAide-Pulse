@@ -23,7 +23,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
-from app.logging_config import configure_logging, request_id_var
+from app.logging_config import configure_logging, redact_path, request_id_var
 from app.ratelimit import limiter, rate_limit_exceeded_handler
 from app.routers import (
     activity,
@@ -616,7 +616,8 @@ def create_app() -> FastAPI:
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Response-Time"] = f"{elapsed_ms:.0f}ms"
             method = request.method
-            path = request.url.path
+            # Redacted: two routes carry a credential in the path.
+            path = redact_path(request.url.path)
             status_code = response.status_code
             if settings.api_slow_request_ms and elapsed_ms >= settings.api_slow_request_ms:
                 logger.warning(

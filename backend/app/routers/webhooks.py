@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.logging_config import url_for_log
 from app.deps import ListOffset, RowId, get_current_user
 from app.models.user import User
 from app.models.webhook import (
@@ -248,7 +249,8 @@ def delete_webhook(
     logger.info(
         "webhook %s (%s) deleted by user %s — %s delivery(ies) went with it",
         webhook.id,
-        webhook.url,
+        # Host only: a Slack or Discord webhook URL's path is its secret.
+        url_for_log(webhook.url),
         user.id,
         deliveries,
     )

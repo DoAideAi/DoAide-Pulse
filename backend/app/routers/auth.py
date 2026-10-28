@@ -312,7 +312,7 @@ def request_password_reset(
     the caller can time. Still in-process rather than on a worker, keeping what
     the inline version was right about: a reset that silently waits on a broker
     being up is worse than one that takes a second. When SMTP is unconfigured
-    the link goes to the log instead — see :mod:`app.services.mailer`.
+    nothing is sent and the link is not logged — see :mod:`app.services.mailer`.
 
     Issuing the token stays on the request path: it needs the request-scoped
     session, which is closed by the time a background task runs, and it is two

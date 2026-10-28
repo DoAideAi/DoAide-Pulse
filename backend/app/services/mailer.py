@@ -4,13 +4,12 @@ Pulse sends exactly one kind of message — the password reset link — so this 
 deliberately the smallest thing that can do that: no templating, no queue, no
 provider SDK. ``smtplib`` against whatever host the operator points it at.
 
-**When SMTP is not configured the message is written to the log instead**, at
-WARNING, link and all. That is not a stub: Pulse is single-user and self-hosted,
-and the alternative for an operator who never set up a mail server is a reset
-flow that cannot complete at all. ``journalctl -u pulse-api`` is a legitimate
-way to collect your own reset link. It does mean the link passes through the
-logs, which is why :func:`configured` is surfaced on the health endpoint and why
-the log line says so out loud.
+**When SMTP is not configured nothing is sent**, and a WARNING names the
+subject that was dropped — the subject, never the body. The body of a reset
+email is a working credential, and a log is read by more people, and kept
+longer, than a mailbox. :func:`configured` is surfaced on the health endpoint so
+the gap is visible before somebody needs a reset. Recipients are masked
+(``s***@example.com``) in every line this module writes.
 
 Sending is best-effort by design: :func:`send` returns False rather than raising,
 because a reset request must answer the same way whether or not the mail went
@@ -23,6 +22,7 @@ import smtplib
 from email.message import EmailMessage
 
 from app.config import settings
+from app.logging_config import mask_email
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,8 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
     """Deliver a message. Never raises; returns whether it went out.
 
     *body* is the plain-text version and is always required — an HTML-only
-    email is unreadable to anything that cannot render it, and it is the part
-    that ends up in the log when SMTP is not configured. Passing *html* adds an
-    alternative part; the client picks.
+    email is unreadable to anything that cannot render it. Passing *html* adds
+    an alternative part; the client picks.
     """
     if not configured():
         logger.warning(
@@ -79,10 +78,10 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
     except (OSError, smtplib.SMTPException) as exc:
         # Includes auth failures, DNS, TLS and timeouts. The caller cannot act
         # on any of them and must not leak which one happened to the requester.
-        logger.error("SMTP send to=%s subject=%r failed: %s", to, subject, exc)
+        logger.error("SMTP send to=%s subject=%r failed: %s", mask_email(to), subject, exc)
         return False
 
-    logger.info("sent %r to %s", subject, to)
+    logger.info("sent %r to %s", subject, mask_email(to))
     return True
 
 

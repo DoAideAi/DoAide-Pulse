@@ -30,8 +30,10 @@ shipper nobody has installed.
 from __future__ import annotations
 
 import logging
+import re
 import sys
 from contextvars import ContextVar
+from urllib.parse import urlsplit
 
 from app.config import settings
 
@@ -87,6 +89,59 @@ class RequestIDFilter(logging.Filter):
         return True
 
 
+#: URL path segments that are credentials. Holding the inbound-trigger token
+#: is enough to fire the trigger; holding the preview token is enough to read
+#: the draft. Both arrive in the path, and every path is logged — by uvicorn's
+#: access log on every request, and by the slow-request and server-error lines
+#: in ``app.main`` — so journald kept a working copy of each.
+_SECRET_PATH = re.compile(r"(/triggers/inbound/|/content/preview/)[^/?#\s]+")
+
+
+def redact_path(path: str) -> str:
+    """*path* with any credential segment replaced by ``[redacted]``."""
+    return _SECRET_PATH.sub(r"\1[redacted]", path or "")
+
+
+def mask_email(address: str | None) -> str:
+    """``sumit@example.com`` → ``s***@example.com``: which mailbox, not whose.
+
+    Enough to tell a log reader which domain a send failed for, or to match a
+    line to a support request, without turning the log into a mailing list.
+    """
+    local, at, domain = (address or "").strip().partition("@")
+    if not (at and local and domain):
+        return "***"
+    return f"{local[0]}***@{domain.lower()}"
+
+
+def url_for_log(url: str | None) -> str:
+    """Scheme and host only. For URLs whose path or query may be the secret.
+
+    A Slack or Discord incoming webhook *is* its path —
+    ``https://hooks.slack.com/services/T…/B…/XXXX`` — so logging a webhook URL
+    in full logs a credential that lets anyone post to that channel.
+    """
+    parts = urlsplit(url or "")
+    if not parts.scheme or not parts.hostname:
+        return "[unparseable url]"
+    return f"{parts.scheme}://{parts.hostname}/…"
+
+
+class AccessPathRedactor(logging.Filter):
+    """Redact credential segments from uvicorn's access-log lines.
+
+    Uvicorn formats ``'%s - "%s %s HTTP/%s" %d'`` from ``record.args`` —
+    client, method, path, HTTP version, status — so the path is rewritten in
+    the args rather than in the message, which is only built at format time.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            record.args = (*args[:2], redact_path(args[2]), *args[3:])
+        return True
+
+
 def resolve_level(name: str) -> int:
     """A level name to its number, falling back to INFO.
 
@@ -124,6 +179,12 @@ def configure_logging(*, level: str | None = None) -> None:
     handler.addFilter(RequestIDFilter())
     root.addHandler(handler)
     root.setLevel(resolved)
+
+    # On the logger, not a handler: uvicorn attaches its own handler to it, and
+    # this has to run whichever handler ends up writing the line.
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(f, AccessPathRedactor) for f in access.filters):
+        access.addFilter(AccessPathRedactor())
 
     # ``LOG_LEVEL=DEBUG`` is nobody's steady state — it is set by somebody
     # chasing a specific thing, and half of what they are chasing is usually in
