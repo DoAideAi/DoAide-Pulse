@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -17,7 +19,8 @@ function draw(path = "/content/42") {
 
 async function openForm(user) {
   await user.click(screen.getByRole("button", { name: "Feedback" }));
-  return screen.getByRole("dialog", { name: "Send feedback" });
+  // The form is its own chunk, loaded on first open.
+  return screen.findByRole("dialog", { name: "Send feedback" });
 }
 
 beforeEach(() => {
@@ -132,6 +135,13 @@ describe("FeedbackWidget", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Could not send your feedback: Write something before sending.",
     );
+  });
+
+  it("keeps the form out of the entry chunk", () => {
+    // The button is on every page; the form and Dialog load when it is used.
+    const source = readFileSync(resolve(__dirname, "FeedbackWidget.jsx"), "utf8");
+    expect(source).toContain('import("./FeedbackForm")');
+    expect(source).not.toMatch(/from "\.\/ui\/Dialog"|from "\.\/FeedbackForm"/);
   });
 
   it.each(["/embed", "/preview/abc123"])("stays off %s, which is not Pulse's own UI", (path) => {

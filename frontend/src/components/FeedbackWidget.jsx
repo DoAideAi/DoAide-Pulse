@@ -1,15 +1,8 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { api } from "../lib/api";
-import { FEATURE_AREAS, describeBrowser, featureFor } from "../lib/featureArea";
-import Dialog from "./ui/Dialog";
 
-const CATEGORIES = [
-  { value: "bug", label: "Bug Report" },
-  { value: "feature", label: "Feature Request" },
-  { value: "general", label: "General Feedback" },
-  { value: "other", label: "Other" },
-];
+const loadForm = () => import("./FeedbackForm");
+const FeedbackForm = lazy(loadForm);
 
 /**
  * Pages that are not Pulse's own UI: the subscribe widget runs inside other
@@ -41,6 +34,10 @@ export default function FeedbackWidget() {
       <button
         type="button"
         onClick={() => setOpen(true)}
+        // Fetched when the pointer or focus arrives, so it is usually there by
+        // the click; the click itself loads it otherwise.
+        onPointerEnter={loadForm}
+        onFocus={loadForm}
         className="fixed bottom-5 right-4 z-30 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-white shadow-lg hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:right-5 sm:px-4 print:hidden"
         style={{ backgroundColor: "#2563eb" }}
         aria-haspopup="dialog"
@@ -51,164 +48,11 @@ export default function FeedbackWidget() {
         </svg>
         <span className="hidden sm:inline">Feedback</span>
       </button>
-      {open && <FeedbackForm pathname={pathname} onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-function FeedbackForm({ pathname, onClose }) {
-  const [feature, setFeature] = useState(() => featureFor(pathname));
-  const [category, setCategory] = useState("general");
-  const [message, setMessage] = useState("");
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const [sent, setSent] = useState(false);
-
-  const browser = describeBrowser(typeof navigator === "undefined" ? "" : navigator.userAgent);
-
-  async function submit(event) {
-    event.preventDefault();
-    if (!message.trim()) {
-      setError("Write something before sending.");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      await api.submitFeedback({
-        category,
-        message: message.trim(),
-        email: email.trim() || null,
-        // The path only; the server drops anything after it as well.
-        page_url: pathname,
-        detected_feature: feature,
-      });
-      setSent(true);
-    } catch (err) {
-      setError(
-        err.status === 429
-          ? "That is a lot of feedback in one hour — thank you. Please try again later."
-          : `Could not send your feedback: ${err.message}`,
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (sent) {
-    return (
-      <Dialog label="Feedback sent" onClose={onClose} width="md">
-        <h2 className="font-display text-2xl text-ink-900">Thank you</h2>
-        <p className="text-sm text-ink-600" role="status">
-          Your feedback about {feature} has been sent.
-          {email.trim() ? " We will reply by email if we need more detail." : ""}
-        </p>
-        <div className="flex justify-end pt-2">
-          <button type="button" className="btn-primary" onClick={onClose}>
-            Close
-          </button>
-        </div>
-      </Dialog>
-    );
-  }
-
-  return (
-    <Dialog label="Send feedback" onClose={onClose} closable={!busy} onSubmit={submit} width="md">
-      <h2 className="font-display text-2xl text-ink-900">Send feedback</h2>
-
-      <div>
-        <label className="label" htmlFor="fb-feature">
-          Feedback about
-        </label>
-        <select
-          id="fb-feature"
-          className="input"
-          value={feature}
-          onChange={(e) => setFeature(e.target.value)}
-        >
-          {FEATURE_AREAS.map((area) => (
-            <option key={area} value={area}>
-              {area}
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-ink-400">
-          Detected from the page you are on — change it if it is about something else.
-        </p>
-      </div>
-
-      <div>
-        <label className="label" htmlFor="fb-category">
-          Category
-        </label>
-        <select
-          id="fb-category"
-          className="input"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div>
-        <label className="label" htmlFor="fb-message">
-          Your feedback
-        </label>
-        <textarea
-          id="fb-message"
-          className="input min-h-[7rem]"
-          required
-          maxLength={5000}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="What happened, or what would make this better?"
-        />
-      </div>
-
-      <div>
-        <label className="label" htmlFor="fb-email">
-          Email <span className="normal-case tracking-normal">(optional, if you would like a reply)</span>
-        </label>
-        <input
-          id="fb-email"
-          className="input"
-          type="email"
-          maxLength={320}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
-
-      <p className="text-xs text-ink-400">
-        Sent with this feedback: the page <span className="font-mono">{pathname}</span> and your
-        browser ({browser}).
-      </p>
-
-      {error && (
-        <p className="text-sm text-bad" role="alert">
-          {error}
-        </p>
+      {open && (
+        <Suspense fallback={null}>
+          <FeedbackForm pathname={pathname} onClose={() => setOpen(false)} />
+        </Suspense>
       )}
-
-      <div className="flex justify-end gap-2 pt-2">
-        <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>
-          Cancel
-        </button>
-        <button
-          type="submit"
-          className="btn-primary"
-          disabled={busy || !message.trim()}
-          style={{ backgroundColor: "#2563eb" }}
-        >
-          {busy ? "Sending…" : "Send feedback"}
-        </button>
-      </div>
-    </Dialog>
+    </>
   );
 }
