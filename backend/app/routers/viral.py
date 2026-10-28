@@ -110,12 +110,23 @@ def subscribe(
     payload: SubscribeIn,
     db: Session = Depends(get_db),
 ) -> SubscribeOut:
-    """Collect an email from the embed widget or public pages. Unauthenticated."""
-    sub = Subscriber(
-        email=payload.email.lower(),
-        source=payload.source,
-        project_id=_article_project(db, payload.article),
-    )
+    """Collect an email from the embed widget or public pages. Unauthenticated.
+
+    One row per address *per project*: the same reader signing up on two
+    accounts' articles is on both lists. The answer is the same either way,
+    so this cannot be used to find out who is already subscribed.
+    """
+    email = payload.email.lower()
+    project_id = _article_project(db, payload.article)
+    if project_id is None and db.scalar(
+        select(Subscriber.id).where(
+            Subscriber.email == email, Subscriber.project_id.is_(None)
+        )
+    ):
+        # The unique constraint cannot see this one — NULLs never collide —
+        # so an unattributed repeat is caught here.
+        return SubscribeOut(ok=True)
+    sub = Subscriber(email=email, source=payload.source, project_id=project_id)
     db.add(sub)
     try:
         db.commit()

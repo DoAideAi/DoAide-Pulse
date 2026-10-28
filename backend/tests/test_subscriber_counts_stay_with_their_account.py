@@ -107,3 +107,77 @@ def test_is_operator_follows_the_product_admin_rule(user, monkeypatch):
 
     monkeypatch.setattr(settings, "product_activity_admin_emails", "DEV@example.com, x@y.z")
     assert accounts.is_operator(user)
+
+
+# --------------------------------------------------------------------------- #
+# M2: one reader, two accounts' lists                                          #
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def bobs_article(db, second_account) -> Content:
+    bob, _ = second_account
+    project = db.query(Project).filter_by(user_id=bob.id).one()
+    row = Content(
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        status=ContentStatus.PUBLISHED,
+        title="Bob ships",
+        slug="bob-ships",
+        body_markdown="# Bob ships\n\nOut today.\n",
+        published_at=utcnow(),
+    )
+    db.add(row)
+    db.commit()
+    return row
+
+
+def test_a_reader_on_one_list_can_join_another_accounts(
+    client, auth, db, article, second_account, bobs_article
+):
+    """``email`` was unique across the install, so the second sign-up was a
+    silent duplicate: the reader was told "ok" and never reached Bob's list."""
+    _, bob_auth = second_account
+    _subscribe(client, "Reader@Example.com", article=article.slug)
+    _subscribe(client, "reader@example.com", article=bobs_article.slug)
+
+    rows = db.query(Subscriber).filter_by(email="reader@example.com").all()
+    assert sorted(r.project_id for r in rows) == sorted([article.project_id, bobs_article.project_id])
+    assert client.get(GROWTH, headers=bob_auth).json()["total"] == 1
+    assert client.get(GROWTH, headers=auth).json()["total"] == 1
+
+
+def test_signing_up_twice_on_one_list_is_still_one_row(client, db, article):
+    _subscribe(client, "reader@example.com", article=article.slug)
+    _subscribe(client, "READER@example.com", article=article.slug)
+    assert db.query(Subscriber).filter_by(email="reader@example.com").count() == 1
+
+
+def test_an_unattributed_repeat_is_still_one_row(client, db):
+    """NULLs never collide in a unique constraint, so this one is checked by hand."""
+    _subscribe(client, "reader@example.com")
+    _subscribe(client, "reader@example.com", source="footer")
+    assert db.query(Subscriber).filter_by(email="reader@example.com").count() == 1
+
+
+def test_unsubscribing_takes_the_address_off_every_list(client, db, article, bobs_article):
+    _subscribe(client, "reader@example.com", article=article.slug)
+    _subscribe(client, "reader@example.com", article=bobs_article.slug)
+
+    resp = client.post("/api/v1/subscribers/unsubscribe", json={"email": "reader@example.com"})
+
+    assert resp.status_code == 200, resp.text
+    assert db.query(Subscriber).filter_by(email="reader@example.com").count() == 0
+
+
+def test_deleting_a_project_keeps_working_when_its_reader_is_also_unattributed(
+    client, auth, db, project, article
+):
+    """Why there is no partial unique index on unattributed rows: ``SET NULL``
+    would turn this project's row into a second unattributed one."""
+    _subscribe(client, "reader@example.com")
+    _subscribe(client, "reader@example.com", article=article.slug)
+
+    resp = client.delete(f"/api/v1/projects/{project.id}", headers=auth)
+
+    assert resp.status_code == 204, resp.text

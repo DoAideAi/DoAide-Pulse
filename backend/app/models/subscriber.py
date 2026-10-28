@@ -14,7 +14,15 @@ SOURCE_MAX_LENGTH = 100
 class Subscriber(Base, TimestampMixin):
     __tablename__ = "subscribers"
     __table_args__ = (
-        UniqueConstraint("email", name="uq_subscriber_email"),
+        # Per project, not global (M2). Pulse is multi-account and a list is
+        # counted per account through ``project_id``: with ``email`` unique on
+        # its own, a reader already on one account's list who signed up on
+        # another's article was dropped as a duplicate — told "ok", and never
+        # on the second list. Two unattributed rows for one address are kept
+        # out by ``subscribe`` rather than by an index, because a partial
+        # unique index would make deleting a project (``SET NULL`` below) fail
+        # whenever one of its readers had also signed up unattributed.
+        UniqueConstraint("email", "project_id", name="uq_subscriber_email_project"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
