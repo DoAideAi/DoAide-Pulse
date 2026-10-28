@@ -30,7 +30,7 @@ from fastapi import (
     status,
 )
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only, raiseload
 
 from app.database import get_db
 from app.deps import QueryRowId, RowId, get_current_user, owned_project
@@ -182,8 +182,17 @@ def rename_tag(
         )
 
     if rewritten:
+        # Only what the write touches. A whole row would bring the body back
+        # for every piece being retagged — a common tag is most of the account
+        # — and ``Content.publications`` is ``selectin``, so every publication
+        # of each piece too. ``version`` comes along because the UPDATE checks it.
         for content in db.scalars(
-            select(Content).where(Content.id.in_(rewritten))
+            select(Content)
+            .where(Content.id.in_(rewritten))
+            .options(
+                load_only(Content.id, Content.tags, Content.version),
+                raiseload(Content.publications),
+            )
         ):
             content.tags = rewritten[content.id]
         db.commit()

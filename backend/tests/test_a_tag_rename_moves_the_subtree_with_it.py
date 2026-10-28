@@ -397,3 +397,27 @@ def test_suggesting_writes_nothing(client, auth, db, project):
     client.post(f"/api/v1/tags/suggest/{piece.id}", headers=auth)
     db.expire_all()
     assert db.get(Content, piece.id).tags == ["news"]
+
+
+def test_the_rename_write_reads_no_body_and_no_publications(
+    client, auth, db, tagged, sql_log
+):
+    """M8: retagging a piece rewrites a short list and reads nothing else.
+
+    The write-back used to load each changed piece whole — its body, and via
+    the ``selectin`` relationship every publication — to set one column.
+    """
+    db.expire_all()
+    sql_log.clear()
+    resp = client.post(
+        "/api/v1/tags/rename", headers=auth, json={"old": "guides", "new": "howto"}
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["count"] > 0
+
+    selects = [s for s in sql_log if s.startswith("SELECT")]
+    assert not any("body_markdown" in s for s in selects), selects
+    assert not any("FROM publications" in s for s in selects), selects
+    db.expire_all()
+    for row in db.query(Content).filter(Content.id.in_(resp.json()["content_ids"])):
+        assert not any(tag_service.is_within(t, "guides") for t in row.tags)
