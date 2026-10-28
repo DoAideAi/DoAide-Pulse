@@ -131,6 +131,15 @@ describe("a page that throws", () => {
     expect(screen.getByText("writer@example.com")).toBeInTheDocument();
   });
 
+  it("speaks about the page, not about a section of it", async () => {
+    await whileCaught(() => draw("/dashboard"));
+
+    const alert = screen.getByRole("alert");
+    // The whole page threw: "the rest of the page is unaffected" was untrue.
+    expect(alert).not.toHaveTextContent(/rest of the page/i);
+    expect(alert).toHaveTextContent(/failed to render/i);
+  });
+
   it("keeps the error's message, so the fallback is worth screenshotting", async () => {
     await whileCaught(() => draw("/dashboard"));
 
@@ -158,6 +167,10 @@ describe("an unshelled route that throws", () => {
     // Its own framing, not the Shell's: no navigation on this page at all.
     expect(screen.queryByRole("link", { name: "Projects" })).not.toBeInTheDocument();
     expect(alert.parentElement).toHaveClass("max-w-md");
+    // With no chrome at all, a "section" wording and a "rest of the page" were
+    // both wrong.
+    expect(alert).toHaveTextContent(/this page could not load/i);
+    expect(alert).not.toHaveTextContent(/rest of the page/i);
   });
 });
 

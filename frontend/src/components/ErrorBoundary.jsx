@@ -70,7 +70,12 @@ export default class ErrorBoundary extends Component {
     if (error === null) return this.props.children;
     if (this.props.fallback) return this.props.fallback({ error, reset: this.reset });
     return (
-      <ErrorFallback error={error} reset={this.reset} title={this.props.title} />
+      <ErrorFallback
+        error={error}
+        reset={this.reset}
+        title={this.props.title}
+        message={this.props.message}
+      />
     );
   }
 }
@@ -83,17 +88,29 @@ export default class ErrorBoundary extends Component {
  * same error again. It is there for the transient half: a render that raced a
  * state update, a chart handed a list that was briefly empty.
  */
-export function ErrorFallback({ error, reset, title = "This section could not load" }) {
+/** What a section-sized fallback says. A page-sized one passes its own. */
+const SECTION_MESSAGE =
+  "This section stopped rendering. The rest of the page is unaffected — " +
+  "try again, or reload if it keeps happening.";
+
+/** What a boundary around a whole page says — there is no "rest of the page". */
+export const PAGE_MESSAGE =
+  "Something on this page failed to render. Try again, or reload the page " +
+  "if it keeps happening.";
+
+export function ErrorFallback({
+  error,
+  reset,
+  title = "This section could not load",
+  message = SECTION_MESSAGE,
+}) {
   return (
     <div
       role="alert"
       className="panel flex flex-col items-center gap-3 px-6 py-12 text-center"
     >
       <p className="text-sm font-medium text-ink-900">{title}</p>
-      <p className="max-w-sm text-sm text-ink-500">
-        This section stopped rendering. The rest of the page is unaffected —
-        try again, or reload if it keeps happening.
-      </p>
+      <p className="max-w-sm text-sm text-ink-500">{message}</p>
       {/* The raw message, because the person hitting this is usually the person
           who can act on it, and "an error occurred" is not a bug report. */}
       {error?.message && (

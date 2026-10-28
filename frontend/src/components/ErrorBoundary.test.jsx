@@ -10,7 +10,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useEffect } from "react";
 import { MemoryRouter, Route, Routes, Link } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import ErrorBoundary, { ErrorFallback, RouteErrorBoundary } from "./ErrorBoundary";
+import ErrorBoundary, { ErrorFallback, PAGE_MESSAGE, RouteErrorBoundary } from "./ErrorBoundary";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
 import { whileCaught } from "../test/caught";
 
@@ -356,5 +356,31 @@ describe("ErrorFallback on its own", () => {
     render(<ErrorFallback error={new Error("x")} />);
 
     expect(screen.getByText("This section could not load")).toBeInTheDocument();
+  });
+});
+
+describe("the fallback's wording", () => {
+  it("tells a section that the rest of the page still works", async () => {
+    await whileCaught(async () => {
+      render(
+        <ErrorBoundary>
+          <Boom />
+        </ErrorBoundary>,
+      );
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent(/rest of the page is unaffected/i);
+  });
+
+  it("lets a page-sized boundary say something true about a page", async () => {
+    await whileCaught(async () => {
+      render(
+        <ErrorBoundary title="This page stopped working" message={PAGE_MESSAGE}>
+          <Boom />
+        </ErrorBoundary>,
+      );
+    });
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/failed to render/i);
+    expect(alert).not.toHaveTextContent(/rest of the page/i);
   });
 });

@@ -1,6 +1,6 @@
 import { Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { ErrorFallback, RouteErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorFallback, PAGE_MESSAGE, RouteErrorBoundary } from "./components/ErrorBoundary";
 import InstallPrompt from "./components/InstallPrompt";
 import Shell from "./components/Shell";
 import { useAuth } from "./hooks/useAuth";
@@ -74,7 +74,7 @@ function Protected({ children }) {
   if (!user) return <Navigate to="/" replace />;
   return (
     <Shell>
-      <RouteErrorBoundary title="This page stopped working" section="page">
+      <RouteErrorBoundary title="This page stopped working" message={PAGE_MESSAGE} section="page">
         <Suspense fallback={<PageLoading />}>{children}</Suspense>
       </RouteErrorBoundary>
     </Shell>
@@ -95,7 +95,14 @@ function Unshelled({ children, section }) {
       fallback={({ error, reset }) => (
         <div className="flex min-h-screen items-center justify-center px-5">
           <div className="w-full max-w-md">
-            <ErrorFallback error={error} reset={reset} />
+            {/* The whole page, so the page wording — the section default
+                promised a "rest of the page" that was not there. */}
+            <ErrorFallback
+              error={error}
+              reset={reset}
+              title="This page could not load"
+              message={PAGE_MESSAGE}
+            />
           </div>
         </div>
       )}
