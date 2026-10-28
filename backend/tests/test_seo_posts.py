@@ -159,3 +159,27 @@ def test_optimal_slots_without_a_platform_falls_back_to_connected_ones(client, a
     assert [s["platform"] for s in resp.json()] == ["devto"]
     resp = client.get(f"{SLOTS}?platforms=hashnode&platforms=devto", headers=auth)
     assert {s["platform"] for s in resp.json()} == {"hashnode", "devto"}
+
+
+def test_the_queue_partitions_by_id_in_one_pass(db, user, project):
+    """M8: every post appears exactly once — scheduled first, the rest in order.
+
+    The unscheduled remainder used to be found by a list-membership test per
+    post, quadratic in the 500 candidates.
+    """
+    now = utcnow()
+    for i in range(40):
+        extra = {"scheduled_for": now + timedelta(days=40 - i)} if i % 4 == 0 else {}
+        _post(db, project, f"Post {i}", **extra)
+
+    posts = seo_posts.queue(db, user.id, limit=500)
+
+    ids = [p["id"] for p in posts]
+    assert len(ids) == len(set(ids)) == 40
+    upcoming = [p for p in posts if p["scheduled_for"]]
+    assert posts[: len(upcoming)] == upcoming
+    assert [p["scheduled_for"] for p in upcoming] == sorted(p["scheduled_for"] for p in upcoming)
+    rest = posts[len(upcoming):]
+    assert [p["created_at"] for p in rest] == sorted(
+        (p["created_at"] for p in rest), reverse=True
+    )

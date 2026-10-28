@@ -159,5 +159,9 @@ def queue(db: Session, user_id: int, *, limit: int = 100) -> list[dict]:
         (p for p in posts if p["scheduled_for"] and not p["published_at"]),
         key=lambda p: p["scheduled_for"],
     )
-    rest = [p for p in posts if p not in upcoming]
+    # By id: ``p not in upcoming`` was a list scan per post, each step a dict
+    # comparison — quadratic in the 500 candidates for an answer a set gives
+    # in one pass.
+    scheduled = {p["id"] for p in upcoming}
+    rest = [p for p in posts if p["id"] not in scheduled]
     return (upcoming + rest)[:limit]
