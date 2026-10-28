@@ -1501,6 +1501,37 @@ function PreviewLinksPanel({ contentId }) {
 
 function PublicationsPanel({ content, onChanged }) {
   const toast = useToast();
+  const [cancelling, setCancelling] = useState(false);
+  // Rows that will still go out by themselves. The backend has always been able
+  // to call these off (`DELETE /content/{id}/schedule`); the editor showed the
+  // date and offered no way to change your mind short of deleting the piece.
+  const waiting = content.publications.filter(
+    (p) => p.status === "scheduled" || p.status === "pending",
+  );
+
+  async function cancelSchedule() {
+    if (
+      !window.confirm(
+        "Take this piece off the schedule? Nothing will be published. " +
+          "Publishing it again later re-arms the same platforms.",
+      )
+    )
+      return;
+    setCancelling(true);
+    try {
+      const cancelled = await api.unscheduleContent(content.id);
+      onChanged();
+      toast.success(
+        cancelled.length === 1
+          ? "Schedule cancelled — it will not go out"
+          : `Schedule cancelled on ${cancelled.length} platforms — nothing will go out`,
+      );
+    } catch (err) {
+      toast.error(`Could not cancel the schedule: ${err.message}`);
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   async function retry(publicationId) {
     try {
@@ -1523,7 +1554,19 @@ function PublicationsPanel({ content, onChanged }) {
 
   return (
     <div className="panel p-5">
-      <h2 className="mb-3 text-sm font-semibold text-ink-900">Publications</h2>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink-900">Publications</h2>
+        {waiting.length > 0 && (
+          <button
+            type="button"
+            className="btn-quiet -mr-2.5 text-xs text-bad"
+            onClick={cancelSchedule}
+            disabled={cancelling}
+          >
+            {cancelling ? "Cancelling…" : "Cancel schedule"}
+          </button>
+        )}
+      </div>
       <ul className="space-y-3">
         {content.publications.map((publication) => (
           <li key={publication.id} className="text-xs">

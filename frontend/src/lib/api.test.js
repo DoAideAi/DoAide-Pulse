@@ -594,6 +594,7 @@ describe("every endpoint's path and verb", () => {
     ["seoOptimalSlots", [["devto", "hashnode"]], "/seo/optimal-slots?platforms=devto&platforms=hashnode", "GET"],
     ["createContent", [{ title: "t" }], "/content", "POST"],
     ["scheduleContent", [3, { optimize: true }], "/content/3/schedule", "POST"],
+    ["unscheduleContent", [3], "/content/3/schedule", "DELETE"],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],

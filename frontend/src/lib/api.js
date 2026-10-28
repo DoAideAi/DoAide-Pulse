@@ -233,6 +233,9 @@ export const api = {
   // table's best slot per platform with `optimize: true`.
   scheduleContent: (id, payload) =>
     request(`/content/${id}/schedule`, { method: "POST", body: payload }),
+  // Cancels every row that would still go out on its own (scheduled or
+  // pending) without publishing anything; returns the rows it cancelled.
+  unscheduleContent: (id) => request(`/content/${id}/schedule`, { method: "DELETE" }),
   // `force` approves past the SEO preflight's 409 — the human override for
   // checks that are advice about a piece somebody has already read.
   approveContent: (id, { force = false } = {}) =>

@@ -38,6 +38,7 @@ vi.mock("../lib/api", () => ({
     createPreviewLink: vi.fn(),
     revokePreviewLink: vi.fn(),
     retryPublication: vi.fn(),
+    unscheduleContent: vi.fn(),
     publishContent: vi.fn(),
     listRevisions: vi.fn(),
     restoreRevision: vi.fn(),
@@ -468,6 +469,43 @@ describe("the link check", () => {
 // --------------------------------------------------------------------------- //
 
 describe("the publications panel", () => {
+  it("can call off a scheduled piece, after confirming", async () => {
+    const scheduled = publication({
+      id: 12,
+      status: "scheduled",
+      external_url: null,
+      scheduled_for: "2026-08-20T09:00:00Z",
+    });
+    api.unscheduleContent.mockResolvedValue([{ ...scheduled, status: "cancelled" }]);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+    await open({ publications: [scheduled] });
+
+    await user.click(screen.getByRole("button", { name: "Cancel schedule" }));
+
+    expect(confirm).toHaveBeenCalled();
+    expect(api.unscheduleContent).toHaveBeenCalledWith(3);
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Schedule cancelled — it will not go out"));
+    confirm.mockRestore();
+  });
+
+  it("does nothing if the confirmation is declined", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const user = userEvent.setup();
+    await open({ publications: [publication({ id: 12, status: "pending", external_url: null })] });
+
+    await user.click(screen.getByRole("button", { name: "Cancel schedule" }));
+
+    expect(api.unscheduleContent).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
+
+  it("offers no cancel once nothing is waiting to go out", async () => {
+    await open({ publications: [publication()] }); // published
+
+    expect(screen.queryByRole("button", { name: "Cancel schedule" })).not.toBeInTheDocument();
+  });
+
   it("says nothing has been sent rather than showing an empty list", async () => {
     await open({ publications: [] });
 
