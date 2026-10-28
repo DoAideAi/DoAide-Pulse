@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -286,44 +286,80 @@ def verify_connection(
     # on the publish path.
     credentials: dict = {}
     previous_status = connection.status
+    connection_id = connection.id
+    ciphertext = connection.encrypted_credentials
+    values: dict
     try:
-        credentials = decrypt_credentials(connection.encrypted_credentials)
-        connection.display_name = adapter.verify(credentials)
-        connection.status = ConnectionStatus.CONNECTED
-        connection.last_verified_at = utcnow()
-        connection.last_error = None
+        credentials = decrypt_credentials(ciphertext)
+        values = {
+            "display_name": adapter.verify(credentials),
+            "status": ConnectionStatus.CONNECTED,
+            "last_verified_at": utcnow(),
+            "last_error": None,
+        }
     except (CredentialError, CredentialEncryptionError) as exc:
-        connection.status = ConnectionStatus.INVALID
-        connection.last_error = clip_error(
-            redact(str(exc), publishers.secret_values(adapter, credentials))
-        )
+        values = {
+            "status": ConnectionStatus.INVALID,
+            "last_error": clip_error(
+                redact(str(exc), publishers.secret_values(adapter, credentials))
+            ),
+        }
     except (PublishError, NotImplementedAdapter) as exc:
         # Leave the status alone: an unreachable platform is not proof the
         # credentials are bad, and flipping to INVALID would make the user
         # re-enter a working token.
-        connection.last_error = clip_error(
-            redact(str(exc), publishers.secret_values(adapter, credentials))
-        )
+        values = {
+            "last_error": clip_error(
+                redact(str(exc), publishers.secret_values(adapter, credentials))
+            )
+        }
 
-    if connection.status != previous_status:
+    # Written only onto the credentials that were checked. The call above is a
+    # network round-trip, and a save from another tab in the meantime had its
+    # fresh credentials marked with the verdict on the old ones — INVALID, in
+    # the case that matters — while a removal meanwhile was a StaleDataError
+    # and a 500. Either way the row now says something this check did not see.
+    db.rollback()
+    written = db.execute(
+        update(PlatformConnection)
+        .where(
+            PlatformConnection.id == connection_id,
+            PlatformConnection.encrypted_credentials == ciphertext,
+        )
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    db.commit()
+
+    current = db.get(PlatformConnection, connection_id, populate_existing=True)
+    if current is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"{platform.value} was disconnected while it was being checked.",
+        )
+    if not written:
+        logger.info(
+            "user %s verified %s, but the credentials were replaced meanwhile; "
+            "result discarded",
+            user.id,
+            platform.value,
+        )
+    elif current.status != previous_status:
         logger.warning(
             "user %s connection %s status changed: %s -> %s",
             user.id,
             platform.value,
             previous_status.value,
-            connection.status.value,
+            current.status.value,
         )
     else:
         logger.info(
             "user %s verified %s: status=%s",
             user.id,
             platform.value,
-            connection.status.value,
+            current.status.value,
         )
-
-    db.commit()
-    db.refresh(connection)
-    return ConnectionOut.model_validate(connection)
+    return ConnectionOut.model_validate(current)
 
 
 @router.delete(
