@@ -17,7 +17,7 @@ from __future__ import annotations
 # Imported at runtime: SQLAlchemy resolves Mapped[...] at class-definition time.
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -36,6 +36,18 @@ KINDS = (PAGE_VIEW, ACTION)
 
 class ActivityEvent(Base):
     __tablename__ = "activity_events"
+    __table_args__ = (
+        # The summary reads one user's rows inside a time window; the two
+        # single-column indexes made the planner pick one and filter on the
+        # other, which on the busiest user is most of the table.
+        Index("ix_activity_events_user_created", "user_id", "created_at"),
+        # The API accepts only these, but a column the database does not
+        # check is one direct write away from holding anything.
+        CheckConstraint(
+            "kind IN (" + ", ".join(f"'{k}'" for k in KINDS) + ")",
+            name="ck_activity_event_kind",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(

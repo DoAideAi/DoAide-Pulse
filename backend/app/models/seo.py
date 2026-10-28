@@ -11,7 +11,7 @@ from __future__ import annotations
 # Imported at runtime: SQLAlchemy resolves Mapped[...] at class-definition time.
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Integer, String, Text
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -19,9 +19,18 @@ from app.models.mixins import TimestampMixin
 
 SITE_KEY_MAX_LENGTH = 40
 
+#: Every value :func:`app.services.sitemaps.check` writes to ``submit_status``.
+SUBMIT_STATUSES = ("submitted", "error", "unconfigured")
+
 
 class SitemapStatus(Base, TimestampMixin):
     __tablename__ = "seo_sitemaps"
+    __table_args__ = (
+        CheckConstraint(
+            "submit_status IN (" + ", ".join(f"'{s}'" for s in SUBMIT_STATUSES) + ")",
+            name="ck_sitemap_submit_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     site_key: Mapped[str] = mapped_column(

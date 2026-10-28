@@ -16,7 +16,7 @@ from __future__ import annotations
 # Imported at runtime: SQLAlchemy resolves Mapped[...] at class-definition time.
 from datetime import datetime
 
-from sqlalchemy import DateTime, Index, String
+from sqlalchemy import CheckConstraint, DateTime, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -37,6 +37,10 @@ class ProductEvent(Base):
     __tablename__ = "product_events"
     __table_args__ = (
         Index("ix_product_events_product_occurred", "product", "occurred_at"),
+        CheckConstraint(
+            "kind IN (" + ", ".join(f"'{k}'" for k in KINDS) + ")",
+            name="ck_product_event_kind",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
