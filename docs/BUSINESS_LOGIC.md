@@ -153,7 +153,7 @@ focus keyword is `focus_keyword`, or the first keyword if none is set.
 | Keyword density outside 0.5–3.0 % / outside 1.0–2.5 % | −10 / −5 |
 | First paragraph lacks the focus keyword | −10 |
 | No headings / no heading has the focus keyword | −10 / −5 |
-| A heading level skipped (H2 → H4), per skip | −5 |
+| A heading level skipped (H2 → H4) — once, however many skips | −5 |
 | No cover image | −5 |
 | An image without alt text | −5 |
 | Under 300 words | −5 |
