@@ -93,6 +93,11 @@ def test_copying_the_example_unedited_cannot_start_in_production():
 #: the running API has no use for them and should not carry them.
 _READ_DIRECTLY_FROM_ENV = {"SEED_EMAIL", "SEED_PASSWORD"}
 
+#: Keys docker-compose.yml substitutes, not the app. ``POSTGRES_PASSWORD`` sets
+#: the bundled Postgres's password and is spliced into the services'
+#: DATABASE_URL by compose itself; no Python reads it.
+_READ_BY_COMPOSE = {"POSTGRES_PASSWORD"}
+
 
 def test_every_example_key_is_a_real_setting():
     """A key the app does not read is a line an operator will set and trust.
@@ -100,7 +105,11 @@ def test_every_example_key_is_a_real_setting():
     ``extra="ignore"`` means a renamed or misspelled setting here is accepted in
     silence, so the example can go on documenting a knob that stopped existing.
     """
-    known = {name.upper() for name in Settings.model_fields} | _READ_DIRECTLY_FROM_ENV
+    known = (
+        {name.upper() for name in Settings.model_fields}
+        | _READ_DIRECTLY_FROM_ENV
+        | _READ_BY_COMPOSE
+    )
     unknown = sorted(set(_example_values()) - known)
     assert not unknown, f".env.example documents settings that do not exist: {unknown}"
 
@@ -118,6 +127,18 @@ def test_the_directly_read_keys_are_still_read_directly():
     )
     for key in _READ_DIRECTLY_FROM_ENV:
         assert f'"{key}"' in source, f"{key} is no longer read by app/seed.py"
+        assert key.lower() not in Settings.model_fields, (
+            f"{key} is now a real setting — drop it from the allowlist"
+        )
+
+
+def test_the_compose_keys_are_still_read_by_compose():
+    """The compose allowlist, held to the same standard as the one above."""
+    compose = (Path(__file__).resolve().parents[2] / "docker-compose.yml").read_text(
+        encoding="utf-8"
+    )
+    for key in _READ_BY_COMPOSE:
+        assert f"${{{key}" in compose, f"{key} is no longer read by docker-compose.yml"
         assert key.lower() not in Settings.model_fields, (
             f"{key} is now a real setting — drop it from the allowlist"
         )
