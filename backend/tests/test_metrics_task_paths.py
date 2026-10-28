@@ -168,6 +168,47 @@ def test_one_broken_platform_does_not_stop_the_sweep(db, project, monkeypatch):
     assert result == {"polled": 3, "recorded": 2, "crossings": 0}
 
 
+def test_a_batch_lost_to_a_failed_commit_is_logged_not_swallowed(
+    db, project, monkeypatch, caplog
+):
+    """When one platform raises, the sweep commits the snapshots it already has
+    for the others. If *that* commit failed it rolled back silently, and the
+    only line in the journal named the publication that raised — a batch of
+    other publications' metrics disappeared without a trace."""
+    import logging
+
+    from sqlalchemy.exc import OperationalError
+
+    for index in range(2):
+        _published(db, project, index)
+    calls: list[int] = []
+
+    def _collect(session, publication, **kwargs):
+        calls.append(publication.id)
+        if len(calls) == 2:
+            raise ValueError("that was not JSON")
+        return ContentMetric(publication_id=publication.id, views=1)
+
+    real_commit = db.commit
+    failed = []
+
+    def _commit_fails_once():
+        if not failed:
+            failed.append(True)
+            raise OperationalError("COMMIT", {}, Exception("disk full"))
+        return real_commit()
+
+    monkeypatch.setattr(metrics_tasks.publishing_service, "collect_metrics", _collect)
+    monkeypatch.setattr(db, "commit", _commit_fails_once)
+
+    with caplog.at_level(logging.ERROR, logger="app.tasks.metrics_tasks"):
+        metrics_tasks.collect_all_metrics()
+
+    assert any(
+        "discarded 1 snapshot(s)" in r.getMessage() for r in caplog.records
+    ), [r.getMessage() for r in caplog.records]
+
+
 # --------------------------------------------------------------------------- #
 # collect_one — the refresh button                                             #
 # --------------------------------------------------------------------------- #

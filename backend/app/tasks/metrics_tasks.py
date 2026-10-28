@@ -137,6 +137,15 @@ def collect_all_metrics() -> dict:
                             db.commit()
                         except Exception:
                             db.rollback()
+                            # Logged, not swallowed: these are snapshots already
+                            # fetched for *other* publications, and the line
+                            # below only names the one that raised. Without this
+                            # a batch of metrics vanished with no trace at all.
+                            logger.exception(
+                                "metrics collection discarded %d snapshot(s) "
+                                "already fetched: the batch commit failed",
+                                _pending,
+                            )
                         _pending = 0
                     else:
                         db.rollback()
