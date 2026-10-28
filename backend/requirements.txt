@@ -2,35 +2,37 @@
 # Python 3.12 (3.11+ works; 3.14 lacks wheels for some of these).
 
 # ---- Web ----
-# Floors are security floors, not compatibility guesses. `pip install -r` on a
-# box that already has a package only upgrades it when the installed version
-# falls below the floor, so a floor that admits a vulnerable release keeps that
-# release installed indefinitely (see the cryptography note below). Each floor
-# here is at or above the newest fix pip-audit knows of for that package, as of
+# Exact pins (C103 M20). These were >= floors, which made every deploy install
+# whatever was newest that morning — production and a fresh checkout could run
+# different code from the same commit, and nothing reviewed the difference. A
+# pin moves only in a commit, after the suite has run against it.
+#
+# Each pin is also at or above the newest fix pip-audit knows of for that
+# package (the notes below say which advisory each was raised for), as of
 # 2026-10-28; re-check with
-#   pip-audit -r <(sed -E 's/\[[a-z,]+\]//; s/>=/==/' requirements.txt) --no-deps --disable-pip
-fastapi>=0.160
+#   pip-audit -r <(sed -E 's/\[[a-z,]+\]//' requirements.txt) --no-deps --disable-pip
+fastapi==0.162.0
 # Transitive, but pinned here because FastAPI's own range admits releases with
 # known advisories: starlette below 1.3.1 (7, including multipart DoS) and h11
 # below 0.16.0 (request smuggling).
-starlette>=1.3.1
-h11>=0.16.0
-uvicorn[standard]>=0.30
-python-multipart>=0.0.31
-email-validator>=2.1
+starlette==1.10.0
+h11==0.16.0
+uvicorn[standard]==0.54.0
+python-multipart==0.0.32
+email-validator==2.3.0
 # Not imported directly: email-validator's DNS dependency. Floor is 2.9.0 for
 # CVE-2026-114605 (excessive CPU decompressing a crafted DNS name). Pulse
 # validates addresses without a deliverability lookup, so it parses no DNS
 # replies today — but the box had 2.8.0, and without a floor here `pip install
 # -r` keeps whatever is installed for as long as email-validator is satisfied.
-dnspython>=2.9.0
+dnspython==2.9.0
 
 # ---- Data ----
-sqlalchemy>=2.0
-alembic>=1.13
-psycopg[binary]>=3.1
-pydantic>=2.7
-pydantic-settings>=2.3
+sqlalchemy==2.1.6
+alembic==1.20.1
+psycopg[binary]==3.3.6
+pydantic==2.14.1
+pydantic-settings==2.16.2
 
 # ---- Auth ----
 # JWTs are PyJWT's, not python-jose's. Worth stating because `python-jose` was
@@ -50,43 +52,50 @@ pydantic-settings>=2.3
 #
 # Until somebody runs that, an `ecdsa` line in a pip-audit report is this, and
 # not a dependency that came back.
-PyJWT>=2.15.0
-bcrypt>=4.1
+PyJWT==2.15.1
+bcrypt==5.0.0
 # Rate limiting for /auth/* (login guessing, signup, reset-mail flooding).
-slowapi>=0.1.9
+slowapi==0.1.10
+# Imported directly (app.ratelimit: parse_many, the window stats behind
+# every 429's wait) rather than only through slowapi, so declared and
+# pinned in its own right.
+limits==5.8.0
 # Credential encryption at rest (Fernet).
 # Floor is 50.0 for PYSEC-2026-3552 (a decryption oracle in the PKCS7 helpers).
 # Pulse only uses Fernet and never touches those, so the exposure was nil — but
 # the floor is what `pip install -r` on the box compares against, and at >=42.0
 # an already-installed 49.0.0 satisfied it and was never upgraded.
-cryptography>=50.0
+cryptography==50.0.2
 
 # ---- Queue ----
-celery[redis]>=5.4
-redis>=5.0
+celery[redis]==5.6.3
+redis==6.4.0
 
 # ---- HTTP (LLM providers, GitHub, platform APIs) ----
-httpx>=0.27
+httpx==0.28.1
+# Imported directly by app.services.link_check for the vetted-address
+# transport; declared rather than left to arrive with httpx.
+httpcore==1.0.9
 # Not imported directly: the CA bundle httpx trusts. Floor is 2026.10.18 for
 # PYSEC-2026-4320 — earlier bundles still trust the emSign ECC Root CA - G3,
 # under which eight intermediates' private keys are compromised, so anyone
 # holding one could pass as any platform's API and be handed the credentials
 # the publishers send it. Pinned here because nothing else would ever move it:
 # production was on 2026.7.22.
-certifi>=2026.10.18
+certifi==2026.10.23
 
 # ---- Content ----
 # Markdown -> HTML for the platforms that don't take Markdown (Medium, LinkedIn,
 # WordPress). `extras` gives us fenced code blocks and tables.
-markdown>=3.8.1
+markdown==3.11.2
 # Strips HTML back to plain text for character-limited platforms.
-beautifulsoup4>=4.12
+beautifulsoup4==4.15.0
 # Sanitises rendered post HTML before it is published. Markdown passes raw HTML
 # straight through, so this is what stands between a <script> in a body and the
 # author's readers. See app.services.publishers.formatting.sanitize_html.
-nh3>=0.2.18
+nh3==0.3.7
 # Text out of uploaded PDFs, for creating a project from documents
 # (app.services.project_import). Pure Python, no system libraries.
 # 6.21.2: below it pypdf has some sixty advisories, nearly all denial of
 # service from a crafted PDF — and the PDFs this parses are uploaded by users.
-pypdf>=6.21.2
+pypdf==6.21.3

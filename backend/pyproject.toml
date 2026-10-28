@@ -12,7 +12,7 @@ dynamic = ["dependencies"]
 # Kept equal to requirements-dev.txt (which setuptools cannot read: it opens
 # with `-r requirements.txt`). tests/test_dev_extra_matches_requirements_dev.py
 # holds the two together; this list had lost httpx2, pytest-cov and pyyaml.
-dev = ["pytest>=8.2", "pytest-cov>=5.0", "ruff>=0.5", "httpx2>=2.0", "pyyaml>=6.0"]
+dev = ["pytest==9.2.0", "pytest-cov==7.1.0", "ruff==0.17.3", "httpx2==2.16.0", "pyyaml==6.0.3"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
