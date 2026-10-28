@@ -68,14 +68,36 @@ def _project_url(value: str | None) -> str | None:
     raise ValueError("must be an http(s) URL, like https://example.com")
 
 
+def _clean_entries(values: list[str]) -> list[str]:
+    """Trim, drop blanks, dedupe case-insensitively, keep the user's casing.
+
+    "FastAPI" should not become "fastapi" in the UI. Shared by create and
+    update: the update had none of it, so a PATCH stored the blank entries and
+    the case-variant repeats a create would have cleaned out.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = str(value).strip()
+        if not text or text.lower() in seen:
+            continue
+        seen.add(text.lower())
+        out.append(text)
+    return out[:25]
+
+
 class ProjectBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=5000)
     repo_url: str | None = Field(default=None, max_length=500)
     live_url: str | None = Field(default=None, max_length=500)
-    tech_stack: list[str] = Field(default=[], max_length=25)
+    # The same item types ``ProjectUpdate`` uses. These were bare ``str``, so a
+    # project could be *created* with a keyword as long as the body limit —
+    # stored, and handed to every prompt and SEO check written for it — that a
+    # PATCH of the same value would refuse.
+    tech_stack: list[TechStackEntry] = Field(default=[], max_length=25)
     target_audience: str = Field(default="", max_length=500)
-    keywords: list[str] = Field(default=[], max_length=25)
+    keywords: list[Keyword] = Field(default=[], max_length=25)
     tone: Tone = Tone.TECHNICAL
     is_active: bool = True
     autopilot_mode: AutopilotMode = AutopilotMode.OFF
@@ -115,17 +137,7 @@ class ProjectBase(BaseModel):
     @field_validator("tech_stack", "keywords")
     @classmethod
     def _clean_list(cls, values: list[str]) -> list[str]:
-        # Trim, drop blanks, dedupe case-insensitively but keep the user's
-        # capitalisation — "FastAPI" should not become "fastapi" in the UI.
-        out: list[str] = []
-        seen: set[str] = set()
-        for value in values:
-            text = str(value).strip()
-            if not text or text.lower() in seen:
-                continue
-            seen.add(text.lower())
-            out.append(text)
-        return out[:25]
+        return _clean_entries(values)
 
 
 class ProjectCreate(ProjectBase):
@@ -181,6 +193,11 @@ class ProjectUpdate(BaseModel):
         if not name:
             raise ValueError("A project needs a name.")
         return name
+
+    @field_validator("tech_stack", "keywords")
+    @classmethod
+    def _clean_list(cls, values: list[str] | None) -> list[str] | None:
+        return None if values is None else _clean_entries(values)
 
     @field_validator("autopilot_platforms")
     @classmethod
