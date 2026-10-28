@@ -1,0 +1,35 @@
+# The build context is this directory (docker-compose.yml: `build: ./backend`),
+# so the repository-root .dockerignore never applies to it. Without this file
+# `COPY . .` shipped the developer's virtualenv (macOS binaries, ~175 MB), the
+# uploads directory — other people's images — and any local .env into every
+# image built from a working checkout.
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+keys/
+*.pem
+*.key
+
+# Local virtualenv and tool caches
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.benchmarks/
+
+# Runtime data
+uploads/
+*.db
+*.sqlite3
+celerybeat-schedule*
+
+# Not needed to run the service
+tests/
+requirements-dev.txt
