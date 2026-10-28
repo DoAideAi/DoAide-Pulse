@@ -262,6 +262,10 @@ def generate_and_route(
         and (confident or auto_approvable or mode == AutopilotMode.FULL)
         and destinations.usable
     )
+    # Whether the mode and confidence made this a candidate for publishing
+    # unreviewed, before any gate had its say — kept so "held by a gate" and
+    # "never eligible" stay distinguishable afterwards (autopilot_report).
+    candidate = auto
 
     dead_links: list[str] = []
     if auto and settings.link_check_enabled:
@@ -498,6 +502,11 @@ def generate_and_route(
             # looking at a piece that was meant to publish itself should be able
             # to see why it did not without reading the logs.
             "unconnected_platforms": destinations.unconnected,
+            # The decision itself. The status records it only until somebody
+            # moves the piece, and "how often does autopilot hold back, and
+            # how often is it overruled" needs what it decided, not where the
+            # piece is now.
+            "routing": {"mode": mode.value, "candidate": candidate, "auto": auto},
         },
     )
     db.add(content)

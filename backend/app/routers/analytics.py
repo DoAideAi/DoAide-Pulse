@@ -15,6 +15,7 @@ from app.models.user import User
 from app.ratelimit import account_key, limiter
 from app.schemas.analytics import (
     AlertsOut,
+    AutopilotEffectivenessOut,
     DashboardOut,
     DigestOut,
     DigestSendOut,
@@ -32,7 +33,17 @@ from app.schemas.analytics import (
     VelocitySummaryOut,
 )
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
-from app.services import accounts, alerts, analytics_service, digest, feature_usage, funnel, mailer, velocity
+from app.services import (
+    accounts,
+    alerts,
+    analytics_service,
+    autopilot_report,
+    digest,
+    feature_usage,
+    funnel,
+    mailer,
+    velocity,
+)
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -86,6 +97,22 @@ def content_funnel(
     """The content funnel for pieces written in the last ``days``, overall and
     by origin, with the pieces that have stalled. See :mod:`app.services.funnel`."""
     return funnel.funnel(db, user.id, days=days, stale_days=stale_days)
+
+
+@router.get(
+    "/autopilot",
+    response_model=AutopilotEffectivenessOut,
+    summary="Autopilot's decisions: published unreviewed, held and why, overruled",
+    responses=errors(*AUTHENTICATED),
+)
+def autopilot_effectiveness(
+    days: int = Query(default=90, ge=1, le=365),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """How the autopilot's gates judged the pieces written in the last ``days``
+    and how often people disagreed. See :mod:`app.services.autopilot_report`."""
+    return autopilot_report.report(db, user.id, days=days)
 
 
 @router.get(

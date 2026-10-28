@@ -659,6 +659,49 @@ class FunnelOut(BaseModel):
     stuck: list[StuckContentOut]
 
 
+class HoldReasonOut(BaseModel):
+    """How many held pieces one gate held back (a piece can count under several)."""
+
+    reason: str
+    count: int
+
+
+class QualityBucketOut(BaseModel):
+    """Pieces in one quality-score band, by what autopilot did with them."""
+
+    bucket: str
+    auto: int
+    held: int
+
+
+class AutopilotEffectivenessOut(BaseModel):
+    """What autopilot published unreviewed, what it held and why, and how
+    often a person disagreed afterwards."""
+
+    days: int
+    routed: int
+    auto_approved: int
+    held: int
+    auto_rate: float | None
+    #: Pieces from before the decision was recorded, whose decision is inferred.
+    inferred: int
+    hold_reasons: list[HoldReasonOut]
+    #: Held, then published by a person: the gates were stricter than the reviewer.
+    held_published: int
+    override_rate: float | None
+    #: Held, then archived without going out.
+    held_rejected: int
+    rejection_rate: float | None
+    #: Auto-approved, then archived without going out: the gates were too lenient.
+    auto_pulled: int
+    pulled_rate: float | None
+    #: Auto-approved with the SEO score under the bar (the confidence waiver).
+    auto_below_seo_threshold: int
+    median_quality_auto: float | None
+    median_quality_held: float | None
+    quality_distribution: list[QualityBucketOut]
+
+
 class SubscriberGrowthOut(BaseModel):
     """Newsletter audience growth for the analytics page.
 
