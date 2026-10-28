@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { staticPosts } from "../data/blogPosts";
+import { blogPostIndex } from "../data/blogPostIndex";
 import CrossProductLinks from "../components/CrossProductLinks";
 import PublicNav from "../components/PublicNav";
 import DoAideFooter from "../components/DoAideFooter";
@@ -8,9 +8,47 @@ import ShareButtons from "../components/ShareButtons";
 import trackEvent from "../lib/trackEvent";
 import { applyPageMeta } from "../lib/pageMeta";
 
+/**
+ * One loader per post, so a post view fetches its own body and nobody else's.
+ * Importing every post's text (data/blogPosts.js) put about 125 KB of other
+ * posts into this page's chunk; the listing fields come from the small index,
+ * which is enough to draw the heading and the page's meta straight away.
+ */
+const CONTENT = import.meta.glob("../data/posts/*.js");
+
+function usePostContent(slug) {
+  const [state, setState] = useState({ slug: null, content: null, failed: false });
+  const [attempt, setAttempt] = useState(0);
+  const load = slug ? CONTENT[`../data/posts/${slug}.js`] : null;
+
+  useEffect(() => {
+    if (!load) return undefined;
+    let cancelled = false;
+    setState({ slug, content: null, failed: false });
+    load().then(
+      (module) => {
+        if (!cancelled) setState({ slug, content: module.default, failed: false });
+      },
+      () => {
+        if (!cancelled) setState({ slug, content: null, failed: true });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [load, slug, attempt]);
+
+  // Never another post's text while the next one is on its way.
+  const current = state.slug === slug ? state : { content: null, failed: false };
+  return { ...current, retry: () => setAttempt((n) => n + 1) };
+}
+
 export default function BlogPost() {
   const { slug } = useParams();
-  const post = staticPosts.find((p) => p.slug === slug);
+  const listed = blogPostIndex.find((p) => p.slug === slug);
+  const { content, failed, retry } = usePostContent(listed ? slug : null);
+  // A listed slug with no body module is a post that does not exist either.
+  const post = listed && CONTENT[`../data/posts/${slug}.js`] ? listed : null;
 
   useEffect(() => {
     if (post)
@@ -53,11 +91,12 @@ export default function BlogPost() {
         ],
       },
     ];
-    if (post.faqs && post.faqs.length > 0) {
+    const faqs = content?.faqs ?? [];
+    if (faqs.length > 0) {
       schemas.push({
         "@context": "https://schema.org",
         "@type": "FAQPage",
-        mainEntity: post.faqs.map((faq) => ({
+        mainEntity: faqs.map((faq) => ({
           "@type": "Question",
           name: faq.question,
           acceptedAnswer: {
@@ -74,7 +113,7 @@ export default function BlogPost() {
     return () => {
       document.head.removeChild(script);
     };
-  }, [post]);
+  }, [post, content]);
 
   if (!post) {
     return (
@@ -116,17 +155,36 @@ export default function BlogPost() {
           <h1 className="font-display text-3xl md:text-4xl text-ink-900 mb-2 leading-tight">{post.title}</h1>
           <time className="text-xs text-ink-400">{post.published}</time>
 
-          <div className="mt-8 space-y-5">
-            {post.body.map((para, i) => (
-              <p key={i} className="text-[15px] leading-[1.8] text-ink-700">{para}</p>
-            ))}
+          <div className="mt-8 space-y-5" aria-busy={!content && !failed}>
+            {content &&
+              content.body.map((para, i) => (
+                <p key={i} className="text-[15px] leading-[1.8] text-ink-700">{para}</p>
+              ))}
+            {!content && !failed && (
+              <div className="space-y-3" aria-label="Loading the post">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-4 animate-pulse rounded bg-ink-50" />
+                ))}
+              </div>
+            )}
+            {failed && (
+              // Most often a tab opened before a deploy, asking for a chunk the
+              // new build no longer has.
+              <p className="text-sm text-ink-500" role="alert">
+                This post could not load.{" "}
+                <button type="button" className="text-brand-500 hover:underline" onClick={retry}>
+                  Try again
+                </button>{" "}
+                or reload the page.
+              </p>
+            )}
           </div>
 
-          {post.faqs && post.faqs.length > 0 && (
+          {content?.faqs && content.faqs.length > 0 && (
             <section className="mt-10">
               <h2 className="text-xl font-display text-ink-900 mb-4">Frequently Asked Questions</h2>
               <dl className="space-y-4">
-                {post.faqs.map((faq, i) => (
+                {content.faqs.map((faq, i) => (
                   <div key={i} className="panel p-4">
                     <dt className="text-[15px] font-medium text-ink-900 mb-2">{faq.question}</dt>
                     <dd className="text-[14px] leading-[1.7] text-ink-700">{faq.answer}</dd>
