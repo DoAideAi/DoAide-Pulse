@@ -527,15 +527,21 @@ const NUDGES = {
 };
 
 /** Color by content type for visual pipeline health. Falls back to status
- *  tone for terminal states (failed, published) where the status matters more. */
+ *  tone for terminal states (failed, published) where the status matters more.
+ *
+ *  The text colours were the dark theme's (#34D399, #0D9488, #60A5FA) in both
+ *  themes, which on a light chip is 1.9–3.7:1. Each now has a light-mode shade
+ *  of the same hue that clears 4.5:1 on its own tint, and keeps the old one
+ *  under `dark:`. */
 function typeTone(entry) {
   if (entry.status === "failed") return "bg-bad-wash text-bad";
   if (entry.status === "published") return "bg-good-wash text-good";
   const type = entry.content_type;
-  if (type === "social_thread") return "bg-[rgba(52,211,153,0.15)] text-[#34D399]";
+  if (type === "social_thread")
+    return "bg-[rgba(52,211,153,0.15)] text-[#047857] dark:text-[#34D399]";
   if (type === "product_spotlight" || type === "feature_spotlight")
-    return "bg-[rgba(13,148,136,0.12)] text-[#0D9488]";
-  return "bg-[rgba(96,165,250,0.12)] text-[#60A5FA]";
+    return "bg-[rgba(13,148,136,0.12)] text-brand-500";
+  return "bg-[rgba(96,165,250,0.12)] text-[#1D4ED8] dark:text-[#60A5FA]";
 }
 
 function CalendarChip({ entry, onDragStart, onDragEnd, onNudge }) {

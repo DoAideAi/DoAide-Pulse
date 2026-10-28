@@ -30,11 +30,14 @@ export default {
           600: "rgb(var(--c-brand-600) / <alpha-value>)",
           700: "rgb(var(--c-brand-700) / <alpha-value>)",
         },
-        good: "#34D399",
+        // Theme tokens, not fixed hex: the old values were the dark-mode ones
+        // everywhere, and as text on white they measured 1.7–2.8:1. See the
+        // --c-good/warn/bad notes in src/doaide-theme.css.
+        good: "rgb(var(--c-good) / <alpha-value>)",
         "good-wash": "rgba(52, 211, 153, 0.1)",
-        warn: "#FBBF24",
+        warn: "rgb(var(--c-warn) / <alpha-value>)",
         "warn-wash": "rgba(251, 191, 36, 0.1)",
-        bad: "#F87171",
+        bad: "rgb(var(--c-bad) / <alpha-value>)",
         "bad-wash": "rgba(248, 113, 113, 0.1)",
       },
       boxShadow: {

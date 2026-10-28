@@ -44,6 +44,11 @@ describe.each([
     expect(contrast(t[ink], t.paper)).toBeGreaterThanOrEqual(4.5);
   });
 
+  it.each(["good", "warn", "bad"])("status text %s is readable on canvas and paper", (tone) => {
+    expect(contrast(t[tone], t.canvas)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(t[tone], t.paper)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("brand text is readable, and so is a primary button's label", () => {
     // text-brand-500 links and eyebrows on either surface…
     expect(contrast(t["brand-500"], t.canvas)).toBeGreaterThanOrEqual(4.5);

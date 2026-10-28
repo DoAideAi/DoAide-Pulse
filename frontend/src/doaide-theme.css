@@ -26,6 +26,13 @@
      doaideTheme.contrast.test.js holds every text token to it. */
   --c-ink-400:     109 114 122;
   --c-line:        229 231 235;
+  /* Status text. The 400 shades the app used to fix for every theme were the
+     dark-mode ones, and on white they read at 1.7:1 (warn) to 2.8:1 (bad) —
+     every form error among them. The 700 shades of the same hues clear 4.5:1
+     on canvas and paper. */
+  --c-good:         21 128  61;
+  --c-warn:        180  83   9;
+  --c-bad:         185  28  28;
   --c-line-strong: 209 213 219;
   --c-brand-300:    94 234 212;
   /* Was 13 148 136 (#0D9488) — 3.7:1 against white, as button text
@@ -125,6 +132,9 @@
      dark surfaces. */
   --c-ink-400:     126 134 150;
   --c-line:         42  42  45;
+  --c-good:         52 211 153;
+  --c-warn:        251 191  36;
+  --c-bad:         248 113 113;
   --c-line-strong:  51  51  54;
   --c-brand-300:    94 234 212;
   --c-brand-500:    45 212 191;
