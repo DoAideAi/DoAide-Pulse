@@ -2579,6 +2579,9 @@ def schedule_content(
             PublishRequestIn(
                 platforms=platforms,
                 scheduled_for=when,
+                # An optimal slot is already UTC-aware, so the zone only ever
+                # applies to a time the caller gave.
+                timezone=None if payload.optimize else payload.timezone,
                 as_draft=payload.as_draft,
             ),
             db,

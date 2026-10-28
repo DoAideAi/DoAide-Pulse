@@ -911,6 +911,10 @@ class ScheduleContentIn(BaseModel):
     platforms: list[Platform] | None = Field(default=None, min_length=1)
     #: When. Required unless ``optimize`` is set, and refused if both are.
     scheduled_for: datetime | None = None
+    #: The publish endpoint and the calendar both took this; scheduling did not
+    #: (C104 M1), so a naive time here could only mean UTC and a time inside a
+    #: DST change got none of the handling ``scheduling.in_zone`` gives it.
+    timezone: Timezone | None = Field(default=None, description=TIMEZONE_HELP)
     #: Let Pulse pick the time per platform from the cadence table instead.
     #: Each platform gets its own slot, so a cross-post staggers rather than
     #: firing five copies into five feeds in the same second.
