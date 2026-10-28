@@ -117,6 +117,27 @@ describe("request", () => {
     );
   });
 
+  it.each([
+    // A union field that failed every member names the field, not the type.
+    [{ loc: ["body", "count", "int"], msg: "Input should be a valid integer" }, "Count: Input should be a valid integer"],
+    [{ loc: ["body", "when", "function-after[_aware(), datetime]"], msg: "bad" }, "When: bad"],
+    [{ loc: ["body", "items", 0, "Var", "name"], msg: "too short" }, "Name: too short"],
+    // An error on one item of a list says which item, counting from one.
+    [{ loc: ["body", "tags", 3], msg: "Input should be a valid string" }, "Tags (item 4): Input should be a valid string"],
+    // An index before the field is the container, not the location.
+    [{ loc: ["body", "variables", 0, "name"], msg: "required" }, "Name: required"],
+    [{ loc: ["query", "limit"], msg: "too big" }, "Limit: too big"],
+    [{ loc: ["body", 2], msg: "bad item" }, "bad item"],
+    [{ loc: [], msg: "Value error, whole body wrong" }, "whole body wrong"],
+    [{ msg: "no loc at all" }, "no loc at all"],
+  ])("describes %j as %j", async (error, expected) => {
+    vi.stubGlobal(
+      "fetch",
+      respondWith({ status: 422, body: JSON.stringify({ detail: [error] }) }),
+    );
+    await expect(api.listProjects()).rejects.toThrow(expected);
+  });
+
   it("returns null rather than throwing for an empty 204 body", async () => {
     vi.stubGlobal("fetch", respondWith({ status: 204, body: "" }));
 

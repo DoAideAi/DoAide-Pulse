@@ -98,24 +98,58 @@ async function request(
 const LOCATION_PREFIXES = new Set(["body", "query", "path", "header"]);
 
 /**
+ * A `loc` part that names a *type* rather than a field.
+ *
+ * Pydantic adds one per union member it tried: `int | str` failing both
+ * reports `["body", "count", "int"]` and `["body", "count", "str"]`, and the
+ * last named part — which this used to take as the field — is the type. Those
+ * tags are scalar names, generic shapes with brackets (`list[str]`,
+ * `function-after[...]`), or a model's class name; Pulse's own fields are all
+ * snake_case, so none of them collide.
+ */
+const SCALAR_TAGS = new Set([
+  "int", "str", "float", "bool", "bytes", "none", "datetime", "date", "time",
+  "timedelta", "decimal", "uuid", "url", "dict", "list", "set", "tuple",
+]);
+
+function isTypeTag(part) {
+  return SCALAR_TAGS.has(part) || part.includes("[") || /^[A-Z]/.test(part);
+}
+
+/**
  * One validation error as a sentence a person can act on.
  *
  * `msg` alone was what the toast showed: "Field required" or "String should
  * have at least 8 characters", with nothing saying *which* field — on a form
  * of eight of them. The field comes from the last named part of `loc`
- * (`["body", "full_name"]` → "Full name"), and Pydantic's "Value error, "
- * prefix on a custom validator's message is dropped, since the sentence after
- * it was written for the reader.
+ * (`["body", "full_name"]` → "Full name"), skipping union type tags, and an
+ * error on one item of a list says which (`["body", "tags", 3]` → "Tags
+ * (item 4)"). Pydantic's "Value error, " prefix on a custom validator's
+ * message is dropped, since the sentence after it was written for the reader.
  */
 function describeValidationError(error) {
   const msg = String(error?.msg ?? "").replace(/^Value error, /, "");
-  const loc = Array.isArray(error?.loc) ? error.loc : [];
-  const field = [...loc]
-    .reverse()
-    .find((part) => typeof part === "string" && !LOCATION_PREFIXES.has(part));
+  const loc = (Array.isArray(error?.loc) ? error.loc : []).filter(
+    (part) => !(typeof part === "string" && isTypeTag(part)),
+  );
+  let field;
+  let item;
+  for (let i = loc.length - 1; i >= 0; i -= 1) {
+    const part = loc[i];
+    if (typeof part === "number") {
+      // Only an index *after* the field locates the error; one before it
+      // (`variables.0.name`) is the item the named field sits inside.
+      if (field === undefined && item === undefined) item = part;
+      continue;
+    }
+    if (LOCATION_PREFIXES.has(part)) break;
+    field = part;
+    break;
+  }
   if (!field) return msg;
   const label = field.replace(/_/g, " ");
-  return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${msg}`;
+  const where = item === undefined ? "" : ` (item ${item + 1})`;
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}${where}: ${msg}`;
 }
 
 /** Build a query string, dropping empty values so `?status=` never appears. */
