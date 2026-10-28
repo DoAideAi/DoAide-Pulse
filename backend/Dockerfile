@@ -6,9 +6,14 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# System deps for psycopg / building wheels, plus curl for health checks.
+# curl for the HEALTHCHECK below, and nothing else. There is no compiler or
+# libpq-dev: every requirement installs from a wheel, and psycopg[binary]
+# bundles its own libpq. Carrying build-essential into the runtime image
+# roughly doubled it (901 MB -> 470 MB without) for nothing it ever ran.
+# If a future requirement does need building, add a builder stage rather
+# than putting the toolchain back here.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first (better layer caching)
