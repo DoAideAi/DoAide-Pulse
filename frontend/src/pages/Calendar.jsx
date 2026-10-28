@@ -268,6 +268,15 @@ export default function Calendar() {
         </div>
       )}
 
+      {data && !error && counts.total === 0 && (
+        // A bare grid read as broken to a new account: nothing said what
+        // belongs here or how it gets here.
+        <p className="rounded-lg border border-line bg-canvas px-4 py-3 text-sm text-ink-500">
+          Nothing is scheduled or published this month. Schedule a piece from its
+          Publish panel in the editor, or pick a day for an idea in the backlog.
+        </p>
+      )}
+
       {counts.total > 0 && shown.length === 0 && (
         // An empty grid with a filter on looks identical to an empty month.
         <p className="rounded-lg border border-line bg-canvas px-4 py-3 text-sm text-ink-500">

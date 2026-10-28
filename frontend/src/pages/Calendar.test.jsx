@@ -829,3 +829,21 @@ describe("ideas on the calendar", () => {
     );
   });
 });
+
+describe("an empty month", () => {
+  it("says what goes on the calendar and how it gets there", async () => {
+    respond([]);
+    draw();
+    expect(
+      await screen.findByText(/Nothing is scheduled or published this month/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not say so when the month has entries", async () => {
+    const one = entry();
+    respond([one]);
+    draw();
+    await screen.findByText(one.title);
+    expect(screen.queryByText(/Nothing is scheduled or published this month/)).not.toBeInTheDocument();
+  });
+});
