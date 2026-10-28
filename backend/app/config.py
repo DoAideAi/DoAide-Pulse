@@ -207,6 +207,10 @@ class Settings(BaseSettings):
     # checking what this week's mail looks like sends one or two; a loop sends
     # enough to get the domain filed as a sender nobody asked for.
     rate_limit_digest_send: str = "10/hour;30/day"
+    # Exporting the account assembles every piece it has written, bodies and
+    # all, into one response — the most expensive read there is, and one a
+    # person needs a handful of times, not a loop.
+    rate_limit_account_export: str = "10/hour;30/day"
     # A webhook ping and a trigger check are both synchronous outbound requests
     # made from Pulse's address on the caller's say-so, which is the link
     # checker's problem in a different shape. A trigger check is the sharper of

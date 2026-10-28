@@ -31,6 +31,7 @@ vi.mock("../lib/api", () => ({
     deleteWebhook: vi.fn(),
     updateWebhook: vi.fn(),
     pingWebhook: vi.fn(),
+    exportAccount: vi.fn(),
     webhookDeliveries: vi.fn(),
     redeliverWebhook: vi.fn(),
     listApiKeys: vi.fn(),
@@ -1268,6 +1269,42 @@ describe("deleting the account", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("nothing was deleted");
     expect(auth.logout).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Delete account" })).toBeInTheDocument();
+  });
+});
+
+describe("downloading your work", () => {
+  it("saves the export as a dated JSON file and says how much was in it", async () => {
+    api.exportAccount.mockResolvedValue({
+      format_version: 1, projects: [{ id: 1 }], content: [{ id: 1 }, { id: 2 }],
+      templates: [], ideas: [], account: {}, exported_at: "2026-10-28T00:00:00Z",
+    });
+    const createObjectURL = vi.fn(() => "blob:export");
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+    const clicked = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Download my data" }));
+
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith("Exported 2 pieces from 1 projects"),
+    );
+    expect(clicked).toHaveBeenCalled();
+    expect(clicked.mock.contexts[0].download).toMatch(/^pulse-export-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:export");
+    clicked.mockRestore();
+  });
+
+  it("reports an export that failed", async () => {
+    api.exportAccount.mockRejectedValue(new Error("Too many requests"));
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Download my data" }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Could not export: Too many requests"),
+    );
   });
 });
 

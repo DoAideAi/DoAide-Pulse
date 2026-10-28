@@ -198,6 +198,7 @@ export default function Settings() {
         />
       )}
 
+      <ExportAccountSection />
       <DeleteAccountSection />
     </div>
   );
@@ -1505,6 +1506,56 @@ export function OneTimeSecret({ title, value, onClose }) {
         </button>
       </div>
     </Dialog>
+  );
+}
+
+/* ---- Export ---- */
+
+/**
+ * Download everything the account has written.
+ *
+ * Above Delete account on purpose: erasing was possible and taking the work
+ * out first was not. The file is the API's JSON as-is, saved under a dated
+ * name; credentials are never in it (``app.services.account_export``).
+ */
+export function ExportAccountSection() {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function download() {
+    setBusy(true);
+    try {
+      const data = await api.exportAccount();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pulse-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${data.content.length} pieces from ${data.projects.length} projects`);
+    } catch (err) {
+      toast.error(`Could not export: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section aria-labelledby="export-heading" className="border-t border-line pt-8">
+      <h2 id="export-heading" className="text-base font-semibold text-ink-900">
+        Download your work
+      </h2>
+      <p className="mt-0.5 max-w-2xl text-sm text-ink-500">
+        Every piece with its full text and where it went live, your projects, templates and
+        ideas, as one JSON file. No passwords or connection keys are included.
+      </p>
+      <button type="button" className="btn-ghost mt-3" onClick={download} disabled={busy}>
+        {busy ? "Preparing…" : "Download my data"}
+      </button>
+    </section>
   );
 }
 

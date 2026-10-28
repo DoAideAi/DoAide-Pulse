@@ -34,8 +34,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
+from app.models.mixins import utcnow
 from app.models.user import User
 from app.ratelimit import (
+    account_key,
     clear_login_failures,
     client_key,
     limiter,
@@ -46,6 +48,7 @@ from app.ratelimit import (
 from app.routers._patch import reject_nulls
 from app.schemas.auth import (
     AccountDeleteRequest,
+    AccountExportOut,
     MessageOut,
     PasswordResetConfirm,
     PasswordResetRequest,
@@ -61,7 +64,7 @@ from app.security import (
     hash_password,
     verify_password,
 )
-from app.services import accounts, mailer, password_reset
+from app.services import account_export, accounts, mailer, password_reset
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +437,34 @@ def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.get(
+    "/me/export",
+    response_model=AccountExportOut,
+    summary="Download everything the account has written",
+    responses=errors(*AUTHENTICATED, status.HTTP_429_TOO_MANY_REQUESTS),
+)
+@limiter.limit(settings.rate_limit_account_export, key_func=account_key)
+def export_me(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """The profile, projects, every piece with its body and where it went
+    live, templates and ideas, as one JSON document — the way to take the work
+    out before erasing the account, or at any time.
+
+    No credentials: connections, API keys, webhook and trigger secrets and the
+    account's own LLM key are left out on purpose. Sent as an attachment so the
+    browser saves it rather than showing it.
+    """
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="pulse-export-{utcnow().date().isoformat()}.json"'
+    )
+    logger.info("account export for user %s", current_user.id)
+    return account_export.build(db, current_user)
 
 
 @router.delete(

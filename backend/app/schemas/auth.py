@@ -85,3 +85,17 @@ class PreferencesUpdate(BaseModel):
             return None
         name = value.strip()
         return name or None
+
+
+class AccountExportOut(BaseModel):
+    """Everything the account has written. See ``app.services.account_export``
+    for what is in it and, as importantly, which credentials are left out."""
+
+    format_version: int
+    exported_at: str
+    account: dict
+    projects: list[dict]
+    content: list[dict]
+    templates: list[dict]
+    ideas: list[dict]
+

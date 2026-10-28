@@ -620,6 +620,7 @@ describe("every endpoint's path and verb", () => {
 
     ["redeliverWebhook", [4, 9], "/webhooks/4/deliveries/9/redeliver", "POST"],
     ["repurposeContent", [3], "/content/3/repurpose", "POST"],
+    ["exportAccount", [], "/auth/me/export", "GET"],
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],
     ["createTrigger", [{ kind: "rss" }], "/triggers", "POST"],

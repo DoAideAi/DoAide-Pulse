@@ -178,6 +178,8 @@ export const api = {
   logout: () => setToken(null),
   // Erases the account and everything in it. The password is asked for again.
   deleteAccount: (password) => request("/auth/me", { method: "DELETE", body: { password } }),
+  // Everything the account has written, as one JSON document — no credentials.
+  exportAccount: () => request("/auth/me/export"),
 
   // The public liveness probe: status, database, redis, and nothing else.
   health: () => request("/health", { auth: false }),
