@@ -474,6 +474,10 @@ def save_llm_key(
         if row is None:  # pragma: no cover - the conflict means it exists
             raise
         _store(row)
+    # Which provider the account's generations now bill to is the first thing
+    # to know when the bill or the output changes; the key itself never is
+    # logged, nor its hint.
+    logger.info("LLM key saved for user %s (provider %s)", user.id, payload.provider)
     return _llm_settings(db, user)
 
 
@@ -489,6 +493,8 @@ def delete_llm_key(
     """Forget the key. Generation goes back to the server's providers."""
     row = user_llm.get_row(db, user.id)
     if row is not None:
+        provider = row.provider
         db.delete(row)
         db.commit()
+        logger.info("LLM key removed for user %s (provider %s)", user.id, provider)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

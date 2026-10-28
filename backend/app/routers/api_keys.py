@@ -13,6 +13,8 @@ these rows worth stealing.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -33,6 +35,8 @@ from app.schemas.api_key import (
 )
 from app.schemas.errors import OWNED, errors
 from app.services import api_keys
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api-keys", tags=["api-keys"])
 
@@ -184,6 +188,17 @@ def create_api_key(
 
     db.commit()
     db.refresh(key)
+    # Revoking and rotating a key were logged; issuing one was not, so the one
+    # event that puts a working credential into the world left no trace of who
+    # asked for it (C104 M4). The prefix identifies the key and is not secret.
+    logger.info(
+        "api key %s created by user %s (project %s, scopes %s, expires %s)",
+        key.prefix,
+        user.id,
+        project.id,
+        ",".join(sorted(str(s) for s in key.scopes or [])) or "-",
+        key.expires_at.isoformat() if key.expires_at else "never",
+    )
     return ApiKeyCreated(**ApiKeyOut.model_validate(key).model_dump(), token=token)
 
 
