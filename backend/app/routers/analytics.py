@@ -19,6 +19,7 @@ from app.schemas.analytics import (
     DigestOut,
     DigestSendOut,
     EngagementTrendPointOut,
+    FeatureUsageOut,
     OverviewOut,
     PipelineOut,
     PlatformStatsOut,
@@ -30,7 +31,7 @@ from app.schemas.analytics import (
     VelocitySummaryOut,
 )
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
-from app.services import accounts, alerts, analytics_service, digest, mailer, velocity
+from app.services import accounts, alerts, analytics_service, digest, feature_usage, mailer, velocity
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -46,6 +47,24 @@ def overview(
 ) -> dict:
     """Everything the analytics page needs, in one round trip."""
     return analytics_service.overview(db, user.id)
+
+
+@router.get(
+    "/features",
+    response_model=FeatureUsageOut,
+    summary="Which features this account uses, most-used first",
+    responses=errors(*AUTHENTICATED),
+)
+def features(
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Feature usage from the actions and page views the app records, plus the
+    pieces autopilot and triggers wrote. ``unmapped_actions`` lists anything
+    recorded that no feature claims, so a new endpoint cannot go uncounted
+    unnoticed. See :mod:`app.services.feature_usage`."""
+    return feature_usage.usage(db, user.id, days=days)
 
 
 @router.get(

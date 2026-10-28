@@ -585,6 +585,34 @@ class SubscriberSourceOut(BaseModel):
     count: int
 
 
+class FeatureUseOut(BaseModel):
+    """How much one feature was used in the window."""
+
+    feature: str
+    label: str
+    #: Actions taken (pieces written, for autopilot).
+    uses: int
+    #: Distinct days it was used — habit, as opposed to one busy afternoon.
+    active_days: int
+
+
+class UnmappedActionOut(BaseModel):
+    """A recorded action no feature claims — the sign the map needs a line."""
+
+    name: str
+    count: int
+
+
+class FeatureUsageOut(BaseModel):
+    """Which of Pulse's features this account used, most-used first."""
+
+    days: int
+    features: list[FeatureUseOut]
+    #: Feature keys with no use at all in the window.
+    unused: list[str]
+    unmapped_actions: list[UnmappedActionOut] = []
+
+
 class SubscriberGrowthOut(BaseModel):
     """Newsletter audience growth for the analytics page.
 
