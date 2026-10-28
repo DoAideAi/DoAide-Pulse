@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,6 +17,11 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.user_llm_key import UserLLMKey
 from app.services import crypto
+
+if TYPE_CHECKING:
+    # Annotation only: importing it at runtime here would make the two
+    # modules circular — see build_provider.
+    from app.services.llm_router import Provider
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +104,9 @@ def provider_name(user_id: int, provider: str) -> str:
     return f"own:{user_id}:{provider}"[:40]
 
 
-def build_provider(provider: str, api_key: str, model: str = "", *, user_id: int = 0):
+def build_provider(
+    provider: str, api_key: str, model: str = "", *, user_id: int = 0
+) -> Provider:
     """A chain :class:`Provider` for this key. Imported lazily — see below."""
     # llm_router imports this module lazily too; importing it at the top here
     # would make the two modules circular.
@@ -124,7 +132,7 @@ def get_row(db: Session, user_id: int) -> UserLLMKey | None:
     return db.scalar(select(UserLLMKey).where(UserLLMKey.user_id == user_id))
 
 
-def provider_for(db: Session, user_id: int):
+def provider_for(db: Session, user_id: int) -> Provider | None:
     """The user's key as a chain provider, or ``None`` when they have none.
 
     A key that cannot be decrypted is logged and treated as absent: the server
@@ -151,7 +159,7 @@ def session_factory() -> Session:
     return SessionLocal()
 
 
-def load_for(user_id: int):
+def load_for(user_id: int) -> Provider | None:
     """:func:`provider_for` on a session of its own, for the LLM chain.
 
     The chain is reached from code that has no session to lend — a Celery task

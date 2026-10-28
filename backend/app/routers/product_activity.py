@@ -75,6 +75,11 @@ def product_dashboard(
 def require_ingest_token(
     x_pulse_ingest_token: str | None = Header(default=None),
 ) -> None:
+    """Refuse a product-event post without the shared ingest token.
+
+    503 when ingest is switched off (no ``PRODUCT_INGEST_TOKEN``), 401 for a
+    missing or wrong token — compared in constant time.
+    """
     expected = settings.product_ingest_token
     if not expected:
         raise HTTPException(

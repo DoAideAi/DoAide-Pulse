@@ -245,6 +245,7 @@ def set_acting_user(user_id: int | None) -> Token:
 
 
 def reset_acting_user(token: Token) -> None:
+    """Undo the :func:`set_acting_user` call that returned *token*."""
     _acting_user.reset(token)
 
 
