@@ -276,6 +276,41 @@ class _FormNulScanner:
         self.tail = window[-2:]
 
 
+class ForwardedSchemeMiddleware:
+    """Take the request's scheme from ``X-Forwarded-Proto``: Caddy's, not the bridge's.
+
+    Caddy terminates TLS and forwards plain HTTP, and uvicorn only honours the
+    forwarded header from ``forwarded_allow_ips`` — loopback by default, which
+    the bridge address Caddy connects from is not. So every request reached the
+    app as ``http``, and the one place Starlette builds a URL from it said so
+    out loud: ``GET /api/v1/projects/`` answered ``307`` to
+    ``http://pulse.doaide.com/api/v1/projects``. A client that follows that
+    redirect repeats the request — its ``Authorization`` header, or a login
+    form with the password in it — over plain HTTP before Caddy bounces it
+    back, and a ``POST`` that meets Caddy's own redirect there can arrive as a
+    ``GET``.
+
+    The header is trusted for the reason the HSTS check below trusts it:
+    nothing but Caddy can reach the port, because the services bind the bridge
+    address and not a public one (``deploy/Caddyfile.pulse``). Only the scheme
+    is taken — the client address, which the rate limiter keys on, is left to
+    :func:`app.ratelimit.client_key`. Raw ASGI so it applies before routing.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            forwarded = Headers(scope=scope).get("x-forwarded-proto", "")
+            proto = forwarded.split(",")[0].strip().lower()
+            if proto in ("http", "https") and scope.get("scheme") != proto:
+                secure = scope["type"] == "websocket"
+                scope = dict(scope)
+                scope["scheme"] = ("wss" if proto == "https" else "ws") if secure else proto
+        await self.app(scope, receive, send)
+
+
 class ActingUserMiddleware:
     """Bind the signed-in user for the LLM chain, so their own key is tried first.
 
@@ -857,6 +892,9 @@ def create_app() -> FastAPI:
             "Retry-After",
         ],
     )
+
+    # Last added, so outermost: the scheme is settled before anything reads it.
+    app.add_middleware(ForwardedSchemeMiddleware)
 
     prefix = settings.api_v1_prefix
     app.include_router(misc.router, prefix=prefix)
