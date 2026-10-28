@@ -104,6 +104,48 @@ def subscribe(
     return SubscribeOut(ok=True)
 
 
+_IDEA_TYPES = frozenset(
+    {"tutorial", "how_to", "comparison", "announcement", "feature_spotlight", "product_spotlight"}
+)
+
+
+def _idea_text(value: object, limit: int) -> str:
+    return " ".join(value.split())[:limit] if isinstance(value, str) else ""
+
+
+def _parse_ideas(raw: object, count: int) -> list[ContentIdeaItem]:
+    """The usable ideas in whatever JSON the model answered with.
+
+    The niche is free text from an anonymous caller, and it goes into the
+    prompt, so the shape of the answer is theirs to steer: an object instead of
+    an array, a bare string where an idea belongs, a number for a title. Each of
+    those was an uncaught ``AttributeError`` or ``ValidationError`` and a 500
+    from a public endpoint. Anything that is not an idea is skipped.
+    """
+    if isinstance(raw, dict):
+        raw = raw.get("ideas")
+    if not isinstance(raw, list):
+        return []
+    ideas = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        title = _idea_text(item.get("title"), 300)
+        if not title:
+            continue
+        kind = item.get("content_type")
+        ideas.append(
+            ContentIdeaItem(
+                title=title,
+                hook=_idea_text(item.get("hook"), 500),
+                content_type=kind if kind in _IDEA_TYPES else "tutorial",
+            )
+        )
+        if len(ideas) == count:
+            break
+    return ideas
+
+
 @router.post(
     "/tools/content-ideas",
     response_model=ContentIdeasOut,
@@ -129,7 +171,9 @@ def generate_content_ideas(
 
     prompt = (
         f"You are an expert content strategist. Generate {payload.count} unique, "
-        f"engaging content ideas for the niche: \"{payload.niche}\".\n\n"
+        # ``json.dumps`` so the niche stays one quoted string: a quote or a
+        # newline in it used to close the quotes and start instructions of its own.
+        f"engaging content ideas for the niche: {json.dumps(payload.niche, ensure_ascii=False)}.\n\n"
         "For each idea, provide:\n"
         "- title: A compelling headline\n"
         "- hook: A one-sentence hook explaining why readers would care\n"
@@ -162,20 +206,16 @@ def generate_content_ideas(
     try:
         data = resp.json()
         text = data["choices"][0]["message"]["content"]
+        if not isinstance(text, str):
+            raise TypeError("message content is not text")
         text = text.strip()
         if text.startswith("```"):
             text = text.split("\n", 1)[1] if "\n" in text else text[3:]
             text = text.rsplit("```", 1)[0]
-        ideas_raw = json.loads(text)
-        ideas = [
-            ContentIdeaItem(
-                title=item.get("title", "Untitled"),
-                hook=item.get("hook", ""),
-                content_type=item.get("content_type", "tutorial"),
-            )
-            for item in ideas_raw[:payload.count]
-        ]
-    except (KeyError, json.JSONDecodeError, IndexError) as exc:
+        ideas = _parse_ideas(json.loads(text), payload.count)
+        if not ideas:
+            raise ValueError("no usable ideas in the response")
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
         logger.exception(
             "Failed to parse Gemini response for content ideas; body=%s",
             resp.text[:500],

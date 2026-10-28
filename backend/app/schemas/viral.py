@@ -57,6 +57,15 @@ class ContentIdeasIn(BaseModel):
     niche: str = Field(min_length=2, max_length=200)
     count: int = Field(default=5, ge=1, le=10)
 
+    @field_validator("niche", mode="before")
+    @classmethod
+    def _flatten_niche(cls, value: object) -> object:
+        """One line of visible text: whitespace and control characters collapse,
+        so ``"  "`` is too short rather than a prompt about nothing."""
+        if not isinstance(value, str):
+            return value
+        return " ".join("".join(c if c.isprintable() else " " for c in value).split())
+
 
 class ContentIdeasOut(BaseModel):
     ideas: list[ContentIdeaItem]
