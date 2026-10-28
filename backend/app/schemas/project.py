@@ -42,6 +42,30 @@ def _publishable(platform: Platform) -> Platform:
     return platform
 
 
+def _project_url(value: str | None) -> str | None:
+    """An absolute http(s) URL, or nothing.
+
+    ``repo_url`` and ``live_url`` are the links every published post points a
+    reader at (``project_url`` and ``share_url``) and the ``<link>`` of the
+    project's public RSS feed, and they took any string — ``javascript:…``
+    included — where the import path (``project_import._url``) already kept to
+    http(s). A bare ``github.com/acme/app`` is what people type into the field
+    and gains ``https://``; any other scheme is refused rather than guessed at.
+    """
+    if value is None:
+        return None
+    url = value.strip()
+    if not url:
+        return None
+    lower = url.lower()
+    if lower.startswith(("http://", "https://")):
+        return url
+    head = url.split("/", 1)[0]
+    if ":" not in head and "." in head and " " not in url:
+        return f"https://{url}"
+    raise ValueError("must be an http(s) URL, like https://example.com")
+
+
 class ProjectBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=5000)
@@ -83,6 +107,8 @@ class ProjectBase(BaseModel):
         if not name:
             raise ValueError("A project needs a name.")
         return name
+
+    _check_urls = field_validator("repo_url", "live_url")(_project_url)
 
     @field_validator("tech_stack", "keywords")
     @classmethod
@@ -141,6 +167,8 @@ class ProjectUpdate(BaseModel):
     engagement_threshold: int | None = Field(default=None, ge=0, le=10_000_000)
     utm_enabled: bool | None = None
     utm_campaign: str | None = Field(default=None, max_length=120)
+
+    _check_urls = field_validator("repo_url", "live_url")(_project_url)
 
     @field_validator("name")
     @classmethod
