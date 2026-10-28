@@ -21,6 +21,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm.attributes import set_committed_value
 from sqlalchemy.orm.exc import StaleDataError
 
 from app.config import settings
@@ -352,8 +353,14 @@ def cancel_if(
     wrote ``cancelled`` over a live post — losing the record of where it is,
     and leaving a row that a later Publish re-arms and posts a second time. A
     conditional UPDATE re-reads the row under its lock, so only a row that is
-    still waiting is cancelled. The in-memory row is refreshed either way, so
-    the caller's status sync sees what the database holds.
+    still waiting is cancelled.
+
+    The in-memory row is brought into line without a query per row: when the
+    UPDATE won, its values are known and are set as already committed; when it
+    lost — the race, and only then — the row is expired, so whatever reads it
+    next loads what the worker wrote. A ``refresh`` per row here was an N+1 on
+    ``DELETE /content/{id}/schedule``, whose cancelled rows are reloaded in one
+    query afterwards (``test_publication_refresh_budget``).
 
     Does not commit.
     """
@@ -370,8 +377,12 @@ def cancel_if(
         .values(**values)
         .execution_options(synchronize_session=False)
     )
-    db.refresh(publication)
-    return result.rowcount == 1
+    if result.rowcount == 1:
+        for key, value in values.items():
+            set_committed_value(publication, key, value)
+        return True
+    db.expire(publication)
+    return False
 
 
 def arming_approves(content: Content) -> None:
