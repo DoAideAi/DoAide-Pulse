@@ -503,6 +503,7 @@ describe("every endpoint's path and verb", () => {
   // [method name, arguments, expected path, expected verb]
   const ENDPOINTS = [
     ["me", [], "/auth/me", "GET"],
+    ["deleteAccount", ["pw"], "/auth/me", "DELETE"],
     ["health", [], "/health", "GET"],
     ["healthDetail", [], "/health/detail", "GET"],
 

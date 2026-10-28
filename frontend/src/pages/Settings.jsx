@@ -188,6 +188,8 @@ export default function Settings() {
           }}
         />
       )}
+
+      <DeleteAccountSection />
     </div>
   );
 }
@@ -1414,3 +1416,92 @@ export function OneTimeSecret({ title, value, onClose }) {
     </Dialog>
   );
 }
+
+/* ---- Delete account ---- */
+
+/**
+ * Erase the account and everything in it.
+ *
+ * Asks for the password, as the API does, and says plainly what goes and
+ * what cannot be reached from here — posts already on other platforms stay
+ * there. On success the session is dropped and the person lands on the front
+ * page, because there is no account left to show them.
+ */
+function DeleteAccountSection() {
+  const [open, setOpen] = useState(false);
+  return (
+    <section aria-labelledby="delete-account-heading" className="border-t border-line pt-8">
+      <h2 id="delete-account-heading" className="text-base font-semibold text-ink-900">
+        Delete account
+      </h2>
+      <p className="mt-0.5 max-w-2xl text-sm text-ink-500">
+        Erases your projects, content, connected accounts and their keys, API keys,
+        webhooks, triggers, templates and the newsletter sign-ups collected on your pages.
+        Posts already published to other platforms stay there.
+      </p>
+      <button type="button" className="btn-ghost mt-3 text-bad" onClick={() => setOpen(true)}>
+        Delete my account…
+      </button>
+      {open && <DeleteAccountDialog onClose={() => setOpen(false)} />}
+    </section>
+  );
+}
+
+function DeleteAccountDialog({ onClose }) {
+  const { logout } = useAuth();
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!password) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.deleteAccount(password);
+      logout();
+      window.location.assign("/");
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Dialog label="Delete account" onClose={onClose} closable={!busy} onSubmit={submit} width="md">
+      <h2 className="font-display text-2xl text-ink-900">Delete your account?</h2>
+      <p className="text-sm text-ink-600">
+        This cannot be undone. Enter your password to confirm.
+      </p>
+      <div>
+        <label className="label" htmlFor="delete-account-password">Password</label>
+        <input
+          id="delete-account-password"
+          className="input"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "delete-account-error" : undefined}
+        />
+      </div>
+      {error && (
+        <p id="delete-account-error" className="text-sm text-bad" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" className="btn-ghost" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+        <button type="submit" className="btn-primary bg-bad hover:bg-bad/90" disabled={busy || !password}>
+          {busy ? "Deleting…" : "Delete everything"}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+

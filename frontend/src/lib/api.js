@@ -176,6 +176,8 @@ export const api = {
   },
   me: () => request("/auth/me"),
   logout: () => setToken(null),
+  // Erases the account and everything in it. The password is asked for again.
+  deleteAccount: (password) => request("/auth/me", { method: "DELETE", body: { password } }),
 
   // The public liveness probe: status, database, redis, and nothing else.
   health: () => request("/health", { auth: false }),

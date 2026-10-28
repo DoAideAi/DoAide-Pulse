@@ -19,6 +19,7 @@ import { ROUTER_FUTURE } from "../lib/routerFuture";
 vi.mock("../lib/api", () => ({
   api: {
     platforms: vi.fn(),
+    deleteAccount: vi.fn(),
     healthDetail: vi.fn(),
     health: vi.fn(),
     verifyConnection: vi.fn(),
@@ -47,7 +48,7 @@ vi.mock("../components/ui/Toast", () => ({ useToast: () => toast }));
 // One object, not a fresh `{refresh: vi.fn()}` per call: the page calls
 // `refresh()` to re-read the user after a connection changes, and a mock that
 // is rebuilt on every render can never be asserted against.
-const auth = { user: { email: "you@example.com" }, refresh: vi.fn() };
+const auth = { user: { email: "you@example.com" }, refresh: vi.fn(), logout: vi.fn() };
 vi.mock("../hooks/useAuth", () => ({ useAuth: () => auth }));
 
 const LLM_PROVIDERS = [
@@ -1169,3 +1170,54 @@ describe("your AI key", () => {
     expect(toast.success).toHaveBeenCalledWith("AI key removed");
   });
 });
+
+describe("deleting the account", () => {
+  async function openDialog(user) {
+    draw();
+    await user.click(await screen.findByRole("button", { name: "Delete my account…" }));
+    return screen.findByRole("dialog", { name: "Delete account" });
+  }
+
+  it("says what goes, and what cannot be reached", async () => {
+    draw();
+    expect(await screen.findByText(/Posts already published to other platforms stay there/)).toBeInTheDocument();
+  });
+
+  it("asks for the password before anything is deleted", async () => {
+    const user = userEvent.setup();
+    await openDialog(user);
+    expect(screen.getByRole("button", { name: "Delete everything" })).toBeDisabled();
+    expect(api.deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("deletes, signs out and leaves for the front page", async () => {
+    api.deleteAccount.mockResolvedValue(null);
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    try {
+      const user = userEvent.setup();
+      await openDialog(user);
+      await user.type(screen.getByLabelText("Password"), "hunter2hunter2");
+      await user.click(screen.getByRole("button", { name: "Delete everything" }));
+      await waitFor(() => expect(assign).toHaveBeenCalledWith("/"));
+      expect(api.deleteAccount).toHaveBeenCalledWith("hunter2hunter2");
+      expect(auth.logout).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("keeps the dialog open with the reason when the password is wrong", async () => {
+    api.deleteAccount.mockRejectedValue(
+      Object.assign(new Error("That password is not right, so nothing was deleted."), { status: 403 }),
+    );
+    const user = userEvent.setup();
+    await openDialog(user);
+    await user.type(screen.getByLabelText("Password"), "nope");
+    await user.click(screen.getByRole("button", { name: "Delete everything" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("nothing was deleted");
+    expect(auth.logout).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "Delete account" })).toBeInTheDocument();
+  });
+});
+
