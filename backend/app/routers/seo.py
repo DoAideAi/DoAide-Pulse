@@ -8,7 +8,16 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    status,
+)
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -16,6 +25,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models.publication import Platform
 from app.models.user import User
+from app.ratelimit import account_key, limiter
 from app.routers.product_activity import require_product_admin
 from app.schemas.content import SlotOut
 from app.schemas.errors import AUTHENTICATED, errors
@@ -99,6 +109,8 @@ def list_sitemaps(
     db: Session = Depends(get_db),
     _: User = Depends(require_product_admin),
 ) -> dict:
+    """Each site's last sitemap check and Search Console submission, as stored.
+    Reads only; ``POST /seo/sitemaps/submit`` is what fetches and submits."""
     return _sitemaps_payload(db)
 
 
@@ -106,9 +118,17 @@ def list_sitemaps(
     "/sitemaps/submit",
     response_model=SitemapsOut,
     summary="Fetch and submit sitemaps to Google Search Console",
-    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
+    responses=errors(
+        *AUTHENTICATED,
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+    ),
 )
+@limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
 def submit_sitemaps(
+    request: Request,
+    response: Response,
     site: str | None = Query(default=None, description="One site key; omit for all."),
     db: Session = Depends(get_db),
     _: User = Depends(require_product_admin),
@@ -160,6 +180,8 @@ def get_audit(
     db: Session = Depends(get_db),
     _: User = Depends(require_product_admin),
 ) -> dict:
+    """The stored result of the last meta-tag audit, per site, with the labels
+    for each issue code. Reads only; ``POST /seo/audit`` runs one."""
     return _audit_payload(db)
 
 
@@ -167,9 +189,16 @@ def get_audit(
     "/audit",
     response_model=MetaAuditOut | AuditQueuedOut,
     summary="Audit one site now, or queue every site",
-    responses=errors(*AUTHENTICATED, status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND),
+    responses=errors(
+        *AUTHENTICATED,
+        status.HTTP_403_FORBIDDEN,
+        status.HTTP_404_NOT_FOUND,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+    ),
 )
+@limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
 def run_audit(
+    request: Request,
     response: Response,
     background: BackgroundTasks,
     site: str | None = Query(default=None, description="One site key; omit to queue all."),
@@ -217,6 +246,8 @@ def traffic(
     db: Session = Depends(get_db),
     user: User = Depends(require_product_admin),
 ) -> dict:
+    """Top pages and referrers per site from Umami over the last *days*,
+    cached between requests unless ``refresh`` is set."""
     return seo_traffic.traffic(db, user.id, days=days, force=refresh)
 
 
@@ -237,6 +268,8 @@ def list_seo_posts(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[dict]:
+    """The caller's SEO posts, scheduled ones first in publishing order, then
+    the rest newest first."""
     return seo_posts.queue(db, user.id, limit=limit)
 
 

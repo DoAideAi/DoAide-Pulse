@@ -176,6 +176,11 @@ _RATE_LIMIT_EXEMPT = {
     "PATCH /calendar/content/{content_id}",
     "PATCH /calendar/ideas/{idea_id}",
     "DELETE /calendar/ideas/{idea_id}",
+    # SEO link suggestions: a deterministic DB read behind POST (the draft is
+    # the body), which the editor calls on every pause in typing
+    "POST /seo/link-suggestions",
+    # Removing your own LLM key is a single-row delete
+    "DELETE /settings/llm-key",
     # Settings — disconnect is a simple delete
     "DELETE /settings/connections/{platform}",
     # Webhooks — bounded by per-user cap (20)

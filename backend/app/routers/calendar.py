@@ -486,6 +486,7 @@ def plan_idea(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> CalendarIdeaOut:
+    """Set the day an idea is planned for; ``null`` sends it back to the backlog."""
     idea, project = _owned_idea(idea_id, db, user)
     idea.planned_date = payload.planned_date
     db.commit()

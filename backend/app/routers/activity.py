@@ -24,7 +24,7 @@ router = APIRouter(prefix="/activity", tags=["activity"])
     "",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Record a batch of page views and actions",
-    responses=errors(*AUTHENTICATED),
+    responses=errors(*AUTHENTICATED, status.HTTP_429_TOO_MANY_REQUESTS),
 )
 @limiter.limit(settings.rate_limit_activity, key_func=account_key)
 def record_activity(

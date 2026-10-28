@@ -66,6 +66,9 @@ def product_dashboard(
     db: Session = Depends(get_db),
     _: User = Depends(require_product_admin),
 ) -> dict:
+    """Per product: Umami traffic for the last *days*, plus the signups,
+    logins and key actions its backend reported through ``POST
+    /products/events``. Umami answers are cached unless ``refresh`` is set."""
     return product_activity.dashboard(db, days=days, force=refresh)
 
 
@@ -90,7 +93,11 @@ def require_ingest_token(
     "/events",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Report signups, logins and key actions from a product backend",
-    responses=errors(status.HTTP_401_UNAUTHORIZED, status.HTTP_503_SERVICE_UNAVAILABLE),
+    responses=errors(
+        status.HTTP_401_UNAUTHORIZED,
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        status.HTTP_503_SERVICE_UNAVAILABLE,
+    ),
 )
 @limiter.limit(settings.rate_limit_product_ingest, key_func=client_key)
 def ingest_product_events(
@@ -100,5 +107,11 @@ def ingest_product_events(
     db: Session = Depends(get_db),
     _: None = Depends(require_ingest_token),
 ) -> Response:
+    """Append up to a batch of events from a product's own backend.
+
+    Authenticated by the shared ``X-Pulse-Ingest-Token``, not a user. Actors
+    are masked before they are stored, and a timestamp in the future is
+    clamped to now.
+    """
     product_activity.record(db, (e.model_dump() for e in body.events))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
