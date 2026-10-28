@@ -2090,12 +2090,18 @@ def update_content(
     # Not committed here. The snapshot joins this request's transaction, so a
     # request that then fails `_assert_review_ready` leaves no history entry for
     # an edit that never happened.
+    # Normalized first, so the question "does this change the text?" is asked
+    # of what will be stored. ``["a"]`` normalizes to ``[]``; compared raw it
+    # banked a revision for an edit that changed nothing, the row's version did
+    # not move, and the next real edit collided with that revision — a 500.
+    if "keywords" in data and data["keywords"] is not None:
+        data["keywords"] = seo.normalize_keywords(data["keywords"])
+
     revisions.snapshot_if_changing(db, content, data, author_user_id=user.id)
 
     if "title" in data and data["title"] != content.title:
         content.slug = unique_content_slug(db, content.project_id, data["title"])
     if "keywords" in data and data["keywords"] is not None:
-        data["keywords"] = seo.normalize_keywords(data["keywords"])
         # Keep focus_keyword in sync unless the caller set it explicitly — in
         # this request or before it. The editor re-sends ``keywords`` on every
         # save and never sends ``focus_keyword``, so following the first keyword

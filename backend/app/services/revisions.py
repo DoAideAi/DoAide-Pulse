@@ -135,7 +135,7 @@ def snapshot(
     (piece, version) names one text and it does not matter who asked for it
     first.
     """
-    existing = _staged(db, content)
+    existing = _staged(db, content) or _stored(db, content)
     if existing is not None:
         return existing
 
@@ -168,6 +168,24 @@ def _staged(db: Session, content: Content) -> ContentRevision | None:
         ):
             return obj
     return None
+
+
+def _stored(db: Session, content: Content) -> ContentRevision | None:
+    """A revision for this piece's current version already in the database.
+
+    ``version`` moves on every UPDATE of the row, so a stored revision for the
+    current version holds exactly the current text. It exists when an earlier
+    request decided its edit was a change, banked the text, and then wrote
+    nothing that moved the row — a normalizer that turned the edit back into
+    the stored value. Inserting a second one tripped ``uq_revision_per_content``
+    and made the *next* real edit a 500.
+    """
+    return db.scalar(
+        select(ContentRevision).where(
+            ContentRevision.content_id == content.id,
+            ContentRevision.revision == content.version,
+        )
+    )
 
 
 def _prune(db: Session, content: Content) -> None:
