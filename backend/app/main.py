@@ -9,6 +9,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.exc import DBAPIError, OperationalError
@@ -533,6 +535,24 @@ def create_app() -> FastAPI:
         )
 
     app.add_exception_handler(StaleDataError, _stale_data)
+
+    # FastAPI's own 422 echoes each rejected value back as ``input`` — so a
+    # password one character short came back verbatim in the response body,
+    # where a browser error tracker or a proxy log keeps it. The caller sent
+    # the value and has no use for it back; ``loc`` and ``msg`` say what to
+    # fix. Same list shape otherwise, so nothing reading ``detail`` changes.
+    async def _validation_error(request: Request, exc: Exception) -> JSONResponse:
+        assert isinstance(exc, RequestValidationError)
+        errors = [
+            {k: v for k, v in err.items() if k not in ("input", "url")}
+            for err in exc.errors()
+        ]
+        return JSONResponse(
+            {"detail": jsonable_encoder(errors)},
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    app.add_exception_handler(RequestValidationError, _validation_error)
 
     # --- Middleware stack (outermost first) ---
 
