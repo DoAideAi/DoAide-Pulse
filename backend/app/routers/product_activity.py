@@ -38,7 +38,8 @@ def require_product_admin(user: User = Depends(get_current_user)) -> User:
     if not accounts.is_operator(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cross-product activity is limited to PRODUCT_ACTIVITY_ADMIN_EMAILS.",
+            detail="Cross-product activity is for this install's administrators. Ask "
+            "the operator to add your email to PRODUCT_ACTIVITY_ADMIN_EMAILS.",
         )
     return user
 

@@ -65,7 +65,8 @@ def require_operator(user: User = Depends(get_current_user)) -> User:
     if not accounts.is_operator(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Feedback is readable by this install's operator only.",
+            detail="Feedback is readable by this install's operator only. Sign in "
+            "with the operator account to read it.",
         )
     return user
 

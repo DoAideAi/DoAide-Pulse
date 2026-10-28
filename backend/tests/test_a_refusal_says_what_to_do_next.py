@@ -95,3 +95,21 @@ def test_an_action_event_without_a_name_says_what_a_name_looks_like():
     with pytest.raises(ValidationError) as caught:
         ProductEventIn(product="gst", kind="action")
     assert "email_sent" in str(caught.value)
+
+
+def test_a_non_operator_is_told_how_to_get_feedback_access(client, auth, monkeypatch):
+    from app.routers import feedback as feedback_router
+
+    monkeypatch.setattr(feedback_router.accounts, "is_operator", lambda user: False)
+    resp = client.get("/api/v1/feedback", headers=auth)
+    assert resp.status_code == 403
+    assert "Sign in with the operator account" in resp.json()["detail"]
+
+
+def test_a_non_admin_is_told_who_can_grant_product_activity(client, auth, monkeypatch):
+    from app.routers import product_activity as activity_router
+
+    monkeypatch.setattr(activity_router.accounts, "is_operator", lambda user: False)
+    resp = client.get("/api/v1/products/activity", headers=auth)
+    assert resp.status_code == 403
+    assert "Ask the operator" in resp.json()["detail"]
