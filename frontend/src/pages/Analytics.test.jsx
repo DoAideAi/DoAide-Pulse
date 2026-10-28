@@ -14,6 +14,7 @@ vi.mock("../lib/api", () => ({
     alerts: vi.fn(),
     pipeline: vi.fn(),
     featureUsage: vi.fn(),
+    contentFunnel: vi.fn(),
     activitySummary: vi.fn(),
     subscriberGrowth: vi.fn(),
   },
@@ -211,6 +212,11 @@ beforeEach(() => {
     by_platform: [],
   });
   api.featureUsage.mockResolvedValue({ days: 30, features: [], unused: [], unmapped_actions: [] });
+  api.contentFunnel.mockResolvedValue({
+      days: 90, stale_days: 7,
+      overall: { written: 0, reached_review: 0, approved: 0, published: 0, dropped: 0, review_rate: null, approval_rate: null, publish_rate: null, overall_rate: null },
+      by_origin: [], median_hours_to_publish: null, stuck_in_draft: 0, stuck_in_review: 0, stuck: [],
+    });
   api.activitySummary.mockResolvedValue({
     days: 30,
     page_views: 0,
@@ -809,6 +815,7 @@ describe("feature usage", () => {
   it("is on the page once something is published", async () => {
     draw();
     expect(await screen.findByText("What gets used")).toBeInTheDocument();
+    expect(await screen.findByText("From draft to published")).toBeInTheDocument();
   });
 
   it("is on the page before anything is published, too", async () => {

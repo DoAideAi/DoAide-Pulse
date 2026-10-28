@@ -144,6 +144,11 @@ describe("the analytics page", () => {
       days: 30, page_views: 0, actions: 0, top_pages: [], top_actions: [], by_day: [],
     });
     api.featureUsage.mockResolvedValue({ days: 30, features: [], unused: [], unmapped_actions: [] });
+    api.contentFunnel.mockResolvedValue({
+        days: 90, stale_days: 7,
+        overall: { written: 0, reached_review: 0, approved: 0, published: 0, dropped: 0, review_rate: null, approval_rate: null, publish_rate: null, overall_rate: null },
+        by_origin: [], median_hours_to_publish: null, stuck_in_draft: 0, stuck_in_review: 0, stuck: [],
+      });
     api.subscriberGrowth.mockResolvedValue({
       total: 0, last_30_days: 0, series: [], by_source: [],
     });

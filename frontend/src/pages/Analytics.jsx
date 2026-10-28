@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { FeatureUsagePanel } from "../components/analytics/FeatureUsagePanel";
+import { FunnelPanel } from "../components/analytics/FunnelPanel";
 import { ActivityPanel, PipelineHealth } from "../components/analytics/PipelinePanels";
 import { SectionBoundary } from "../components/ErrorBoundary";
 import {
@@ -87,6 +88,9 @@ export default function Analytics() {
         <Section name="feature-usage">
           <FeatureUsagePanel />
         </Section>
+        <Section name="funnel">
+          <FunnelPanel />
+        </Section>
         <Section name="activity">
           <ActivityPanel />
         </Section>
@@ -113,6 +117,10 @@ export default function Analytics() {
 
       <Section name="feature-usage">
         <FeatureUsagePanel />
+      </Section>
+
+      <Section name="funnel">
+        <FunnelPanel />
       </Section>
 
       <Section name="reach">
