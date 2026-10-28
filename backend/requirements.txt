@@ -2,9 +2,21 @@
 # Python 3.12 (3.11+ works; 3.14 lacks wheels for some of these).
 
 # ---- Web ----
-fastapi>=0.111
+# Floors are security floors, not compatibility guesses. `pip install -r` on a
+# box that already has a package only upgrades it when the installed version
+# falls below the floor, so a floor that admits a vulnerable release keeps that
+# release installed indefinitely (see the cryptography note below). Each floor
+# here is at or above the newest fix pip-audit knows of for that package, as of
+# 2026-10-28; re-check with
+#   pip-audit -r <(sed -E 's/\[[a-z,]+\]//; s/>=/==/' requirements.txt) --no-deps --disable-pip
+fastapi>=0.160
+# Transitive, but pinned here because FastAPI's own range admits releases with
+# known advisories: starlette below 1.3.1 (7, including multipart DoS) and h11
+# below 0.16.0 (request smuggling).
+starlette>=1.3.1
+h11>=0.16.0
 uvicorn[standard]>=0.30
-python-multipart>=0.0.9
+python-multipart>=0.0.31
 email-validator>=2.1
 
 # ---- Data ----
@@ -32,7 +44,7 @@ pydantic-settings>=2.3
 #
 # Until somebody runs that, an `ecdsa` line in a pip-audit report is this, and
 # not a dependency that came back.
-PyJWT>=2.8
+PyJWT>=2.15.0
 bcrypt>=4.1
 # Rate limiting for /auth/* (login guessing, signup, reset-mail flooding).
 slowapi>=0.1.9
@@ -53,7 +65,7 @@ httpx>=0.27
 # ---- Content ----
 # Markdown -> HTML for the platforms that don't take Markdown (Medium, LinkedIn,
 # WordPress). `extras` gives us fenced code blocks and tables.
-markdown>=3.6
+markdown>=3.8.1
 # Strips HTML back to plain text for character-limited platforms.
 beautifulsoup4>=4.12
 # Sanitises rendered post HTML before it is published. Markdown passes raw HTML
@@ -62,4 +74,6 @@ beautifulsoup4>=4.12
 nh3>=0.2.18
 # Text out of uploaded PDFs, for creating a project from documents
 # (app.services.project_import). Pure Python, no system libraries.
-pypdf>=5.0
+# 6.21.2: below it pypdf has some sixty advisories, nearly all denial of
+# service from a crafted PDF — and the PDFs this parses are uploaded by users.
+pypdf>=6.21.2
