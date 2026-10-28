@@ -233,10 +233,13 @@ def test_metrics_task_isolates_failures():
         # as a column off the join rather than by walking
         # ``publication.content.project``, which does not survive the commit
         # ``collect_metrics`` makes after every row it records.
-        mock_session.execute.return_value.all.return_value = [
-            (mock_pub_ok, 7),
-            (mock_pub_bad, 7),
-            (mock_pub_ok2, 7),
+        #
+        # The sweep pages by id until a page comes back empty, so the mock has
+        # to end too: one page, then nothing. A fixed return value hands back
+        # the same three rows forever and the test never finishes.
+        mock_session.execute.return_value.all.side_effect = [
+            [(mock_pub_ok, 7), (mock_pub_bad, 7), (mock_pub_ok2, 7)],
+            [],
         ]
 
         mock_adapter = MagicMock()
