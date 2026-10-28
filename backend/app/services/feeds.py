@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -112,6 +113,44 @@ def _text(element: ElementTree.Element | None) -> str:
     # Atom permits ``<title type="html">``; nested markup arrives as children,
     # so gather all descendant text rather than just ``.text``.
     return "".join(element.itertext()).strip()
+
+
+#: Something in a feed field that an HTML parser would call a tag. Not ``<!``:
+#: a title that says ``<!DOCTYPE>`` in so many words is text about markup.
+_MARKUP = re.compile(r"</?[A-Za-z]")
+
+#: Elements that end a line where a browser would.
+_BLOCKS = ("p", "div", "br", "li", "ul", "ol", "tr", "blockquote", "pre",
+           "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "hr")
+
+
+def _plain(text: str, *, one_line: bool = False) -> str:
+    """*text* with any HTML in it reduced to the words a reader would see.
+
+    RSS ``description`` and ``content:encoded`` are HTML by convention — in
+    CDATA or entity-escaped, which ``itertext`` hands back as the raw markup —
+    and titles carry it often enough (``Release &lt;b&gt;v2&lt;/b&gt;``).
+    Every consumer of an entry treats these as plain text: the headline becomes
+    a post title, and ``{{signal.headline}}`` / ``{{signal.summary}}`` are
+    substituted verbatim into a template's body. So a feed's ``<script>`` or
+    ``<img onerror>`` landed in a draft as written, and a title showed its tags.
+    Scripts and styles go with their contents; entities are decoded. Text with
+    no markup in it is returned as it was.
+    """
+    if not text or not _MARKUP.search(text):
+        return text
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(text, "html.parser")
+    for tag in soup(["script", "style", "noscript", "iframe", "template"]):
+        tag.decompose()
+    for tag in soup(list(_BLOCKS)):
+        tag.insert_after("\n")
+    flat = soup.get_text()
+    if one_line:
+        return " ".join(flat.split())
+    lines = (" ".join(line.split()) for line in flat.split("\n"))
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def _first(parent: ElementTree.Element, *paths: str) -> ElementTree.Element | None:
@@ -242,12 +281,12 @@ def parse(xml: str | bytes) -> Feed:
 
 
 def _rss_entry(item: ElementTree.Element) -> FeedEntry:
-    title = _text(item.find("title"))
+    title = _plain(_text(item.find("title")), one_line=True)
     link = _text(item.find("link"))
     guid = _text(item.find("guid"))
     # content:encoded is the full post where a publisher offers both; the
     # description is then usually a teaser.
-    summary = _text(_first(item, f"{_CONTENT}encoded", "description"))
+    summary = _plain(_text(_first(item, f"{_CONTENT}encoded", "description")))
     published = _text(_first(item, "pubDate", f"{_DC}date"))
     return FeedEntry(
         entry_id=_entry_id(guid, link, title),
@@ -259,10 +298,10 @@ def _rss_entry(item: ElementTree.Element) -> FeedEntry:
 
 
 def _atom_entry(item: ElementTree.Element) -> FeedEntry:
-    title = _text(item.find(f"{_ATOM}title"))
+    title = _plain(_text(item.find(f"{_ATOM}title")), one_line=True)
     link = _atom_link(item)
     guid = _text(item.find(f"{_ATOM}id"))
-    summary = _text(_first(item, f"{_ATOM}content", f"{_ATOM}summary"))
+    summary = _plain(_text(_first(item, f"{_ATOM}content", f"{_ATOM}summary")))
     published = _text(_first(item, f"{_ATOM}updated", f"{_ATOM}published"))
     return FeedEntry(
         entry_id=_entry_id(guid, link, title),
