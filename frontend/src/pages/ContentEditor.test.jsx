@@ -27,6 +27,9 @@ vi.mock("../lib/api", () => ({
     listTranslations: vi.fn(),
     translateContent: vi.fn(),
     deleteTranslation: vi.fn(),
+    suggestHeadlines: vi.fn(),
+    applyHeadline: vi.fn(),
+    headlinePerformance: vi.fn(),
   },
 }));
 
@@ -107,6 +110,7 @@ beforeEach(() => {
   api.platforms.mockResolvedValue([]);
   api.listPreviewLinks.mockResolvedValue([]);
   api.listRevisions.mockResolvedValue({ items: [], total: 0, retained: 50 });
+  api.headlinePerformance.mockResolvedValue([]);
   api.listLanguages.mockResolvedValue([]);
   api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
 });

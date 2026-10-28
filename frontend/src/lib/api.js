@@ -233,6 +233,14 @@ export const api = {
   // table's best slot per platform with `optimize: true`.
   scheduleContent: (id, payload) =>
     request(`/content/${id}/schedule`, { method: "POST", body: payload }),
+  // Headline testing on a live piece: draft alternatives (nothing is saved),
+  // swap one in (synced to the platforms it went out on), and see what each
+  // headline earned while it was live.
+  suggestHeadlines: (id, count = 4) =>
+    request(`/content/${id}/headlines${qs({ count })}`, { method: "POST" }),
+  applyHeadline: (id, title) =>
+    request(`/content/${id}/headlines/apply`, { method: "POST", body: { title } }),
+  headlinePerformance: (id) => request(`/content/${id}/headlines/performance`),
   // Cancels every row that would still go out on its own (scheduled or
   // pending) without publishing anything; returns the rows it cancelled.
   unscheduleContent: (id) => request(`/content/${id}/schedule`, { method: "DELETE" }),

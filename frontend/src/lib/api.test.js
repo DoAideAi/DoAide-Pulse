@@ -595,6 +595,9 @@ describe("every endpoint's path and verb", () => {
     ["createContent", [{ title: "t" }], "/content", "POST"],
     ["scheduleContent", [3, { optimize: true }], "/content/3/schedule", "POST"],
     ["unscheduleContent", [3], "/content/3/schedule", "DELETE"],
+    ["suggestHeadlines", [3, 4], "/content/3/headlines?count=4", "POST"],
+    ["applyHeadline", [3, "New"], "/content/3/headlines/apply", "POST"],
+    ["headlinePerformance", [3], "/content/3/headlines/performance", "GET"],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],

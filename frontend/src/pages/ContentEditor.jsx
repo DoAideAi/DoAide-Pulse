@@ -725,6 +725,11 @@ export default function ContentEditor() {
           <SectionBoundary name="editor:publications">
             <PublicationsPanel content={data} onChanged={reload} />
           </SectionBoundary>
+          {locked && (
+            <SectionBoundary name="editor:headlines">
+              <HeadlinesPanel content={data} onChanged={reload} />
+            </SectionBoundary>
+          )}
           <SectionBoundary name="editor:translations">
             <TranslationsPanel contentId={data.id} />
           </SectionBoundary>
@@ -1604,6 +1609,108 @@ function PublicationsPanel({ content, onChanged }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Headline testing on a live piece.
+ *
+ * A published piece is locked in the editor, so this is the only way to change
+ * its title — and the API for it (draft alternatives, swap one in, see what
+ * each earned) was complete and unreachable: every piece had exactly one
+ * headline, and the auto-selector that compares them had nothing to compare.
+ * Swapping goes through `headlines/apply`, which retitles the live posts and
+ * starts the new headline's own window of numbers.
+ */
+function HeadlinesPanel({ content, onChanged }) {
+  const toast = useToast();
+  const [variants, setVariants] = useState(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [applying, setApplying] = useState(null);
+  const { data: windows, reload: reloadWindows } = useApi(
+    () => api.headlinePerformance(content.id),
+    [content.id],
+  );
+
+  async function suggest() {
+    setSuggesting(true);
+    try {
+      const result = await api.suggestHeadlines(content.id);
+      setVariants((result?.variants ?? []).filter((v) => v && v !== content.title));
+    } catch (err) {
+      toast.error(`Could not suggest headlines: ${err.message}`);
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function use(title) {
+    setApplying(title);
+    try {
+      await api.applyHeadline(content.id, title);
+      toast.success("Headline swapped — the live posts are being retitled");
+      setVariants(null);
+      onChanged();
+      reloadWindows();
+    } catch (err) {
+      toast.error(`Could not swap the headline: ${err.message}`);
+    } finally {
+      setApplying(null);
+    }
+  }
+
+  const history = (windows ?? []).filter((w) => !w.current || windows.length > 1);
+
+  return (
+    <div className="panel space-y-3 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink-900">Headline</h2>
+        <button className="btn-quiet -mr-2.5" onClick={suggest} disabled={suggesting}>
+          {suggesting ? "Thinking…" : "Suggest alternatives"}
+        </button>
+      </div>
+      <p className="text-xs text-ink-500">{content.title}</p>
+
+      {variants && variants.length === 0 && (
+        <p className="text-xs text-ink-400">No different headlines came back. Try again.</p>
+      )}
+      {variants && variants.length > 0 && (
+        <ul className="space-y-2">
+          {variants.map((title) => (
+            <li key={title} className="flex items-start justify-between gap-2 text-xs">
+              <span className="min-w-0 text-ink-800">{title}</span>
+              <button
+                className="btn-quiet shrink-0"
+                onClick={() => use(title)}
+                disabled={applying !== null}
+                aria-label={`Use “${title}”`}
+              >
+                {applying === title ? "Swapping…" : "Use"}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {history.length > 0 && (
+        <div className="border-t border-line pt-3">
+          <h3 className="mb-1.5 text-xs font-medium text-ink-500">What each headline earned</h3>
+          <ul className="space-y-1.5">
+            {history.map((w) => (
+              <li key={`${w.title}-${w.started_at}`} className="text-xs">
+                <span className="block truncate text-ink-800">
+                  {w.title}
+                  {w.current && <span className="ml-1 text-ink-400">(live)</span>}
+                </span>
+                <span className="block font-mono text-[11px] text-ink-400">
+                  {w.views.toLocaleString()} views · {w.engagement.toLocaleString()} interactions
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

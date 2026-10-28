@@ -38,6 +38,9 @@ vi.mock("../lib/api", () => ({
     createPreviewLink: vi.fn(),
     revokePreviewLink: vi.fn(),
     retryPublication: vi.fn(),
+    suggestHeadlines: vi.fn(),
+    applyHeadline: vi.fn(),
+    headlinePerformance: vi.fn(),
     unscheduleContent: vi.fn(),
     publishContent: vi.fn(),
     listRevisions: vi.fn(),
@@ -129,6 +132,7 @@ beforeEach(() => {
   api.platforms.mockResolvedValue([]);
   api.listPreviewLinks.mockResolvedValue([]);
   api.listRevisions.mockResolvedValue({ items: [], total: 0, retained: 50 });
+  api.headlinePerformance.mockResolvedValue([]);
   api.listLanguages.mockResolvedValue([]);
   api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
   // The auto-save is on a real 2-second timer in this file, and several tests
@@ -1101,5 +1105,50 @@ describe("a side panel whose load fails", () => {
       expect(within(panel).queryByRole("button", { name: /^(Retry|Update)$/ })).not.toBeInTheDocument();
       expect(within(panel).getByRole("button", { name: "Remove" })).toBeInTheDocument();
     });
+  });
+});
+
+
+// --------------------------------------------------------------------------- //
+// Headline testing on a live piece                                            //
+// --------------------------------------------------------------------------- //
+
+describe("the headline panel", () => {
+  it("is not offered while the piece is still a draft", async () => {
+    await open({ status: "draft" });
+
+    expect(screen.queryByRole("button", { name: "Suggest alternatives" })).not.toBeInTheDocument();
+  });
+
+  it("suggests alternatives for a live piece and swaps one in", async () => {
+    api.suggestHeadlines.mockResolvedValue({
+      variants: ["Saved title", "Why the retry budget outlasts the outage"],
+    });
+    api.applyHeadline.mockResolvedValue({ id: 3 });
+    const user = userEvent.setup();
+    await open({ status: "published" });
+
+    await user.click(screen.getByRole("button", { name: "Suggest alternatives" }));
+    // The current title is not offered back as an alternative to itself.
+    const use = await screen.findByRole("button", {
+      name: "Use “Why the retry budget outlasts the outage”",
+    });
+    expect(screen.queryByRole("button", { name: "Use “Saved title”" })).not.toBeInTheDocument();
+
+    await user.click(use);
+
+    expect(api.applyHeadline).toHaveBeenCalledWith(3, "Why the retry budget outlasts the outage");
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+  });
+
+  it("shows what each headline earned once there is more than one", async () => {
+    api.headlinePerformance.mockResolvedValue([
+      { title: "First headline", started_at: "2026-08-01T00:00:00Z", current: false, views: 1200, engagement: 40 },
+      { title: "Saved title", started_at: "2026-08-03T00:00:00Z", current: true, views: 300, engagement: 9 },
+    ]);
+    await open({ status: "published" });
+
+    expect(await screen.findByText("What each headline earned")).toBeInTheDocument();
+    expect(screen.getByText("1,200 views · 40 interactions")).toBeInTheDocument();
   });
 });
