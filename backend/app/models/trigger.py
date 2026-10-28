@@ -206,9 +206,21 @@ class TriggerEvent(Base, TimestampMixin):
     )
     #: Why it was skipped, or how it failed. Empty on success.
     detail: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    #: Not a foreign key: an event is a log entry and must outlive a draft the
-    #: user deletes. Same reasoning as ``ContentIdea.used_content_id``.
-    content_id: Mapped[int | None] = mapped_column(Integer)
+    #: The piece this firing wrote. A FK with ON DELETE SET NULL, like
+    #: ``ContentIdea.used_content_id``: the event is a log entry and outlives a
+    #: draft the user deletes, and the reference goes with the draft rather
+    #: than dangling — the trigger activity list renders it as a link to the
+    #: piece, which pointed at a 404 once the piece was gone.
+    content_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "content.id",
+            ondelete="SET NULL",
+            name="fk_trigger_events_content_id_content",
+        ),
+        # For the SET NULL as much as for reads: deleting a piece makes the
+        # database find the events pointing at it.
+        index=True,
+    )
 
     trigger: Mapped[Trigger] = relationship(back_populates="events")
 
