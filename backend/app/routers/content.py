@@ -1224,6 +1224,10 @@ def platform_checks(
     content_id: RowId,
     platforms: str = Query(
         default="",
+        # Every platform name, comma-joined, is under 100 characters. The cap is
+        # what keeps an unknown name — quoted back in the 422 — from being an
+        # echo of whatever the caller sent.
+        max_length=300,
         description=(
             "Comma-separated platforms to check. Defaults to where this piece "
             "is actually going: the publications it already has, then the "
@@ -1254,13 +1258,13 @@ def platform_checks(
     """
     content = _owned_content(content_id, db, user)
 
-    if platforms.strip():
+    # Names, not the raw string: ",," passed a ``.strip()`` test and named no
+    # platform, so the check ran against nothing and said so — instead of
+    # against the defaults an empty parameter gets. Repeats are dropped too.
+    named = list(dict.fromkeys(n.strip().lower() for n in platforms.split(",") if n.strip()))
+    if named:
         try:
-            wanted = [
-                Platform(name.strip().lower())
-                for name in platforms.split(",")
-                if name.strip()
-            ]
+            wanted = [Platform(name) for name in named]
         except ValueError as exc:
             valid = ", ".join(p.value for p in Platform)
             bad = [
