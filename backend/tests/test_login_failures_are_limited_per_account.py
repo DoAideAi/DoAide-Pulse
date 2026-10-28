@@ -86,6 +86,63 @@ def test_the_counter_store_does_not_hold_the_address():
     assert key == ratelimit._account_bucket(" owner@example.com ")
 
 
+# --------------------------------------------------------------------------- #
+# Boundaries (C103 M1)                                                         #
+# --------------------------------------------------------------------------- #
+
+
+def test_one_failure_short_of_the_budget_still_signs_in(client, user):
+    for n in range(BUDGET - 1):
+        assert _login(client, user.email, "wrong", f"203.0.113.{n}").status_code == 401
+
+    assert not login_locked(user.email)
+    assert _login(client, user.email, "hunter2hunter2", "198.51.100.2").status_code == 200
+
+
+def test_the_budget_th_failure_is_the_one_that_locks(client, user):
+    for n in range(BUDGET - 1):
+        _login(client, user.email, "wrong", f"203.0.113.{n}")
+    assert not login_locked(user.email)
+
+    # The last failure the budget allows is still answered as a failure...
+    assert _login(client, user.email, "wrong", "203.0.113.250").status_code == 401
+    # ...and only the attempt after it is refused unread.
+    assert login_locked(user.email)
+
+
+def test_the_lock_lifts_once_its_window_has_passed(client, user, monkeypatch):
+    import time
+
+    from limits import parse_many
+
+    monkeypatch.setattr(ratelimit, "_LOGIN_FAILURES", parse_many("3/1 second"))
+    for _ in range(3):
+        record_login_failure(user.email)
+    assert login_locked(user.email)
+
+    time.sleep(1.1)
+
+    assert not login_locked(user.email)
+    assert _login(client, user.email, "hunter2hunter2", "198.51.100.3").status_code == 200
+
+
+def test_requests_the_ip_limit_refuses_do_not_spend_the_account_s_budget(client, user):
+    """The per-IP 429 happens before the handler, so it records no failure.
+
+    Otherwise one noisy client behind a shared address could spend the owner's
+    account budget with requests that never had their password read.
+    """
+    statuses = [
+        _login(client, user.email, "wrong", "203.0.113.77").status_code
+        for _ in range(BUDGET + 5)
+    ]
+    assert statuses.count(401) < BUDGET  # the IP limit stepped in first
+    assert 429 in statuses
+
+    assert not login_locked(user.email)
+    assert _login(client, user.email, "hunter2hunter2", "198.51.100.4").status_code == 200
+
+
 @pytest.fixture(autouse=True)
 def _trust_forwarded_for(monkeypatch):
     from app.config import settings
