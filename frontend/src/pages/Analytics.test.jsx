@@ -13,6 +13,7 @@ vi.mock("../lib/api", () => ({
     velocity: vi.fn(),
     alerts: vi.fn(),
     pipeline: vi.fn(),
+    featureUsage: vi.fn(),
     activitySummary: vi.fn(),
     subscriberGrowth: vi.fn(),
   },
@@ -209,6 +210,7 @@ beforeEach(() => {
     publications: { published: 14, failed: 0, in_flight: 0, cancelled: 0, success_rate: 1 },
     by_platform: [],
   });
+  api.featureUsage.mockResolvedValue({ days: 30, features: [], unused: [], unmapped_actions: [] });
   api.activitySummary.mockResolvedValue({
     days: 30,
     page_views: 0,
@@ -800,5 +802,20 @@ describe("subscribers", () => {
     render(<MemoryRouter future={ROUTER_FUTURE}><Analytics /></MemoryRouter>);
     expect(await screen.findByText("No subscribers yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Get the embed code" })).toHaveAttribute("href", "/embed");
+  });
+});
+
+describe("feature usage", () => {
+  it("is on the page once something is published", async () => {
+    draw();
+    expect(await screen.findByText("What gets used")).toBeInTheDocument();
+  });
+
+  it("is on the page before anything is published, too", async () => {
+    api.analytics.mockResolvedValue(
+      overview({ totals: totals({ published_count: 0, views: 0 }) }),
+    );
+    draw();
+    expect(await screen.findByText("What gets used")).toBeInTheDocument();
   });
 });
