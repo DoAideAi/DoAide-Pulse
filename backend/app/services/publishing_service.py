@@ -318,14 +318,60 @@ def cancel_armed(
 
     Does not commit — every caller is inside a request that has more to write.
     """
-    cancelled = [p for p in content.publications if not p.is_terminal]
-    for publication in cancelled:
-        publication.status = PublicationStatus.CANCELLED
-        publication.scheduled_for = None
-        publication.error = reason
     content.scheduled_for = None
     db.flush()
+    cancelled = [
+        p
+        for p in content.publications
+        if not p.is_terminal and cancel_if(db, p, _NOT_TERMINAL, error=reason)
+    ]
     return cancelled
+
+
+#: The rows a worker may still act on. A conditional cancel on anything else
+#: would be rewriting a verdict.
+_NOT_TERMINAL = (
+    PublicationStatus.PENDING,
+    PublicationStatus.SCHEDULED,
+    PublicationStatus.PUBLISHING,
+)
+
+
+def cancel_if(
+    db: Session,
+    publication: Publication,
+    from_statuses: tuple[PublicationStatus, ...],
+    *,
+    error: str | None = None,
+) -> bool:
+    """Cancel *publication* if it is still in one of *from_statuses*.
+
+    The status the caller chose this row by is the one the request loaded, and
+    a worker may have moved it since: claimed it, posted it, and committed
+    ``published`` while the request was still deciding. An ORM assignment then
+    wrote ``cancelled`` over a live post — losing the record of where it is,
+    and leaving a row that a later Publish re-arms and posts a second time. A
+    conditional UPDATE re-reads the row under its lock, so only a row that is
+    still waiting is cancelled. The in-memory row is refreshed either way, so
+    the caller's status sync sees what the database holds.
+
+    Does not commit.
+    """
+    values: dict[str, Any] = {
+        "status": PublicationStatus.CANCELLED,
+        "scheduled_for": None,
+    }
+    if error is not None:
+        values["error"] = error
+    db.flush()
+    result = db.execute(
+        update(Publication)
+        .where(Publication.id == publication.id, Publication.status.in_(from_statuses))
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+    db.refresh(publication)
+    return result.rowcount == 1
 
 
 def arming_approves(content: Content) -> None:

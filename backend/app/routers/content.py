@@ -2635,11 +2635,11 @@ def unschedule_content(
     """
     content = _owned_content(content_id, db, user)
     _UNSCHED = (PublicationStatus.PENDING, PublicationStatus.SCHEDULED)
-    targets = [p for p in content.publications if p.status in _UNSCHED]
-
-    for publication in targets:
-        publication.status = PublicationStatus.CANCELLED
-        publication.scheduled_for = None
+    targets = [
+        p
+        for p in content.publications
+        if p.status in _UNSCHED and publishing_service.cancel_if(db, p, _UNSCHED)
+    ]
     content.scheduled_for = None
     publishing_service.sync_content_status(content)
     db.commit()
