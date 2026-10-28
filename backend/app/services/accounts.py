@@ -77,6 +77,12 @@ def find_by_email(db: Session, email: str) -> User | None:
     # so a padded autofill or a paste out of a mail client arrives verbatim and
     # matched nothing at all.
     wanted = email.strip()
+    # No address contains NUL, and PostgreSQL refuses one as a bound parameter
+    # (psycopg raises DataError), so ``username=a%00b`` on the login form was a
+    # 500 rather than "wrong email or password". The form is urlencoded, so the
+    # JSON body scanner in ``main`` never sees it.
+    if "\x00" in wanted:
+        return None
 
     exact = db.scalar(select(User).where(User.email == wanted))
     if exact is not None:
