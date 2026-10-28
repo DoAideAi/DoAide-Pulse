@@ -86,7 +86,9 @@ def seconds_remaining(platform: Platform, user_id: int) -> float:
 
 def record_success(platform: Platform, user_id: int) -> None:
     """A publish landed: forget whatever run of failures preceded it."""
-    breaker.record_success(key(platform, user_id))
+    name = key(platform, user_id)
+    if breaker.record_success(name):
+        logger.info("publishing breaker closed for %s — the platform answered again", name)
 
 
 def record_failure(platform: Platform, user_id: int, *, retry_after: float | None = None) -> None:

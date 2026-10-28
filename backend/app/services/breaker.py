@@ -96,16 +96,22 @@ class CircuitBreaker:
             state.open_until = max(state.open_until, now + max(0.0, seconds))
             state.failures = 0
 
-    def record_success(self, name: str) -> None:
+    def record_success(self, name: str) -> bool:
         """Clear *name*'s failure count and any open circuit.
 
         Discards the state rather than decrementing it. An upstream that
         answered is working now, and a half-remembered run of failures from an
         outage an hour ago would trip the breaker early on the next unrelated
         blip.
+
+        Returns True when this success closes a circuit that had tripped, so the
+        caller can say the outage is over: the opening was always logged and
+        the recovery never was, which left a journal unable to say how long an
+        upstream was out.
         """
         with self._lock:
-            self._state.pop(name, None)
+            state = self._state.pop(name, None)
+            return state is not None and state.open_until > 0
 
     def reset(self) -> None:
         """Clear all state — used by tests and after a config change."""

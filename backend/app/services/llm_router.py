@@ -885,7 +885,8 @@ def _sweep(
                     break
                 continue
 
-            breaker.record_success(provider.name)
+            if breaker.record_success(provider.name):
+                logger.info("llm breaker closed for %s — it answered again", provider.name)
             elapsed_ms = _elapsed_ms(started)
             logger.info(
                 "llm served by %s (%s) in %.2fs",
