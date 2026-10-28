@@ -730,6 +730,11 @@ function SubscriberPanel({ subscribers }) {
         <Empty
           title="No subscribers yet"
           hint="Share a public article or put the embed widget on your site — sign-ups land here."
+          action={
+            <Link to="/embed" className="btn-primary">
+              Get the embed code
+            </Link>
+          }
         />
       </section>
     );

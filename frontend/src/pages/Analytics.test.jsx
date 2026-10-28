@@ -799,5 +799,6 @@ describe("subscribers", () => {
     });
     render(<MemoryRouter future={ROUTER_FUTURE}><Analytics /></MemoryRouter>);
     expect(await screen.findByText("No subscribers yet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Get the embed code" })).toHaveAttribute("href", "/embed");
   });
 });

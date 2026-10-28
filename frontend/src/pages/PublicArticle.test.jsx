@@ -6,6 +6,7 @@ import PublicArticle from "./PublicArticle";
 vi.mock("../lib/api", () => ({
   api: {
     publicArticle: vi.fn(),
+    subscribe: vi.fn(),
   },
 }));
 
@@ -44,9 +45,13 @@ describe("PublicArticle", () => {
     });
     wrap();
     expect(await screen.findByText("Test Article")).toBeInTheDocument();
-    expect(screen.getByText(/My Project/)).toBeTruthy();
+    expect(screen.getByText(/My Project ·/)).toBeTruthy();
     expect(screen.getByText("Share this article")).toBeInTheDocument();
     expect(screen.getByText("Try DoAide Pulse for free")).toBeInTheDocument();
+    // Readers can subscribe from the article itself — the analytics panel has
+    // always said sign-ups come from here, and before this there was no form.
+    expect(screen.getByText("Get the next My Project update by email")).toBeInTheDocument();
+    expect(screen.getByLabelText("Email address")).toBeInTheDocument();
   });
 
   it("shows error state for missing article", async () => {

@@ -5,6 +5,7 @@ import Logo from "../components/ui/Logo";
 import PublicNav from "../components/PublicNav";
 import DoAideFooter from "../components/DoAideFooter";
 import ShareButtons from "../components/ShareButtons";
+import SubscribeForm from "../components/SubscribeForm";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
 import { formatCount, formatReadLength } from "../lib/format";
@@ -105,6 +106,17 @@ export default function PublicArticle() {
                 }}
               />
             </article>
+
+            <div className="mt-8">
+              <SubscribeForm
+                source="article"
+                heading={
+                  data.project_name
+                    ? `Get the next ${data.project_name} update by email`
+                    : "Get the next one by email"
+                }
+              />
+            </div>
 
             <div className="panel mt-8 p-6">
               <p className="mb-3 text-sm font-medium text-ink-900">Share this article</p>
