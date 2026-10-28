@@ -411,6 +411,10 @@ class Settings(BaseSettings):
     product_activity_admin_emails: str = ""
     # How long reported product events are kept before the daily sweep.
     product_event_retention_days: int = 90
+    # How long feedback left through the in-app widget is kept. Each row can
+    # hold a visitor's email address, free text and user agent, so it is not
+    # kept for ever; a year covers a long-running issue and a yearly review.
+    feedback_retention_days: int = 365
 
     # ---- SEO automation (the /seo page) ----
     # A Google Cloud service account that has been added as an owner of the
@@ -773,6 +777,7 @@ class Settings(BaseSettings):
         "llm_usage_retention_days",
         "activity_retention_days",
         "product_event_retention_days",
+        "feedback_retention_days",
         "seo_audit_max_pages",
         "umami_cache_seconds",
         "password_reset_token_ttl_minutes",

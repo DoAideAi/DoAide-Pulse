@@ -11,6 +11,7 @@ from sqlalchemy import delete, func, or_
 
 from app.config import settings
 from app.database import SessionLocal
+from app.models.feedback import Feedback
 from app.models.mixins import utcnow
 from app.models.preview_link import PreviewLink
 from app.models.trigger import TriggerEvent, TriggerEventStatus
@@ -256,6 +257,32 @@ def purge_old_product_events() -> dict:
         count = product_activity.purge(db, days=settings.product_event_retention_days)
         if count:
             logger.info("purged %d product event row(s)", count)
+        return {"purged": count}
+    finally:
+        db.close()
+
+
+@task(
+    name="app.tasks.maintenance_tasks.purge_old_feedback",
+    soft_time_limit=60,
+    time_limit=120,
+)
+def purge_old_feedback() -> dict:
+    """Drop feedback older than ``feedback_retention_days``.
+
+    The widget takes feedback from anyone, and a row can carry an email
+    address, whatever the person wrote and their user agent. Kept long enough
+    to act on and look back over, then gone — like the activity it sits next
+    to, rather than for as long as the table happens to exist.
+    """
+    cutoff = utcnow() - timedelta(days=settings.feedback_retention_days)
+    db = SessionLocal()
+    try:
+        result = db.execute(delete(Feedback).where(Feedback.created_at < cutoff))
+        db.commit()
+        count = result.rowcount or 0
+        if count:
+            logger.info("purged %d feedback row(s)", count)
         return {"purged": count}
     finally:
         db.close()
