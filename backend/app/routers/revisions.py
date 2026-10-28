@@ -48,6 +48,17 @@ def _owned(content_id: RowId, db: Session, user: User) -> Content:
 def _revision_or_404(db: Session, content: Content, revision: int) -> ContentRevision:
     """One stored revision of this piece, or a 404 naming what is available."""
     stored = revisions.get(db, content, revision)
+    if stored is None and revision == content.version:
+        # The current text is the piece itself, never a stored revision — and
+        # the general message below read "no version 3. It is currently at
+        # version 3", which contradicts itself.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"Version {revision} is the current text, which is the piece itself "
+                "rather than a stored revision. Only older versions are kept here."
+            ),
+        )
     if stored is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -157,8 +168,14 @@ def diff_revision(
     make the ``+`` and ``-`` lines mean the opposite of what the caller expects.
     """
     content = _owned(content_id, db, user)
-    older = _revision_or_404(db, content, revision)
-    newer = _revision_or_404(db, content, against) if against is not None else content
+    # Either side may name the current version, which is not stored as a
+    # revision: it is the piece as it stands, the same thing omitting
+    # ``against`` compares with. Comparing it with itself is an empty diff.
+    older = content if revision == content.version else _revision_or_404(db, content, revision)
+    if against is None or against == content.version:
+        newer = content
+    else:
+        newer = _revision_or_404(db, content, against)
     return RevisionDiffOut(
         from_revision=revision,
         to_revision=against,
