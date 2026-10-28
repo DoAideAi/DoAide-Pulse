@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import ShareButtons from "../../components/ShareButtons";
+import PublicNav from "../../components/PublicNav";
+import DoAideFooter from "../../components/DoAideFooter";
 import trackEvent from "../../lib/trackEvent";
 import { usePageMeta } from "../../lib/pageMeta";
 import { PUBLIC_ROUTE_META } from "../../data/publicRouteMeta";
@@ -107,71 +109,77 @@ export default function SubjectLineTester() {
   usePageMeta(PUBLIC_ROUTE_META["/tools/subject-line-tester"]);
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="page-title mb-2">Subject Line Tester</h1>
-      <p className="mb-6 text-ink-500">
-        Score your email subject line on open-rate predictors. Free, no signup.
-      </p>
+    <div className="min-h-screen bg-canvas text-ink-700">
+      <PublicNav />
 
-      <div className="panel p-5 space-y-4">
-        <div>
-          <label htmlFor="subject" className="label">
-            Your subject line
-          </label>
-          <input
-            id="subject"
-            className="input"
-            placeholder="e.g. 5 Growth Hacks You Haven't Tried"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-        </div>
-
-        {/* Always mounted so a screen reader hears the score change as the
-            line is typed; a live region that appears with its content is
-            not announced. */}
-        <div aria-live="polite">
-          {text.trim() && (
-            <div className="flex items-center gap-4">
-              <div className={`text-4xl font-bold ${scoreColor(score)}`} data-testid="score">
-                {score}
-              </div>
-              <div>
-                <div className={`font-semibold ${scoreColor(score)}`} data-testid="label">
-                  {scoreLabel(score)}
-                </div>
-                <div className="text-xs text-ink-400">out of 100</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {tips.length > 0 && text.trim() && (
-        <div className="mt-6 space-y-2" data-testid="tips">
-          <h2 className="text-sm font-semibold text-ink-900">Tips</h2>
-          <ul className="space-y-1 text-sm text-ink-700">
-            {tips.map((t, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-brand-500">•</span> {t}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="panel mt-10 p-5 text-center">
-        <p className="mb-3 text-ink-900">
-          Ready to build newsletters with AI-powered subject lines?
+      <div className="mx-auto max-w-2xl px-4 py-10">
+        <h1 className="page-title mb-2">Subject Line Tester</h1>
+        <p className="mb-6 text-ink-500">
+          Score your email subject line on open-rate predictors. Free, no signup.
         </p>
-        <Link to="/" className="btn-primary" onClick={() => trackEvent("cta-click", { source: "tool-subject" })}>
-          Try DoAide Pulse
-        </Link>
+
+        <div className="panel p-5 space-y-4">
+          <div>
+            <label htmlFor="subject" className="label">
+              Your subject line
+            </label>
+            <input
+              id="subject"
+              className="input"
+              placeholder="e.g. 5 Growth Hacks You Haven't Tried"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          </div>
+
+          {/* Always mounted so a screen reader hears the score change as the
+              line is typed; a live region that appears with its content is
+              not announced. */}
+          <div aria-live="polite">
+            {text.trim() && (
+              <div className="flex items-center gap-4">
+                <div className={`text-4xl font-bold ${scoreColor(score)}`} data-testid="score">
+                  {score}
+                </div>
+                <div>
+                  <div className={`font-semibold ${scoreColor(score)}`} data-testid="label">
+                    {scoreLabel(score)}
+                  </div>
+                  <div className="text-xs text-ink-400">out of 100</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {tips.length > 0 && text.trim() && (
+          <div className="mt-6 space-y-2" data-testid="tips">
+            <h2 className="text-sm font-semibold text-ink-900">Tips</h2>
+            <ul className="space-y-1 text-sm text-ink-700">
+              {tips.map((t, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-brand-500">•</span> {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="panel mt-10 p-5 text-center">
+          <p className="mb-3 text-ink-900">
+            Ready to build newsletters with AI-powered subject lines?
+          </p>
+          <Link to="/" className="btn-primary" onClick={() => trackEvent("cta-click", { source: "tool-subject" })}>
+            Try DoAide Pulse
+          </Link>
+        </div>
+
+        <div className="mt-6">
+          <ShareButtons text="Score your email subject lines for free — Subject Line Tester by DoAide Pulse" />
+        </div>
       </div>
 
-      <div className="mt-6">
-        <ShareButtons text="Score your email subject lines for free — Subject Line Tester by DoAide Pulse" />
-      </div>
+      <DoAideFooter />
     </div>
   );
 }

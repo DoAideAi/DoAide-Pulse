@@ -1,45 +1,55 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 export default function PublicNav() {
   const [toolsOpen, setToolsOpen] = useState(false);
+  const toolsButton = useRef(null);
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+      {/* Wraps rather than overflowing: six links and the wordmark do not fit
+          one row at phone width, and an unwrapped row scrolled the whole page
+          sideways. */}
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
         <Link to="/" className="flex items-center gap-2 text-base font-semibold text-ink-900">
           DoAide <span className="text-ink-400">|</span> <span className="text-brand-500">Pulse</span>
         </Link>
-        <nav aria-label="Public" className="flex items-center gap-5 text-sm">
-          <div className="relative">
+        <nav aria-label="Public" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          {/* A disclosure, not an ARIA menu: these are plain links, and
+              role="menu" promised arrow-key handling that was never there.
+              It closes when focus leaves the whole group — closing on the
+              button's own blur shut it the moment Tab moved into it, so the
+              tools could not be reached from the keyboard at all. */}
+          <div
+            className="relative"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget)) setToolsOpen(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && toolsOpen) {
+                setToolsOpen(false);
+                toolsButton.current?.focus();
+              }
+            }}
+          >
             <button
+              ref={toolsButton}
+              type="button"
               onClick={() => setToolsOpen(!toolsOpen)}
-              onBlur={() => setTimeout(() => setToolsOpen(false), 150)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape" && toolsOpen) {
-                  setToolsOpen(false);
-                  e.currentTarget.focus();
-                }
-              }}
               aria-expanded={toolsOpen}
-              aria-haspopup="true"
+              aria-controls="public-nav-tools"
               className="text-ink-500 hover:text-brand-500"
             >
               Free Tools ▾
             </button>
             {toolsOpen && (
               <div
+                id="public-nav-tools"
                 className="absolute right-0 top-full z-10 mt-2 w-56 rounded-lg border border-line bg-paper py-1 shadow-lift"
-                role="menu"
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setToolsOpen(false);
-                  }
-                }}
               >
-                <Link to="/tools/subject-line-tester" role="menuitem" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">Subject Line Tester</Link>
-                <Link to="/tools/send-time-optimizer" role="menuitem" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">Send Time Optimizer</Link>
-                <Link to="/tools/newsletter-roi-calculator" role="menuitem" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">ROI Calculator</Link>
-                <Link to="/tools/content-idea-generator" role="menuitem" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">Content Idea Generator</Link>
+                <Link to="/tools/subject-line-tester" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">Subject Line Tester</Link>
+                <Link to="/tools/send-time-optimizer" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">Send Time Optimizer</Link>
+                <Link to="/tools/newsletter-roi-calculator" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">ROI Calculator</Link>
+                <Link to="/tools/content-idea-generator" className="block px-4 py-2 text-sm text-ink-700 hover:bg-canvas hover:text-brand-500">Content Idea Generator</Link>
               </div>
             )}
           </div>
