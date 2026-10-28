@@ -10,6 +10,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -189,23 +190,39 @@ def upsert_connection(
             "Check the server's encryption configuration.",
         ) from exc
 
-    connection = db.scalar(
-        select(PlatformConnection).where(
-            PlatformConnection.user_id == user.id,
-            PlatformConnection.platform == payload.platform,
+    def _existing() -> PlatformConnection | None:
+        return db.scalar(
+            select(PlatformConnection).where(
+                PlatformConnection.user_id == user.id,
+                PlatformConnection.platform == payload.platform,
+            )
         )
-    )
-    if connection is None:
-        connection = PlatformConnection(user_id=user.id, platform=payload.platform)
-        db.add(connection)
 
-    connection.encrypted_credentials = encrypted
-    connection.display_name = display_name
-    connection.status = ConnectionStatus.CONNECTED
-    connection.last_verified_at = utcnow()
-    connection.last_error = None
+    def _store(connection: PlatformConnection) -> None:
+        connection.encrypted_credentials = encrypted
+        connection.display_name = display_name
+        connection.status = ConnectionStatus.CONNECTED
+        connection.last_verified_at = utcnow()
+        connection.last_error = None
+        db.commit()
 
-    db.commit()
+    connection = _existing()
+    try:
+        if connection is None:
+            connection = PlatformConnection(user_id=user.id, platform=payload.platform)
+            db.add(connection)
+        _store(connection)
+    except IntegrityError:
+        # A second Save pressed while the first was still in ``verify`` — a
+        # network call, so the window is seconds wide. Both found no row and
+        # both inserted; ``uq_connection_user_platform`` failed this one, which
+        # was a 500 for credentials that had just verified. Both sets verified,
+        # so the later write simply wins, as it would have one second later.
+        db.rollback()
+        connection = _existing()
+        if connection is None:  # pragma: no cover - the conflict means it exists
+            raise
+        _store(connection)
     db.refresh(connection)
     logger.info(
         "user %s connected %s (display=%s)",
