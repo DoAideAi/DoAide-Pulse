@@ -12,6 +12,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function useApi(loader, deps = []) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  // The HTTP status of the last failure, when there was one. The message alone
+  // cannot tell "this is gone" (404) from "try again" (a dropped connection),
+  // and a page that answers both the same way sends people away from a link
+  // that would have worked on reload.
+  const [errorStatus, setErrorStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const generation = useRef(0);
 
@@ -23,10 +28,12 @@ export function useApi(loader, deps = []) {
         if (current !== generation.current) return;
         setData(result);
         setError(null);
+        setErrorStatus(null);
       })
       .catch((err) => {
         if (current !== generation.current) return;
         setError(err.message || String(err));
+        setErrorStatus(err?.status ?? null);
       })
       .finally(() => {
         if (current === generation.current) setLoading(false);
@@ -43,5 +50,5 @@ export function useApi(loader, deps = []) {
   // `setError` is exposed alongside `setData` for the same reason: a caller
   // that has just talked to the server itself knows something this hook's last
   // attempt does not, and has no other way to say so.
-  return { data, error, loading, reload: run, setData, setError };
+  return { data, error, errorStatus, loading, reload: run, setData, setError };
 }

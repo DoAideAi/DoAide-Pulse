@@ -3,7 +3,7 @@
  * beyond the one public read — everything else about this page is `useApi`'s
  * ordinary loading/error/data cycle.
  */
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PreviewPage from "./PreviewPage";
@@ -97,7 +97,9 @@ describe("while the link is loading", () => {
   });
 
   it("clears the skeleton when the link turns out to be dead", async () => {
-    api.publicPreview.mockRejectedValue(new Error("Link not found"));
+    api.publicPreview.mockRejectedValue(
+      Object.assign(new Error("Link not found"), { status: 404 }),
+    );
     const { container } = draw();
     await screen.findByText(/isn't available anymore/);
 
@@ -147,11 +149,48 @@ describe("a live link", () => {
 
 describe("a dead link", () => {
   it("says the link is unavailable rather than showing a raw error", async () => {
-    api.publicPreview.mockRejectedValue(new Error("Link not found"));
+    api.publicPreview.mockRejectedValue(
+      Object.assign(new Error("Link not found"), { status: 404 }),
+    );
     draw();
 
     expect(
       await screen.findByText(/isn't available anymore/),
     ).toBeInTheDocument();
+  });
+});
+
+describe("a link that failed for some other reason", () => {
+  it("does not tell the reviewer the link expired, and offers a retry", async () => {
+    api.publicPreview
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(preview());
+    draw();
+
+    expect(await screen.findByText(/couldn't be loaded/)).toBeInTheDocument();
+    expect(screen.queryByText(/isn't available anymore/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Shipping Pulse 1.0")).toBeInTheDocument();
+    expect(api.publicPreview).toHaveBeenCalledTimes(2);
+  });
+
+  it("explains a rate limit", async () => {
+    api.publicPreview.mockRejectedValue(Object.assign(new Error("slow"), { status: 429 }));
+    draw();
+    expect(await screen.findByText(/Too many requests/)).toBeInTheDocument();
+  });
+});
+
+describe("the browser tab", () => {
+  it("names the draft once it loads and describes the cover by its title", async () => {
+    api.publicPreview.mockResolvedValue(
+      preview({ cover_image_url: "https://img.example/c.png" }),
+    );
+    draw();
+    await screen.findByText("Shipping Pulse 1.0");
+    expect(document.title).toBe("Preview: Shipping Pulse 1.0 | Pulse");
+    expect(screen.getByRole("img")).toHaveAttribute("alt", "Cover image for Shipping Pulse 1.0");
+    expect(screen.getByRole("main")).toBeInTheDocument();
   });
 });

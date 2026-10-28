@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { Skeleton } from "../components/ui/Bits";
 import Logo from "../components/ui/Logo";
@@ -14,11 +15,27 @@ import { renderMarkdown } from "../lib/markdown";
  */
 export default function PreviewPage() {
   const { token } = useParams();
-  const { data, error, loading } = useApi(() => api.publicPreview(token), [token]);
+  const { data, error, errorStatus, loading, reload } = useApi(
+    () => api.publicPreview(token),
+    [token],
+  );
+  // 404 is the backend's one answer for expired, revoked and never-existed
+  // alike. Anything else — a dropped connection, a 429, a 5xx — says nothing
+  // about the link, and telling a reviewer it had expired sent them back to
+  // the author for a new one they did not need.
+  const gone = errorStatus === 404 || errorStatus === 410;
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = data ? `Preview: ${data.title} | Pulse` : "Draft preview | Pulse";
+    return () => {
+      document.title = previous;
+    };
+  }, [data]);
 
   return (
     <div className="min-h-screen px-5 py-12">
-      <div className="mx-auto max-w-2xl">
+      <main className="mx-auto max-w-2xl">
         <div className="mb-8 flex items-center gap-2 text-ink-400">
           <Logo className="h-5 w-5" />
           <span className="eyebrow">Pulse preview</span>
@@ -42,12 +59,25 @@ export default function PreviewPage() {
           </div>
         )}
 
-        {error && (
-          <div className="panel p-6 text-center">
+        {error && !loading && gone && (
+          <div className="panel p-6 text-center" role="alert">
             <p className="text-sm text-ink-700">
               This link isn't available anymore — it may have expired or been
-              revoked.
+              revoked. Ask the author for a new preview link.
             </p>
+          </div>
+        )}
+
+        {error && !loading && !gone && (
+          <div className="panel p-6 text-center" role="alert">
+            <p className="text-sm text-ink-700">
+              {errorStatus === 429
+                ? "Too many requests for this preview just now. Wait a moment and try again."
+                : "The preview couldn't be loaded. Check your connection and try again."}
+            </p>
+            <button type="button" className="btn-primary mt-4" onClick={reload}>
+              Try again
+            </button>
           </div>
         )}
 
@@ -56,7 +86,7 @@ export default function PreviewPage() {
             {data.cover_image_url && (
               <img
                 src={data.cover_image_url}
-                alt="Newsletter cover image"
+                alt={`Cover image for ${data.title}`}
                 loading="lazy"
                 className="mb-6 aspect-[1200/630] w-full rounded-xl border border-line object-cover"
               />
@@ -76,7 +106,7 @@ export default function PreviewPage() {
             />
           </article>
         )}
-      </div>
+      </main>
     </div>
   );
 }
