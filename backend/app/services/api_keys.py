@@ -337,9 +337,9 @@ def rotate(
     wants and is why it is the default rather than the convenient answer. A
     routine rotation passes enough hours to redeploy the consumers.
 
-    The replacement inherits the original's ``expires_at`` only if that is
-    still in the future; a rotation is not a way to resurrect an expired key,
-    but neither should it silently extend a key that was deliberately dated.
+    The replacement inherits the original's ``expires_at``. An expired key is
+    refused: a rotation is not a way to resurrect one, and neither should it
+    silently extend a key that was deliberately dated.
     """
     moment = now or utcnow()
     # Locked first, so two rotations of one key — a double-click — run one after
@@ -371,7 +371,11 @@ def rotate(
 
     inherited = key.expires_at
     if inherited is not None and as_aware(inherited) <= moment:
-        inherited = None
+        # Refused, like a revoked key. Dropping the past date instead — what
+        # this did — minted a replacement with no expiry at all: the one
+        # outcome the paragraph above rules out, a key that had been dated to
+        # die coming back as a credential that never does.
+        raise ApiKeyError("That key has expired. Create a new one instead.")
 
     project = db.get(Project, key.project_id)
     if project is None:  # pragma: no cover - FK makes this unreachable

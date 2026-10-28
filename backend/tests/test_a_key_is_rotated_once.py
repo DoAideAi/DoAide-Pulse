@@ -65,3 +65,41 @@ def test_the_api_refuses_the_second_rotation_with_a_422(client, auth, db, key):
     resp = client.post(url, headers=auth, json={"grace_hours": 24})
     assert resp.status_code == 422, resp.text
     assert "already rotated" in resp.json()["detail"]
+
+
+# A key dated to die stays dead. Rotating one after its date used to drop the
+# past expiry and mint a replacement with none at all — a credential that had
+# been deliberately time-limited, back as one that never expires.
+def test_an_expired_key_cannot_be_rotated_into_one_that_never_expires(db, project):
+    from datetime import timedelta
+
+    from app.models.mixins import utcnow
+
+    dated, _ = api_keys.mint(
+        db, project=project, name="Contractor", scopes=list(ALL_SCOPES),
+        expires_at=utcnow() - timedelta(days=1),
+    )
+    db.commit()
+    before = _live(db, project)
+
+    with pytest.raises(api_keys.ApiKeyError, match="has expired"):
+        api_keys.rotate(db, dated, grace_hours=0)
+
+    assert _live(db, project) == before
+    assert db.scalar(select(ApiKey).where(ApiKey.rotated_from_id == dated.id)) is None
+
+
+def test_a_dated_key_still_in_date_hands_its_date_on(db, project):
+    from datetime import timedelta
+
+    from app.models.mixins import as_aware, utcnow
+
+    until = utcnow() + timedelta(days=30)
+    dated, _ = api_keys.mint(
+        db, project=project, name="Contractor", scopes=list(ALL_SCOPES), expires_at=until
+    )
+    db.commit()
+
+    replacement, _ = api_keys.rotate(db, dated, grace_hours=0)
+
+    assert as_aware(replacement.expires_at) == as_aware(until)

@@ -321,19 +321,21 @@ def test_a_grace_window_never_extends_a_key_that_was_already_dated(db, key):
     assert as_aware(old.expires_at) == dies_soon
 
 
-def test_the_replacement_does_not_inherit_an_expiry_already_in_the_past(db, key):
+def test_an_expired_key_is_not_rotated_at_all(db, key):
     """Rotation is not a resurrection.
 
     An expired key rotated into a replacement carrying the same dead timestamp
-    would mint something that has never worked and never will.
+    would mint something that has never worked and never will. Minting one with
+    the date dropped — what this used to pin — is the resurrection itself: a key
+    deliberately dated to die, back as one that never expires. Refused instead;
+    a new key is a create away.
     """
     old, _ = key
     old.expires_at = utcnow() - timedelta(days=1)
     db.commit()
 
-    new, new_token = api_keys.rotate(db, old)
-    assert new.expires_at is None
-    assert api_keys.authenticate(db, new_token) is not None
+    with pytest.raises(api_keys.ApiKeyError, match="has expired"):
+        api_keys.rotate(db, old)
 
 
 def test_the_replacement_keeps_an_expiry_still_in_the_future(db, key):
