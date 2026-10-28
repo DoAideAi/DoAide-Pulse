@@ -7,7 +7,7 @@ import logging
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, lazyload
 
@@ -25,6 +25,7 @@ from app.schemas.viral import (
     PublicArticleOut,
     SubscribeIn,
     SubscribeOut,
+    UnsubscribeIn,
 )
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,36 @@ def subscribe(
         db.rollback()
         # Not the address: a subscriber list is PII, and the log is not where it lives.
         logger.debug("duplicate subscriber ignored: source=%s", payload.source or "direct")
+    return SubscribeOut(ok=True)
+
+
+@router.post(
+    "/subscribers/unsubscribe",
+    response_model=SubscribeOut,
+    summary="Take an email off the newsletter list",
+    responses=errors(status.HTTP_429_TOO_MANY_REQUESTS),
+)
+@limiter.limit("10/minute;100/hour")
+def unsubscribe(
+    request: Request,
+    response: Response,
+    payload: UnsubscribeIn,
+    db: Session = Depends(get_db),
+) -> SubscribeOut:
+    """Delete the address, outright. Unauthenticated, like subscribing.
+
+    Deleted rather than flagged: Pulse collects the address and does nothing
+    else with it — no list it is shown on, no mail it is sent — so a row kept
+    as "unsubscribed" would be the same personal data held for no purpose,
+    and withdrawing consent is the reason to have this at all.
+
+    The same answer whether or not the address was on the list, so this
+    cannot be used to find out who subscribed.
+    """
+    result = db.execute(delete(Subscriber).where(Subscriber.email == payload.email.lower()))
+    db.commit()
+    # A count, not the address: the log is not where the list lives.
+    logger.info("unsubscribe: %d row(s) removed", result.rowcount or 0)
     return SubscribeOut(ok=True)
 
 

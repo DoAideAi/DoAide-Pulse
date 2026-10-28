@@ -87,8 +87,9 @@ def test_the_surface_is_the_size_this_file_thinks_it_is():
     157 with the feedback widget's three (submit, list, features), which pass
     every check below as they stand. 158 with ``GET /analytics/features``
     (C103 M15); 159 with ``GET /analytics/funnel``, 160 with
-    ``GET /analytics/autopilot``."""
-    assert len(ROUTES) == 160
+    ``GET /analytics/autopilot``. 161 with ``POST /subscribers/unsubscribe``
+    (C103 M16)."""
+    assert len(ROUTES) == 161
 
 
 @pytest.mark.parametrize("route", ROUTES)

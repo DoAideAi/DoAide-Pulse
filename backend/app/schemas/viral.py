@@ -55,6 +55,14 @@ class SubscribeOut(BaseModel):
     ok: bool = True
 
 
+class UnsubscribeIn(BaseModel):
+    """An address to take off the list. The only thing a subscriber gave."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+
+
 class ContentIdeasIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
