@@ -57,7 +57,7 @@ export default function ContentIdeaGenerator() {
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
 
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-4 py-10">
         <div className="text-center mb-8">
           <span className="eyebrow mb-3 block text-brand-500">
             Free Tool
@@ -177,7 +177,7 @@ export default function ContentIdeaGenerator() {
             Try DoAide Pulse for free
           </Link>
         </div>
-      </div>
+      </main>
 
       <DoAideFooter />
     </div>

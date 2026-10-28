@@ -222,7 +222,7 @@ export default function NewsletterGallery() {
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
 
-      <div className="mx-auto max-w-6xl px-4 py-12">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-12">
         <div className="text-center mb-12">
           <span className="eyebrow mb-3 block text-brand-500">Gallery</span>
           <h1 className="font-display text-4xl md:text-5xl text-ink-900 mb-4">Newsletters built with AI</h1>
@@ -268,7 +268,7 @@ export default function NewsletterGallery() {
         </div>
 
         <CrossProductLinks page="landing" />
-      </div>
+      </main>
 
       <DoAideFooter />
     </div>

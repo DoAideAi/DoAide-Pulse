@@ -46,7 +46,7 @@ export default function NewsletterRoiCalculator() {
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
 
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-4 py-10">
         <h1 className="page-title mb-2">Newsletter ROI Calculator</h1>
         <p className="mb-6 text-ink-500">
           Calculate the return on investment from your newsletter. Adjust the inputs to see projected revenue.
@@ -116,7 +116,7 @@ export default function NewsletterRoiCalculator() {
         <div className="mt-6">
           <ShareButtons text="Calculate your newsletter ROI — free tool by DoAide Pulse" />
         </div>
-      </div>
+      </main>
 
       <DoAideFooter />
     </div>

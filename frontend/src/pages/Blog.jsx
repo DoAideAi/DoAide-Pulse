@@ -48,7 +48,7 @@ export default function Blog() {
   return (
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
-      <div className="mx-auto max-w-3xl px-4 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-3xl px-4 py-10">
         <div className="text-center mb-10">
           <span className="eyebrow mb-3 block text-brand-500">Blog</span>
           <h1 className="font-display text-3xl md:text-4xl text-ink-900 mb-3">Newsletter insights</h1>
@@ -86,7 +86,7 @@ export default function Blog() {
         </div>
 
         <CrossProductLinks page="blog" />
-      </div>
+      </main>
       <DoAideFooter />
     </div>
   );

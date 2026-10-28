@@ -112,7 +112,7 @@ export default function SubjectLineTester() {
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
 
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-4 py-10">
         <h1 className="page-title mb-2">Subject Line Tester</h1>
         <p className="mb-6 text-ink-500">
           Score your email subject line on open-rate predictors. Free, no signup.
@@ -177,7 +177,7 @@ export default function SubjectLineTester() {
         <div className="mt-6">
           <ShareButtons text="Score your email subject lines for free — Subject Line Tester by DoAide Pulse" />
         </div>
-      </div>
+      </main>
 
       <DoAideFooter />
     </div>

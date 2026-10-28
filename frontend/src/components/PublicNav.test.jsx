@@ -43,3 +43,13 @@ describe("PublicNav tools disclosure", () => {
     expect(screen.queryByRole("link", { name: "Subject Line Tester" })).not.toBeInTheDocument();
   });
 });
+
+describe("PublicNav skip link", () => {
+  it("is the first thing Tab reaches, and points at the page's main", async () => {
+    wrap();
+    await userEvent.tab();
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveFocus();
+    expect(skip).toHaveAttribute("href", "#main");
+  });
+});

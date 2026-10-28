@@ -569,6 +569,12 @@ export default function LandingPage() {
 
   return (
     <div className="landing-root">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-brand-500 focus:px-3 focus:py-1.5 focus:text-sm focus:text-canvas"
+      >
+        Skip to content
+      </a>
       <div className="landing-particles" aria-hidden="true">
         {PARTICLE_POSITIONS.map((p, i) => (
           <div
@@ -598,7 +604,7 @@ export default function LandingPage() {
         </nav>
       </header>
 
-      <main className={`landing-main ${visible ? "landing-visible" : ""}`}>
+      <main id="main" tabIndex={-1} className={`landing-main ${visible ? "landing-visible" : ""}`}>
         <div className="landing-left">
           <div className="landing-hero-robot-wrap">
             <HeroRobot color={ACCENT} />

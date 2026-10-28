@@ -58,7 +58,7 @@ export default function PublicArticle() {
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
 
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-4 py-10">
         {loading && (
           <div>
             <p role="status" className="sr-only">Loading article…</p>
@@ -166,7 +166,7 @@ export default function PublicArticle() {
             </div>
           </>
         )}
-      </div>
+      </main>
 
       <DoAideFooter />
     </div>

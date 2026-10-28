@@ -94,7 +94,7 @@ export default function SendTimeOptimizer() {
     <div className="min-h-screen bg-canvas text-ink-700">
       <PublicNav />
 
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <main id="main" tabIndex={-1} className="mx-auto max-w-2xl px-4 py-10">
         <h1 className="page-title mb-2">Send Time Optimizer</h1>
         <p className="mb-6 text-ink-500">
           Find the best days and times to send your newsletter by industry and timezone.
@@ -189,7 +189,7 @@ export default function SendTimeOptimizer() {
         <div className="mt-6">
           <ShareButtons text="Find the best time to send your newsletter — free tool by DoAide Pulse" />
         </div>
-      </div>
+      </main>
 
       <DoAideFooter />
     </div>

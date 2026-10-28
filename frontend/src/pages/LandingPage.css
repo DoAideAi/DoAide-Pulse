@@ -1,4 +1,7 @@
 /* ── Root ── */
+/* Text on --bg and --bg-surface clears WCAG AA (4.5:1). White at 0.45 alpha was
+   4.49:1 and 0.35 was 3.2:1, which is where the subtitles, form labels and
+   sign-in tabs sat; 0.55 is ~6:1 on both surfaces. Placeholders get 0.5. */
 .landing-root {
   --accent: #0D9488;
   --accent-secondary: #2DD4BF;
@@ -7,7 +10,7 @@
   --bg-card: rgba(16, 16, 18, 0.8);
   --bg-surface: #1A1A1D;
   --text: #E4E4E7;
-  --text-muted: #71717A;
+  --text-muted: #A1A1AA;
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
@@ -108,7 +111,7 @@
 
 .landing-header-link {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.55);
   text-decoration: none;
   transition: color 150ms ease;
 }
@@ -193,7 +196,7 @@
   font-family: var(--doaide-font-mono, 'IBM Plex Mono', monospace);
   font-size: 14px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.55);
   margin: 0 0 20px;
   max-width: 480px;
 }
@@ -292,7 +295,7 @@
   padding: 16px 0;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.55);
   font-family: var(--doaide-font, 'Inter', sans-serif);
   font-size: 14px;
   font-weight: 500;
@@ -335,7 +338,7 @@
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.18em;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.55);
   margin-bottom: 8px;
 }
 
@@ -363,7 +366,7 @@
 }
 
 .landing-input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Error ── */
@@ -472,7 +475,7 @@
 
 .landing-section-subtitle {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.55);
   max-width: 500px;
   margin: 0 auto;
   line-height: 1.6;
@@ -528,7 +531,7 @@
 .landing-feature-desc {
   font-size: 13px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.55);
   margin: 0;
 }
 
@@ -804,7 +807,7 @@
 
 .landing-pricing-currency {
   font-size: 18px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .landing-pricing-price {
@@ -1029,7 +1032,7 @@
 
 .landing-cta-subtitle {
   font-size: 15px;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.55);
   margin: 0 0 32px;
   line-height: 1.6;
 }
