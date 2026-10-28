@@ -407,3 +407,15 @@ def test_another_users_numbers_never_leak(client, auth, db, project, user):
     assert body["published_pieces"] == 0
     assert body["reader_minutes"] == 0
     assert analytics_service.totals(db, user.id).views == 0
+
+
+def test_a_band_average_ignores_publications_with_no_view_count(db, user, project):
+    """A LinkedIn post that reports no views must not halve the band's average."""
+    devto = _published(db, project, title="Counted", words=200)
+    linkedin = _published(db, project, title="Uncounted", words=200)
+    _publish_to(db, devto, Platform.DEVTO, views=400)
+    _publish_to(db, linkedin, Platform.LINKEDIN, views=None, reactions=7)
+
+    bands = {b["band"]: b for b in analytics_service.read_time(db, user.id)["by_length"]}
+    assert bands["short"]["publications"] == 2
+    assert bands["short"]["avg_views"] == 400.0

@@ -1250,6 +1250,7 @@ def _read_time_aggregate(
             "publications": 0,
             "read_minutes": 0,
             "reader_minutes": 0,
+            "with_views": 0,
             **_blank_metrics(),
         }
         for name, _ in _LENGTH_BANDS
@@ -1264,6 +1265,8 @@ def _read_time_aggregate(
         bucket["publications"] += 1
         bucket["read_minutes"] += minutes
         _accumulate(bucket, metric)
+        if metric.views is not None:
+            bucket["with_views"] += 1
 
         total_views += metric.views or 0
         if metric.reads is not None:
@@ -1298,10 +1301,12 @@ def _read_time_aggregate(
                 "clicks": bands[name]["clicks"],
                 "engagement": bands[name]["engagement"],
                 "reader_minutes": bands[name]["reader_minutes"],
+                # Same denominator as by_content_type: a publication on a
+                # platform that reports no view count is not a zero.
                 "avg_views": round(
-                    bands[name]["views"] / bands[name]["publications"], 1
+                    bands[name]["views"] / bands[name]["with_views"], 1
                 )
-                if bands[name]["publications"]
+                if bands[name]["with_views"]
                 else None,
                 **_rates(bands[name]),
             }
