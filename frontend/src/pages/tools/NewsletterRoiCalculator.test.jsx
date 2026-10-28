@@ -28,6 +28,16 @@ describe("NewsletterRoiCalculator", () => {
     expect(roi.textContent).toMatch(/%/);
   });
 
+  it("shows no ROI rather than 0% when the newsletter costs nothing", async () => {
+    wrap();
+    const cost = screen.getByLabelText(/monthly cost/i);
+    await userEvent.clear(cost);
+    await userEvent.type(cost, "0");
+    const roi = screen.getByTestId("roi");
+    expect(roi.textContent).toBe("—");
+    expect(roi.className).not.toMatch(/text-good|text-bad/);
+  });
+
   it("shows annual projection", () => {
     wrap();
     const annual = screen.getByTestId("annual");

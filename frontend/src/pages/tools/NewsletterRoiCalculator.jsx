@@ -36,7 +36,8 @@ export default function NewsletterRoiCalculator() {
   const clicks = opens * (safeClick / 100);
   const conversions = clicks * (safeConv / 100);
   const monthlyRevenue = conversions * safeRev;
-  const monthlyROI = safeCost > 0 ? ((monthlyRevenue - safeCost) / safeCost) * 100 : 0;
+  // No cost means no ROI to speak of — not 0%, which reads as "broke even".
+  const monthlyROI = safeCost > 0 ? ((monthlyRevenue - safeCost) / safeCost) * 100 : null;
   const annualRevenue = monthlyRevenue * 12;
 
   return (
@@ -94,7 +95,7 @@ export default function NewsletterRoiCalculator() {
         </div>
         <div className="panel p-4 text-center">
           <div className="eyebrow">Monthly ROI</div>
-          <div className={`stat-figure mt-1 ${monthlyROI >= 0 ? "text-good" : "text-bad"}`} data-testid="roi">{pct(monthlyROI)}</div>
+          <div className={`stat-figure mt-1 ${monthlyROI === null ? "" : monthlyROI >= 0 ? "text-good" : "text-bad"}`} data-testid="roi">{monthlyROI === null ? "—" : pct(monthlyROI)}</div>
         </div>
         <div className="panel p-4 text-center">
           <div className="eyebrow">Annual projection</div>
