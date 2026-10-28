@@ -15,6 +15,7 @@ const TABS = [
   { to: "/analytics", label: "Analytics", icon: AnalyticsIcon },
   { to: "/products", label: "Products", icon: ProductsIcon },
   { to: "/seo", label: "SEO", icon: SeoIcon },
+  { to: "/admin/feedback", label: "Feedback", icon: FeedbackIcon },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -379,6 +380,14 @@ function ProductsIcon() {
       <rect x="11.5" y="2.5" width="6" height="6" rx="1" />
       <rect x="2.5" y="11.5" width="6" height="6" rx="1" />
       <rect x="11.5" y="11.5" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+
+function FeedbackIcon() {
+  return (
+    <svg viewBox="0 0 20 20" className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3.5 5A1.5 1.5 0 0 1 5 3.5h10A1.5 1.5 0 0 1 16.5 5v6.5A1.5 1.5 0 0 1 15 13H9l-3.5 3v-3H5a1.5 1.5 0 0 1-1.5-1.5V5Z" />
     </svg>
   );
 }

@@ -111,8 +111,18 @@ describe("the destinations", () => {
       "Analytics",
       "Products",
       "SEO",
+      "Feedback",
       "Settings",
     ]);
+  });
+
+  it("links the feedback the widget collects", async () => {
+    await draw();
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "Feedback" })).toHaveAttribute(
+      "href",
+      "/admin/feedback",
+    );
   });
 
   it("marks the destination the user is on", async () => {
