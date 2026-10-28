@@ -125,7 +125,22 @@ def machine_content(
     it keeps this a narrow SELECT however long the articles get, and it means a
     leaked read-only key cannot pull out unpublished prose.
     """
-    query = select(Content).where(Content.project_id == key.project_id)
+    # Columns, not the entity. ``select(Content)`` read every body on the page
+    # — the prose this docstring promises a machine never sees — and because
+    # ``Content.publications`` is ``lazy="selectin"``, a second query loaded
+    # every publication of every piece as well, for a response that names
+    # neither.
+    query = select(
+        Content.id,
+        Content.title,
+        Content.slug,
+        Content.content_type,
+        Content.status,
+        Content.word_count,
+        Content.canonical_url,
+        Content.published_at,
+        Content.updated_at,
+    ).where(Content.project_id == key.project_id)
     if status_filter is not None:
         query = query.where(Content.status == status_filter)
 
@@ -138,7 +153,7 @@ def machine_content(
     # two pieces created in the same second must not be able to swap places
     # between page one and page two, which would drop one from both. Same rule
     # as every other listing in this tree — see ``test_paging_is_a_total_order``.
-    rows = db.scalars(
+    rows = db.execute(
         query.order_by(Content.created_at.desc(), Content.id.desc())
         .limit(limit)
         .offset(offset)
