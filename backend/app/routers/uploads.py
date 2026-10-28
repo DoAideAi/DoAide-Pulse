@@ -22,7 +22,6 @@ router = APIRouter(prefix="/uploads", tags=["uploads"])
 
 UPLOAD_LIMIT = "120/hour"
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
     "image/png",

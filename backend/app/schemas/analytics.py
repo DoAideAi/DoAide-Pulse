@@ -163,33 +163,6 @@ class PublishedPointOut(BaseModel):
     published: int
 
 
-class GenerationCostPointOut(BaseModel):
-    """Token spend on one day.
-
-    Install-wide, not per-account: the usage table has no owner column. See
-    :mod:`app.services.ops_metrics` for why, and note that on a multi-account
-    install every caller sees the same series.
-    """
-
-    date: str
-    calls: int
-    total_tokens: int = Field(
-        description=(
-            "Tokens, which is what cost means here — Pulse runs on free tiers "
-            "where quota is the scarce thing and there is no price table to "
-            "multiply by."
-        )
-    )
-    tokens_per_call: float | None = Field(
-        default=None,
-        description=(
-            "Mean tokens per call, or null on a day with no calls. Separates a "
-            "day that cost more because more was written from one where each "
-            "generation got longer."
-        ),
-    )
-
-
 class EngagementTrendPointOut(_Rates):
     """Reader activity *gained* on one day.
 

@@ -589,15 +589,3 @@ def for_publishing(db: Session, content: Content, language: str | None) -> Publi
             f"{code} translation is out of date — the piece has been edited since",
         )
     return PublishChoice(row, code, f"published in {code}")
-
-
-def mark_stale_language_codes(db: Session, content: Content) -> list[str]:
-    """Which of this piece's translations the current text has outrun.
-
-    A read, not a write: staleness is derived from two integers and storing it
-    would be a third copy of the same fact, guaranteed to be wrong for as long
-    as it takes whatever writes the body to remember to update it. The name says
-    "mark" because that is what the caller does with the answer — badge them in
-    the list — not because anything here changes.
-    """
-    return [row.language for row in listing(db, content) if row.is_stale(content)]

@@ -31,7 +31,6 @@ from app.models.content import (
     ContentType,
     read_minutes_for,
 )
-from app.models.llm_usage import LLMUsage
 from app.models.metrics import ContentMetric
 from app.models.mixins import as_aware, utcnow
 from app.models.project import Project
@@ -907,69 +906,6 @@ def published_series(
     return [{"period": label, "published": counts.get(label, 0)} for label in labels]
 
 
-def generation_cost_trend(db: Session, *, days: int = 30) -> list[dict]:
-    """Token spend per day over the last *days*, with the calls behind it.
-
-    **Install-wide, not per-account.** :class:`~app.models.llm_usage.LLMUsage`
-    has no owner column — see :mod:`app.services.ops_metrics` for why — so this
-    is the deployment's spend, and on a multi-account install every caller sees
-    the same series. It lives here rather than on the metrics endpoint because
-    the question it answers ("is generation getting more expensive") is a
-    dashboard question, and the caveat travels with it into the schema.
-
-    "Cost" is tokens. Pulse runs on free tiers where the scarce thing is
-    quota rather than money, and there is no price table to multiply by — a
-    currency figure here would be invented. ``calls`` sits beside the tokens
-    because the two move independently: a day whose token count doubled because
-    twice as much was written is a different fact from one that doubled because
-    each generation got longer, and ``tokens_per_call`` is what separates them.
-
-    Rows are counted in the day they were *written*, which for a completion is
-    when it finished. Every bucket in the window is present.
-    """
-    since = window_start(days)
-    day_col = func.date(LLMUsage.created_at).label("day")
-    rows = db.execute(
-        select(
-            day_col,
-            func.count(LLMUsage.id).label("calls"),
-            func.coalesce(func.sum(LLMUsage.total_tokens), 0).label("tokens"),
-        )
-        .where(LLMUsage.created_at >= since)
-        .group_by(day_col)
-    ).all()
-
-    tokens: dict[str, int] = {}
-    calls: dict[str, int] = {}
-    for day, day_calls, day_tokens in rows:
-        key = str(day)
-        calls[key] = day_calls
-        tokens[key] = int(day_tokens)
-
-    start = since.date()
-    out = []
-    for offset in range(days + 1):
-        label = (start + timedelta(days=offset)).isoformat()
-        day_calls = calls.get(label, 0)
-        day_tokens = tokens.get(label, 0)
-        out.append(
-            {
-                "date": label,
-                "calls": day_calls,
-                "total_tokens": day_tokens,
-                # None, not zero, on a day nothing was generated: "each call
-                # averaged no tokens" is the one reading that is certainly
-                # wrong, and a chart would plot it as a collapse in cost.
-                "tokens_per_call": (
-                    round(day_tokens / day_calls, 1) if day_calls else None
-                ),
-            }
-        )
-    return out
-
-
-#: The fields a daily gain is computed for. ``engagement`` is derived rather
-#: than stored, so it is read off the metric's own property.
 _TREND_FIELDS = ("views", "reads", "clicks", "engagement")
 
 
@@ -1568,7 +1504,6 @@ __all__ = [
     "by_project",
     "dashboard_summary",
     "engagement_trend",
-    "generation_cost_trend",
     "overview",
     "pipeline",
     "published_series",
