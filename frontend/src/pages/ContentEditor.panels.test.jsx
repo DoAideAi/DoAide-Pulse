@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import ContentEditor from "./ContentEditor";
+import ContentEditor, { PUBLICATION_POLL_MS, publicationsInFlight } from "./ContentEditor";
 import { api } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
@@ -595,7 +595,50 @@ describe("the publications panel", () => {
     await waitFor(() => expect(api.retryPublication).toHaveBeenCalledWith(3, 12));
     // Re-read, or the row keeps saying "failed" over a publication now queued.
     await waitFor(() => expect(api.getContent).toHaveBeenCalled());
-    expect(toast.success).toHaveBeenCalledWith("Retrying — check the publish queue for updates");
+    // Here, not "check the publish queue": the panel is where the result lands.
+    expect(toast.success).toHaveBeenCalledWith("Retrying on Medium — the result will show here");
+  });
+
+  it("asks before retrying a post that may already be live", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await open({
+      publications: [
+        publication({
+          id: 12,
+          platform: "medium",
+          status: "failed",
+          error: "read timeout — the request reached Medium, so it may already have gone out. Check Medium before retrying.",
+          outcome_unknown: true,
+        }),
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: "Checked — retry" }));
+
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("may already be live on Medium"));
+    expect(api.retryPublication).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    api.retryPublication.mockResolvedValue({});
+    await user.click(screen.getByRole("button", { name: "Checked — retry" }));
+    await waitFor(() => expect(api.retryPublication).toHaveBeenCalledWith(3, 12));
+    confirm.mockRestore();
+  });
+
+  it("does not ask before an ordinary retry", async () => {
+    const user = userEvent.setup();
+    const confirm = vi.spyOn(window, "confirm");
+    api.retryPublication.mockResolvedValue({});
+    await open({
+      publications: [publication({ id: 12, status: "failed", error: "500", outcome_unknown: false })],
+    });
+
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+
+    await waitFor(() => expect(api.retryPublication).toHaveBeenCalled());
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
   });
 
   it("reports a retry the server refused instead of claiming it worked", async () => {
@@ -1150,5 +1193,41 @@ describe("the headline panel", () => {
 
     expect(await screen.findByText("What each headline earned")).toBeInTheDocument();
     expect(screen.getByText("1,200 views · 40 interactions")).toBeInTheDocument();
+  });
+});
+
+// --------------------------------------------------------------------------- //
+// Watching a publish land                                                      //
+// --------------------------------------------------------------------------- //
+
+describe("a publication on its way", () => {
+  it("counts pending and publishing rows as in flight, and scheduled ones not", () => {
+    expect(publicationsInFlight(content({ publications: [publication({ status: "pending" })] }))).toBe(true);
+    expect(publicationsInFlight(content({ publications: [publication({ status: "publishing" })] }))).toBe(true);
+    expect(publicationsInFlight(content({ publications: [publication({ status: "scheduled" })] }))).toBe(false);
+    expect(publicationsInFlight(content())).toBe(false);
+    expect(publicationsInFlight(null)).toBe(false);
+  });
+
+  it("re-reads the piece until the row settles, so the result shows without a reload", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      await open({
+        publications: [publication({ status: "pending", external_url: null })],
+      });
+      api.getContent.mockClear();
+      api.getContent.mockResolvedValue(content({ publications: [publication({ status: "published" })] }));
+
+      await act(() => vi.advanceTimersByTimeAsync(PUBLICATION_POLL_MS));
+
+      expect(api.getContent).toHaveBeenCalledTimes(1);
+      expect(await screen.findByText("https://dev.to/h/saved-title")).toBeInTheDocument();
+
+      // Settled: no more polling.
+      await act(() => vi.advanceTimersByTimeAsync(PUBLICATION_POLL_MS * 3));
+      expect(api.getContent).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

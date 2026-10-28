@@ -54,6 +54,23 @@ export function isRetryableSaveError(err) {
   );
 }
 
+/** How often, and for how long, the editor re-reads a piece whose publications
+ *  are on their way. A publish or a retry answers with the queue state, not the
+ *  outcome, so without this the Publications panel sat on "pending" until the
+ *  page was reloaded — the success or the error the user was waiting for was
+ *  never shown. Bounded, because a worker that is down leaves rows pending
+ *  indefinitely, and a tab left open should not poll for ever. */
+export const PUBLICATION_POLL_MS = 4000;
+export const PUBLICATION_POLL_LIMIT_MS = 5 * 60 * 1000;
+
+/** Whether any of a piece's publications is still settling. Scheduled rows are
+ *  not: they may be days away, and the calendar is where they are watched. */
+export function publicationsInFlight(content) {
+  return Boolean(
+    content?.publications?.some((p) => p.status === "pending" || p.status === "publishing"),
+  );
+}
+
 /** The server's copy, in the shape the editor's fields hold.
  *
  *  One function so `dirty`, the recovery comparison and the storage mirror all
@@ -320,6 +337,34 @@ export default function ContentEditor() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+
+  // Re-read the piece while a publication settles, so "pending" turns into the
+  // link or the error without a reload. Quietly: a missed poll is not worth the
+  // page-level error banner, the next one will do. `setData` rather than
+  // `reload`, for the same reason — and the draft is safe either way, because
+  // the fields are only replaced when the *piece* changes (see `loadedId`).
+  const inFlight = publicationsInFlight(data);
+  useEffect(() => {
+    if (!inFlight) return undefined;
+    const started = Date.now();
+    let cancelled = false;
+    const timer = setInterval(() => {
+      if (Date.now() - started > PUBLICATION_POLL_LIMIT_MS) {
+        clearInterval(timer);
+        return;
+      }
+      api
+        .getContent(contentId)
+        .then((fresh) => {
+          if (!cancelled) setData(fresh);
+        })
+        .catch(() => {});
+    }, PUBLICATION_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [inFlight, contentId, setData]);
 
   // From a deferred copy of the body: the count splits the whole text into
   // words, and on a long piece that is work a keystroke should not wait for.
@@ -1589,11 +1634,24 @@ function PublicationsPanel({ content, onChanged }) {
     }
   }
 
-  async function retry(publicationId) {
+  async function retry(publication) {
+    // The one failure where Retry can do harm: the platform got the request
+    // and never said what it did with it, so the post may be live already.
+    // The error says to check first; one click past it was a duplicate post,
+    // or for a newsletter a second email to the whole list.
+    if (
+      publication.outcome_unknown &&
+      !window.confirm(
+        `This may already be live on ${titleize(publication.platform)} — the last ` +
+          "attempt reached it but got no clear answer back. Check there first. " +
+          "Retry anyway?",
+      )
+    )
+      return;
     try {
-      await api.retryPublication(content.id, publicationId);
+      await api.retryPublication(content.id, publication.id);
       onChanged();
-      toast.success("Retrying — check the publish queue for updates");
+      toast.success(`Retrying on ${titleize(publication.platform)} — the result will show here`);
     } catch (err) {
       toast.error(`Publication retry failed: ${err.message}`);
     }
@@ -1653,8 +1711,8 @@ function PublicationsPanel({ content, onChanged }) {
               </p>
             )}
             {publication.status === "failed" && (
-              <button className="btn-quiet mt-1 -ml-2.5" onClick={() => retry(publication.id)}>
-                Retry
+              <button className="btn-quiet mt-1 -ml-2.5" onClick={() => retry(publication)}>
+                {publication.outcome_unknown ? "Checked — retry" : "Retry"}
               </button>
             )}
           </li>
