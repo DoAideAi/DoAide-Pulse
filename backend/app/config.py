@@ -27,6 +27,12 @@ _BCRYPT_PRODUCTION_MIN_ROUNDS = 12
 #: the exposure a plaintext origin normally is.
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1", "[::1]"})
 
+#: The names ``ENVIRONMENT`` may take. Only production/prod switch on the
+#: production rules; the rest are spellings of "not production".
+_KNOWN_ENVIRONMENTS = frozenset(
+    {"development", "dev", "local", "test", "testing", "staging", "production", "prod"}
+)
+
 
 def _is_loopback(origin: str) -> bool:
     """Whether *origin*'s host is this machine.
@@ -930,6 +936,58 @@ class Settings(BaseSettings):
         """
         if v < 0:
             raise ValueError("must be zero or positive")
+        return v
+
+    @field_validator("environment")
+    @classmethod
+    def _environment_is_a_known_name(cls, v: str) -> str:
+        """Refuse an ``ENVIRONMENT`` that is not one Pulse knows.
+
+        Everything that is not ``production``/``prod`` runs the development
+        rules — docs open, weak-secret checks skipped — so a typo used to be a
+        silent downgrade: ``ENVIRONMENT=prodcution`` booted a live box as a
+        laptop. Case and stray whitespace are forgiven, since both get typed
+        into env files; a name nobody meant is not.
+        """
+        name = v.strip().lower()
+        if name not in _KNOWN_ENVIRONMENTS:
+            raise ValueError(
+                f"ENVIRONMENT={v!r} is not one Pulse knows. Use one of: "
+                f"{', '.join(sorted(_KNOWN_ENVIRONMENTS))} — anything but "
+                "production/prod runs the development rules."
+            )
+        return name
+
+    @field_validator("frontend_url", "public_api_url")
+    @classmethod
+    def _public_urls_reachable_in_production(cls, v: str, info: ValidationInfo) -> str:
+        """Refuse a production URL that only this machine can follow.
+
+        These two are written into things that leave the box: password-reset
+        and preview links in email, the digest, upload URLs inside published
+        posts, the webhook URL pasted into GitHub. ``FRONTEND_URL`` defaults to
+        the Vite dev server, so a production ``.env`` that forgot it mailed
+        every reset link to ``http://localhost:5173`` and nothing complained.
+        Blank ``PUBLIC_API_URL`` is allowed — it means "same as the frontend".
+        """
+        env = info.data.get("environment") or "development"
+        if env not in {"production", "prod"}:
+            return v
+        if info.field_name == "public_api_url" and not v.strip():
+            return v
+        name = (info.field_name or "url").upper()
+        parts = urlsplit(v.strip())
+        if parts.scheme != "https" or not parts.hostname:
+            raise ValueError(
+                f"{name} must be an https:// URL in production, e.g. "
+                f"https://pulse.example.com — got {v!r}. It goes into emailed "
+                "links and published posts."
+            )
+        if _is_loopback(v.strip()):
+            raise ValueError(
+                f"{name} points at this machine ({v!r}) — in production it "
+                "must be the public address people open."
+            )
         return v
 
     @field_validator("jwt_secret")

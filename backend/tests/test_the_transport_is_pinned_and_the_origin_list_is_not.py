@@ -51,6 +51,7 @@ _BASE = {
     "debug": False,
     "jwt_secret": "x" * 48,
     "token_encryption_key": Fernet.generate_key().decode(),
+    "frontend_url": "https://pulse.example.com",
     "database_url": "sqlite://",
     "_env_file": None,
 }

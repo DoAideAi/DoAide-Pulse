@@ -31,6 +31,7 @@ def _settings(**kwargs):
     return Settings(
         database_url="sqlite://",
         token_encryption_key=Fernet.generate_key().decode(),
+        frontend_url="https://pulse.example.com",
         _env_file=None,
         **kwargs,
     )

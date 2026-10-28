@@ -65,6 +65,7 @@ def test_is_production_property():
             # Production refuses to start without one; this test is about
             # ``is_production``, not about credential encryption.
             token_encryption_key=Fernet.generate_key().decode(),
+            frontend_url="https://pulse.example.com",
             _env_file=None,
         )
         assert s.is_production is True
