@@ -39,7 +39,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only, raiseload
 
 from app.models.content import Content, unique_content_slug
 from app.models.revision import ContentRevision, RevisionSource
@@ -247,15 +247,30 @@ def snapshot_if_changing(
 def history(
     db: Session, content: Content, *, limit: int = 20, offset: int = 0
 ) -> list[ContentRevision]:
-    """This piece's past versions, newest first.
+    """This piece's past versions, newest first — without their text.
 
-    Bodies are deferred nowhere and loaded whole, which is the right trade at
-    ``limit`` of twenty: the list screen shows a word count and a note per row,
-    but the diff the user clicks next needs the body, and a second round trip
-    per row to fetch it is the N+1 this would be criticised for.
+    The list shows a revision number, a source, a note and a word count, and
+    ``word_count`` is stored on the row so that it can. The bodies used to be
+    loaded anyway, on the theory that the diff clicked next would need them —
+    but that diff is ``GET /revisions/{n}``, a separate request that reads its
+    own row, so up to a hundred full snapshots (a body is up to 200,000
+    characters) were read here and dropped by the response schema.
     """
     stmt = (
         select(ContentRevision)
+        .options(
+            load_only(
+                ContentRevision.id,
+                ContentRevision.content_id,
+                ContentRevision.revision,
+                ContentRevision.source,
+                ContentRevision.note,
+                ContentRevision.word_count,
+                ContentRevision.author_user_id,
+                ContentRevision.created_at,
+            ),
+            raiseload("*"),
+        )
         .where(ContentRevision.content_id == content.id)
         .order_by(ContentRevision.revision.desc())
         .offset(offset)

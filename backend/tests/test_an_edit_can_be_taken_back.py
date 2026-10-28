@@ -170,6 +170,28 @@ def test_the_history_is_newest_first_and_carries_no_bodies(client, auth, piece):
     assert response.headers["X-Total-Count"] == "2"
 
 
+def test_the_history_reads_no_bodies_either(client, auth, db, piece, sql_log):
+    """M8: the list's SELECT leaves the text in the database, not just the JSON.
+
+    It used to load up to a hundred whole snapshots and let the response
+    schema drop the bodies on the way out.
+    """
+    for i in range(3):
+        _patch(client, auth, piece, body_markdown=f"Rewritten body number {i}.")
+    db.expire_all()
+    sql_log.clear()
+
+    response = client.get(f"{V1}/content/{piece.id}/revisions", headers=auth)
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 3
+    assert all(item["word_count"] > 0 for item in items)
+    reads = [s for s in sql_log if s.startswith("SELECT") and "FROM content_revisions" in s]
+    assert reads, sql_log
+    assert not any("content_revisions.body_markdown" in s for s in reads), reads
+
+
 def test_one_revision_comes_back_whole(client, auth, piece):
     """The detail endpoint is where the text lives."""
     original = piece.body_markdown
