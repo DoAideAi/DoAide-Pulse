@@ -45,7 +45,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
+from sqlalchemy.orm.exc import StaleDataError
 from sqlalchemy.orm import Session
 
 from app.models.content import Content
@@ -63,6 +64,27 @@ class TranslationError(RuntimeError):
 
 class TranslationUnavailable(TranslationError):
     """Every provider in the chain failed. Retrying later may well work."""
+
+
+class TranslationSourceGone(TranslationError):
+    """The piece was deleted while its translation was being written."""
+
+
+def _still_there(db: Session, row: ContentTranslation) -> bool:
+    """Whether *row* survived the model call.
+
+    The call takes tens of seconds and holds no transaction, which is the point
+    of committing the row first — but it means the piece can be deleted in the
+    meantime, and its translations go with it. Writing to the row afterwards
+    then raised ``ObjectDeletedError`` from inside the failure handler, which
+    is to say a 500 for "you deleted this a moment ago".
+    """
+    try:
+        db.refresh(row)
+    except InvalidRequestError:  # ObjectDeletedError, or no longer persistent
+        db.rollback()
+        return False
+    return True
 
 
 class TranslationInProgress(TranslationError):
@@ -433,6 +455,10 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
             purpose=f"translate:{code}",
         )
     except ai.AIError as exc:
+        if not _still_there(db, row):
+            raise TranslationSourceGone(
+                "This piece was deleted while it was being translated."
+            ) from exc
         row.status = TranslationStatus.FAILED
         row.error = sanitize_unexpected_error(exc)
         db.commit()
@@ -445,6 +471,12 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
     # already arrived, and none of it is expected to fail. If it does, the row
     # must not stay ``PENDING``: nothing is working on it any more, and the
     # language list would show "Waiting" for a translation that never comes.
+    if not _still_there(db, row):
+        logger.info(
+            "translation into %s finished after its piece was deleted; discarded", code
+        )
+        raise TranslationSourceGone("This piece was deleted while it was being translated.")
+
     try:
         title = ai.as_str(payload.get("title"))[:300]
         translated_body = ai.as_str(payload.get("body_markdown"))
@@ -477,9 +509,17 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
         db.commit()
     except Exception as exc:
         db.rollback()
-        row.status = TranslationStatus.FAILED
-        row.error = sanitize_unexpected_error(exc)
-        db.commit()
+        try:
+            row.status = TranslationStatus.FAILED
+            row.error = sanitize_unexpected_error(exc)
+            db.commit()
+        except (InvalidRequestError, StaleDataError):
+            # Deleted between the check above and this write: there is no row
+            # left to mark, and nothing for the caller to see but the deletion.
+            db.rollback()
+            raise TranslationSourceGone(
+                "This piece was deleted while it was being translated."
+            ) from exc
         logger.exception(
             "translation of content %s into %s failed after the model answered",
             content.id,
