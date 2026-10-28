@@ -91,8 +91,11 @@ _FENCE = re.compile(r"```.*?(?:```|\Z)", re.S)
 #: charge the rest of the post as code.
 _INLINE_CODE = re.compile(r"`[^`\n]+`")
 
-_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_LINK = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+# Neither class admits the character that opens it, or a body of thousands of
+# ``[`` (or ``](`` with no ``)``) backtracks from every one to the end: 88
+# seconds to *read* a 200 KB piece, since the quality report is on every GET.
+_IMAGE = re.compile(r"!\[[^\[\]]*\]\([^()]*\)")
+_LINK = re.compile(r"\[([^\[\]]*)\]\([^()]*\)")
 _HEADING_MARK = re.compile(r"^\s{0,3}#{1,6}\s*", re.M)
 _BULLET = re.compile(r"^\s{0,3}[-*+]\s+", re.M)
 _ORDERED = re.compile(r"^\s{0,3}\d+[.)]\s+", re.M)

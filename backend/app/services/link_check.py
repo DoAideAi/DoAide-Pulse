@@ -53,7 +53,9 @@ _CODE_FENCE = re.compile(r"```.*?```|~~~.*?~~~", re.S)
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 #: ``[label](url "title")`` and its image form. The URL is everything up to
 #: whitespace or the closing paren, so a title never lands in the URL.
-_MD_LINK = re.compile(r"!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?[^)]*\)")
+# No class admits the character that opens it — see ``seo._LINK`` for the
+# quadratic backtracking that a run of ``[`` or ``](`` caused otherwise.
+_MD_LINK = re.compile(r"!?\[[^\[\]]*\]\(\s*<?([^()\s>]+)>?[^()]*\)")
 _AUTOLINK = re.compile(r"<(https?://[^>\s]+)>")
 _BARE_URL = re.compile(r"https?://[^\s<>\]\)\"'`]+")
 

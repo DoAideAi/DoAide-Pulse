@@ -113,7 +113,16 @@ _FENCE = re.compile(r"^[ \t]*(```|~~~).*?(?:^[ \t]*\1[ \t]*$|\Z)", re.S | re.M)
 _INLINE_CODE = re.compile(r"`[^`\n]*`")
 #: Link and image *targets* — ``](https://…)`` and bare URLs. A hostname is full
 #: of name-shaped fragments that nobody wrote as prose.
-_LINK_TARGET = re.compile(r"\]\([^)]*\)|<https?://[^>]*>|\bhttps?://\S+|\S+@\S+\.\w+")
+#:
+#: Both open-ended arms are written to fail fast. ``[^()]*`` stops at the next
+#: ``(`` rather than running from every ``](`` to the end of the body, and the
+#: address arm starts only where a token starts (``(?<!\S)``): unanchored,
+#: ``\S+@`` scanned from *every* position of a long unbroken token looking for
+#: an ``@`` — five seconds for a 50,000-character run, which is one paste of
+#: minified JSON or a base64 image.
+_LINK_TARGET = re.compile(
+    r"\]\([^()]*\)|<https?://[^>]*>|\bhttps?://\S+|(?<!\S)[^\s@]+@\S+\.\w+"
+)
 _HTML_TAG = re.compile(r"</?[A-Za-z][^>]*>")
 #: Markdown furniture that would otherwise glue itself to a token.
 _MARKUP = re.compile(r"[*_~#>|\[\]]+")

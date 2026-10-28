@@ -42,6 +42,14 @@ _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _HEADING = re.compile(r"^(#{1,6})\s+(.*)$", re.M)
 _CODE_FENCE = re.compile(r"```.*?```", re.S)
 _INLINE_MARKUP = re.compile(r"[*_`>\[\]()#]")
+#: An image, and a link reduced to its label. Neither class admits the
+#: character that opens it: ``[^\]]*`` ran from every ``[`` to the end of the
+#: body before failing, and ``[^)]*`` did the same from every ``(``, so a body
+#: of 20,000 ``[`` took five seconds to save — this runs six times a save, for
+#: the excerpt, the word count, the SEO audit and the quality report. Excluding
+#: the opener makes each failed attempt stop at the next one: linear.
+_IMAGE = re.compile(r"!\[[^\[\]]*\]\([^()]*\)")
+_LINK = re.compile(r"\[([^\[\]]*)\]\([^()]*\)")
 
 
 def _find_headings(body_markdown: str) -> list[tuple[str, str]]:
@@ -59,8 +67,8 @@ def strip_markdown(markdown: str) -> str:
     Used for excerpting and word counts; not a general-purpose renderer.
     """
     text = _CODE_FENCE.sub(" ", markdown)
-    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", " ", text)  # images
-    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)  # links -> label
+    text = _IMAGE.sub(" ", text)
+    text = _LINK.sub(r"\1", text)
     text = _INLINE_MARKUP.sub("", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -152,7 +160,7 @@ class SeoIssue:
 SEO_SCORE_THRESHOLD = 70
 
 #: Image alt text pattern.
-_IMG_ALT = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
+_IMG_ALT = re.compile(r"!\[([^\[\]]*)\]\([^()]*\)")
 
 
 #: Characters that end a word for density purposes. ``\b`` alone is wrong at the
