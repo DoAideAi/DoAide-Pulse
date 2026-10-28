@@ -95,6 +95,22 @@ describe("loading, error and empty states", () => {
 });
 
 describe("a project card", () => {
+  it("shows where its RSS feed is once something is published", async () => {
+    api.listProjects.mockResolvedValue([project({ id: 7, published_count: 3 })]);
+    draw();
+
+    const link = await screen.findByRole("link", { name: "RSS feed" });
+    expect(link).toHaveAttribute("href", `${window.location.origin}/api/v1/projects/7/feed.xml`);
+  });
+
+  it("offers no feed link before anything is published, since the feed is a 404 then", async () => {
+    api.listProjects.mockResolvedValue([project({ published_count: 0 })]);
+    draw();
+
+    await screen.findByText("0 published");
+    expect(screen.queryByRole("link", { name: "RSS feed" })).not.toBeInTheDocument();
+  });
+
   it("shows its name, links and autopilot mode", async () => {
     api.listProjects.mockResolvedValue([project()]);
     draw();

@@ -132,6 +132,11 @@ export default function Projects() {
   );
 }
 
+/** The public RSS feed of a project's published pieces, as an absolute URL. */
+export function feedUrl(projectId) {
+  return `${window.location.origin}/api/v1/projects/${projectId}/feed.xml`;
+}
+
 function ProjectCard({ project, onEdit, onChanged }) {
   const toast = useToast();
   const [scanning, setScanning] = useState(false);
@@ -212,6 +217,20 @@ function ProjectCard({ project, onEdit, onChanged }) {
         <span>{titleize(project.tone)}</span>
         {project.last_scanned_at && (
           <span title="Last repo scan">scanned {formatWhen(project.last_scanned_at)}</span>
+        )}
+        {project.published_count > 0 && (
+          // The feed has been served all along; nothing in the app said where.
+          // Only once something is published, because until then it answers
+          // 404 — on purpose, so an empty project's metadata is not public.
+          <a
+            href={feedUrl(project.id)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-500 hover:underline"
+            title="Your published pieces as an RSS feed — paste this address into any feed reader"
+          >
+            RSS feed
+          </a>
         )}
       </dl>
 
