@@ -264,3 +264,44 @@ class TestInternalLinkCount:
 
     def test_mailto_is_not_internal(self):
         assert seo_autofix.link_count("[mail](mailto:hi@acme.dev)", self.SCOPE) == 0
+
+
+# A fence opened directly under a line of prose, with a blank line inside the
+# code. Fence state was read only from whether a paragraph *started* with ```,
+# so the code's second half looked like prose and took a keyword sentence —
+# on the closing fence line, which no longer closes, so everything after it
+# renders as code.
+_FENCED_UNDER_PROSE = (
+    "Install the tool and run it against your repository to see what it finds today:\n"
+    "```bash\n"
+    "pip install widget\n"
+    "\n"
+    "widget --run --verbose --all --repo . --output report.json --format json\n"
+    "```\n"
+    "\n"
+    "After that the report explains every finding in plain words for the whole team to read."
+)
+
+
+def test_a_keyword_sentence_never_lands_inside_code():
+    from app.services.seo_autofix import fix_keyword_density
+
+    out = fix_keyword_density(_FENCED_UNDER_PROSE, "release notes")
+
+    assert out != _FENCED_UNDER_PROSE, "nothing was added, so nothing was tested"
+    code = out.split("```bash\n", 1)[1].split("```", 1)[0]
+    assert "release notes" not in code
+    assert "\n```\n" in out, "the closing fence line was changed"
+    assert out.count("```") == 2
+
+
+def test_a_tilde_fence_is_code_too():
+    from app.services.seo_autofix import _prose_blocks
+
+    blocks = [
+        "A paragraph of ordinary prose that is long enough to count here.",
+        "~~~\nsome code",
+        "more code that has enough words to look like a sentence of prose\n~~~",
+        "And a closing paragraph of prose that is also long enough to count.",
+    ]
+    assert _prose_blocks(blocks) == [0, 3]

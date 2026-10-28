@@ -172,10 +172,20 @@ def _prose_blocks(blocks: list[str]) -> list[int]:
     in_fence = False
     for i, block in enumerate(blocks):
         stripped = block.strip()
-        fences = stripped.count("```")
-        if in_fence or stripped.startswith("```"):
-            if fences % 2 == 1:
+        # Fence state is tracked line by line, not by whether a block *starts*
+        # with a fence. A fence opened straight under a line of prose
+        # ("Install it:" then a ```bash line, no blank between) used to go
+        # unnoticed: the code's later paragraphs read as prose, and a keyword
+        # sentence went inside the code — or onto the closing ``` line, where
+        # trailing text stops the fence closing and the rest of the article
+        # renders as code. Any block inside a fence or holding a fence line is
+        # not prose.
+        touched = in_fence
+        for line in block.splitlines():
+            if line.lstrip().startswith(("```", "~~~")):
+                touched = True
                 in_fence = not in_fence
+        if touched:
             continue
         if not stripped or stripped[0] in "#->|*!<" or re.match(r"^\d+[.)]\s", stripped):
             continue
