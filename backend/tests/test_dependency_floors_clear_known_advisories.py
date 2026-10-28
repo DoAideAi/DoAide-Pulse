@@ -37,7 +37,11 @@ MINIMUMS = {
     ("mcp/requirements.txt", "mcp"): "1.28.1",
 }
 
-_LINE = re.compile(r"^([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?\s*>=\s*([0-9][^\s;#]*)")
+#: ``>=`` or ``==``. The backend's requirements became exact pins in C103 M20,
+#: and with only ``>=`` read every pinned package looked unlisted: this file
+#: failed on "has no >= floor" for all of them and never compared a version.
+#: A pin is the strictest floor there is, so it is checked the same way.
+_LINE = re.compile(r"^([A-Za-z0-9_.-]+)(?:\[[^\]]*\])?\s*(?:>=|==)\s*([0-9][^\s;#,]*)")
 
 
 def _floors(relative: str) -> dict[str, Version]:
@@ -54,7 +58,7 @@ def test_floor_is_not_below_the_fixed_release(location, minimum):
     path, package = location
     floors = _floors(path)
 
-    assert package in floors, f"{package} has no >= floor in {path}"
+    assert package in floors, f"{package} has no >= floor or == pin in {path}"
     assert floors[package] >= Version(minimum), (
         f"{package}>={floors[package]} in {path} admits releases with known "
         f"advisories; the fixed floor is {minimum}"

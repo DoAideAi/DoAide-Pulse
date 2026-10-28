@@ -460,6 +460,7 @@ def test_production_validates_every_key_in_the_list():
         "environment": "production",
         "jwt_secret": "x" * 48,
         "database_url": "postgresql+psycopg://u:p@localhost/pulse",
+        "frontend_url": "https://pulse.example.com",
     }
     good = Fernet.generate_key().decode()
 

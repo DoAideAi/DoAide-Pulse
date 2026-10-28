@@ -33,6 +33,9 @@ _PRODUCTION = {
     "environment": "production",
     "jwt_secret": "x" * 48,
     "database_url": "postgresql+psycopg://u:p@localhost/pulse",
+    # Required in production since 9b26342; without it this fixture failed on
+    # the frontend URL and never reached the key checks it exists for.
+    "frontend_url": "https://pulse.example.com",
 }
 
 
