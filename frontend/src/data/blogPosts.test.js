@@ -22,4 +22,18 @@ describe("blog data", () => {
     expect(blog).toContain('from "../data/blogPostIndex"');
     expect(blog).not.toMatch(/from "\.\.\/data\/blogPosts"/);
   });
+
+  it("claims no research Pulse never did", () => {
+    // The posts quoted "our data across 50,000 campaigns" and "after analyzing
+    // over 500,000 email campaigns" — studies nobody ran, with open rates
+    // attached. Advice is fine; an invented dataset presented as ours is not.
+    const invented =
+      /\b(our (data|dataset|analysis|research|study)|we (found|studied|analy[sz]ed|surveyed|measured)|after (studying|analy[sz]ing))\b|\b[0-9]{2,3},000 (email )?campaigns\b/i;
+    for (const post of staticPosts) {
+      const text = [post.description, ...post.body, ...(post.faqs ?? []).flatMap((f) => [f.q, f.a, f.question, f.answer])]
+        .filter(Boolean)
+        .join(" ");
+      expect(text, post.slug).not.toMatch(invented);
+    }
+  });
 });

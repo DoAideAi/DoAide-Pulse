@@ -92,7 +92,7 @@ export const blogPostIndex = [
   {
     slug: "subject-lines-40-percent-open-rates",
     title: "How to Write Subject Lines That Get 40%+ Open Rates",
-    description: "Proven subject line strategies with real examples for Indian businesses — festival hooks, regional language tricks, and data-backed formulas that consistently break 40% open rates.",
+    description: "Proven subject line strategies with real examples for Indian businesses — festival hooks, regional language tricks, and formulas worth A/B testing on your own list.",
     published: "2026-10-08",
     keywords: [
       "email subject lines",
