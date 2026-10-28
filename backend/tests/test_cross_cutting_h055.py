@@ -19,7 +19,6 @@ from app.deps import get_current_user
 from app.main import create_app
 from app.ratelimit import limiter
 
-
 # ── helpers ────────────────────────────────────────────────────────────── #
 
 
@@ -172,8 +171,11 @@ _RATE_LIMIT_EXEMPT = {
     "POST /content/bulk/archive-old",
     # Translation delete — simple DB write
     "DELETE /content/{content_id}/translations/{language}",
-    # Calendar drag-and-drop
+    # Calendar drag-and-drop, and planning or dismissing an idea: each moves or
+    # removes one row the caller already owns. Creating an idea is limited.
     "PATCH /calendar/content/{content_id}",
+    "PATCH /calendar/ideas/{idea_id}",
+    "DELETE /calendar/ideas/{idea_id}",
     # Settings — disconnect is a simple delete
     "DELETE /settings/connections/{platform}",
     # Webhooks — bounded by per-user cap (20)

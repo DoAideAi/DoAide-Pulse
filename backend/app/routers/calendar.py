@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.models.mixins import as_aware, utcnow
 from app.models.project import Project
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.user import User
+from app.ratelimit import account_key, limiter
 from app.schemas.content import (
     CadenceGuideOut,
     CalendarEntry,
@@ -365,6 +366,12 @@ def cadence_guide(
 #: The backlog shown beside the calendar. Capped: a pool to plan from, not an archive.
 IDEA_BACKLOG_LIMIT = 30
 
+#: Hand-written ideas per account. Nothing else bounds them — the backlog
+#: *read* is capped at :data:`IDEA_BACKLOG_LIMIT`, the table is not — so
+#: without this a script could fill ``content_ideas`` faster than anyone
+#: could plan or dismiss them. Far above what a person types.
+IDEA_CREATE_LIMIT = "120/hour;1000/day"
+
 
 def _idea_out(idea: ContentIdea, project_name: str) -> CalendarIdeaOut:
     return CalendarIdeaOut(
@@ -438,9 +445,14 @@ def calendar_ideas(
     response_model=CalendarIdeaOut,
     status_code=status.HTTP_201_CREATED,
     summary="Add your own idea, optionally straight onto a day",
-    responses=errors(*OWNED, status.HTTP_422_UNPROCESSABLE_CONTENT),
+    responses=errors(
+        *OWNED, status.HTTP_422_UNPROCESSABLE_CONTENT, status.HTTP_429_TOO_MANY_REQUESTS
+    ),
 )
+@limiter.limit(IDEA_CREATE_LIMIT, key_func=account_key)
 def create_idea(
+    request: Request,
+    response: Response,
     payload: CalendarIdeaCreate,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
