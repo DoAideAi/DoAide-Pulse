@@ -36,7 +36,6 @@ from app.services.publishers.base import (
     CredentialField,
     MetricsSnapshot,
     PreflightFinding,
-    PublishError,
     PublishRequest,
     PublishResult,
     UnsupportedOption,

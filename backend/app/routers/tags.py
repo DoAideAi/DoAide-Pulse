@@ -38,7 +38,7 @@ from app.models.content import Content
 from app.models.project import Project
 from app.models.user import User
 from app.ratelimit import account_key, limiter
-from app.schemas.errors import AUTHENTICATED, OWNED, errors
+from app.schemas.errors import OWNED, errors
 from app.schemas.tag import (
     TagRenameIn,
     TagRenameOut,

@@ -31,7 +31,6 @@ from app.services.publishers.base import (
     Adapter,
     CredentialError,
     CredentialField,
-    PublishError,
     PublishRequest,
     PublishResult,
 )
