@@ -1701,17 +1701,38 @@ def collect_metrics(
 
     metric = ContentMetric(
         publication_id=publication.id,
-        views=snapshot.views,
-        reads=snapshot.reads,
-        clicks=snapshot.clicks,
-        reactions=snapshot.reactions,
-        comments=snapshot.comments,
-        shares=snapshot.shares,
+        views=_count(snapshot.views),
+        reads=_count(snapshot.reads),
+        clicks=_count(snapshot.clicks),
+        reactions=_count(snapshot.reactions),
+        comments=_count(snapshot.comments),
+        shares=_count(snapshot.shares),
     )
     db.add(metric)
     if commit:
         db.commit()
     return metric
+
+
+def _count(value: object) -> int | None:
+    """A platform's count as the column takes it, or ``None`` if it is not one.
+
+    Adapters hand over whatever the platform's JSON said. A negative number, a
+    string, a float or a ``true`` there is not a count, and writing it as-is
+    either stores the wrong type or trips the column's ``>= 0`` check — at the
+    sweep's batch commit, which then rolls back every *other* publication's
+    reading in the same batch. "Not reported" is the honest reading of a value
+    that is not a count.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    if isinstance(value, str) and value.strip().isdigit():
+        value = int(value.strip())
+    if isinstance(value, int) and value >= 0:
+        return value
+    return None
 
 
 __all__ = [
