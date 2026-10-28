@@ -603,6 +603,14 @@ describe("every endpoint's path and verb", () => {
     ["suggestHeadlines", [3, 4], "/content/3/headlines?count=4", "POST"],
     ["applyHeadline", [3, "New"], "/content/3/headlines/apply", "POST"],
     ["headlinePerformance", [3], "/content/3/headlines/performance", "GET"],
+    ["headlineWinner", [3], "/content/3/headlines/winner", "GET"],
+    ["adoptHeadlineWinner", [3], "/content/3/headlines/auto-select", "POST"],
+    [
+      "scheduleSuggestions",
+      [3, ["devto", "mastodon"]],
+      "/content/3/schedule/suggestions?platforms=devto&platforms=mastodon",
+      "GET",
+    ],
 
     ["triggerKinds", [], "/triggers/kinds", "GET"],
     ["listTriggers", [], "/triggers", "GET"],
