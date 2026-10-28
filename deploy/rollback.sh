@@ -88,6 +88,7 @@ rsync -az --delete -e "ssh -i $SSH_KEY" \
 echo "==> restarting services with rollback code"
 "${SSH[@]}" bash -euo pipefail <<'REMOTE_SCRIPT'
 chown -R pulse:pulse /opt/Pulse
+sudo -u pulse /opt/Pulse/.venv/bin/pip install -q --upgrade pip
 sudo -u pulse /opt/Pulse/.venv/bin/pip install -q -r /opt/Pulse/backend/requirements.txt
 
 systemctl stop pulse-beat pulse-worker || true

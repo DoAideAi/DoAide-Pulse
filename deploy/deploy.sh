@@ -67,6 +67,10 @@ echo "==> installing deps, migrating, restarting"
 # \`pulse\` is the classic post-deploy 500.
 chown -R pulse:pulse /opt/Pulse
 
+# pip itself first. The Dockerfile and CI upgrade it and this did not, so the
+# box's venv sat on pip 24.0 with seven published advisories (M17), and pip
+# is what fetches and unpacks every package installed below.
+sudo -u pulse /opt/Pulse/.venv/bin/pip install -q --upgrade pip
 sudo -u pulse /opt/Pulse/.venv/bin/pip install -q -r /opt/Pulse/backend/requirements.txt
 
 # Unit files. rsync puts them under /opt/Pulse/deploy/systemd, which is not
