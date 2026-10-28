@@ -48,6 +48,7 @@ from app.services import (
     github_client,
     project_import,
     rss,
+    scan_lease,
 )
 
 logger = logging.getLogger(__name__)
@@ -487,6 +488,7 @@ def delete_project(
     responses=errors(
         status.HTTP_400_BAD_REQUEST,
         *OWNED,
+        status.HTTP_409_CONFLICT,
         status.HTTP_429_TOO_MANY_REQUESTS,
         status.HTTP_502_BAD_GATEWAY,
     ),
@@ -519,52 +521,65 @@ def scan_repo(
             detail="This project has no GitHub repo URL to scan.",
         )
 
-    started = time.monotonic()
+    # The same lease the autopilot takes. A hand-run scan moves the watermark,
+    # and beside a sweep's scan of the same project the later write won: the
+    # sweep, still generating, put back the head it had read and the commits
+    # the user had just marked seen were written up anyway.
+    claimed = scan_lease.claim(db, project_id)
+    if claimed is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This project is being scanned already. Try again in a minute.",
+        )
     try:
-        activity = github_client.fetch_activity(
-            full_name,
-            since_sha=project.last_seen_commit_sha,
-            since_tag=project.last_seen_release_tag,
-        )
-    except github_client.GitHubRateLimited as exc:
-        logger.warning("GitHub rate limit hit scanning %s: %s", full_name, exc)
-        headers = (
-            {"Retry-After": str(exc.retry_after)}
-            if exc.retry_after is not None
-            else None
-        )
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="GitHub's rate limit has been reached. Try again later.",
-            headers=headers,
-        ) from exc
-    except github_client.GitHubError as exc:
-        logger.warning("GitHub error scanning %s: %s", full_name, exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not reach GitHub to scan this repository. "
-            "Check the repo URL and try again.",
-        ) from exc
+        started = time.monotonic()
+        try:
+            activity = github_client.fetch_activity(
+                full_name,
+                since_sha=project.last_seen_commit_sha,
+                since_tag=project.last_seen_release_tag,
+            )
+        except github_client.GitHubRateLimited as exc:
+            logger.warning("GitHub rate limit hit scanning %s: %s", full_name, exc)
+            headers = (
+                {"Retry-After": str(exc.retry_after)}
+                if exc.retry_after is not None
+                else None
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="GitHub's rate limit has been reached. Try again later.",
+                headers=headers,
+            ) from exc
+        except github_client.GitHubError as exc:
+            logger.warning("GitHub error scanning %s: %s", full_name, exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not reach GitHub to scan this repository. "
+                "Check the repo URL and try again.",
+            ) from exc
 
-    project.last_seen_commit_sha = activity.head_sha
-    project.last_seen_release_tag = activity.latest_tag
-    # Through the same model method the beat sweep uses. A hand-run scan is a
-    # scan: it spends the same GitHub quota, takes the same time, and moves the
-    # same watermark, so leaving it out of the counter would make the frequency
-    # on `/api/v1/metrics` disagree with what the project page shows for any
-    # project somebody had been clicking Scan on.
-    project.record_scan(duration_ms=elapsed_ms(started))
-    db.commit()
+        project.last_seen_commit_sha = activity.head_sha
+        project.last_seen_release_tag = activity.latest_tag
+        # Through the same model method the beat sweep uses. A hand-run scan is a
+        # scan: it spends the same GitHub quota, takes the same time, and moves the
+        # same watermark, so leaving it out of the counter would make the frequency
+        # on `/api/v1/metrics` disagree with what the project page shows for any
+        # project somebody had been clicking Scan on.
+        project.record_scan(duration_ms=elapsed_ms(started))
+        db.commit()
 
-    return RepoActivityOut(
-        full_name=activity.full_name,
-        new_commit_count=len(activity.new_commits),
-        new_release_tag=activity.new_release.tag if activity.new_release else None,
-        stars=activity.stars,
-        description=activity.description,
-        topics=activity.topics,
-        commits=[c.summary for c in activity.new_commits[:20]],
-    )
+        return RepoActivityOut(
+            full_name=activity.full_name,
+            new_commit_count=len(activity.new_commits),
+            new_release_tag=activity.new_release.tag if activity.new_release else None,
+            stars=activity.stars,
+            description=activity.description,
+            topics=activity.topics,
+            commits=[c.summary for c in activity.new_commits[:20]],
+        )
+    finally:
+        scan_lease.release(db, project_id, claimed)
 
 
 @router.get("/{project_id}/feed.xml", include_in_schema=False)

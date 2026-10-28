@@ -48,7 +48,14 @@ from app.models.mixins import elapsed_ms, utcnow
 from app.models.project import AutopilotMode, Project, repo_full_name, scan_due
 from app.models.trigger import Trigger, TriggerKind
 from app.models.user import User
-from app.services import content_generator, content_pipeline, dedup, github_client, llm_router
+from app.services import (
+    content_generator,
+    content_pipeline,
+    dedup,
+    github_client,
+    llm_router,
+    scan_lease,
+)
 from app.services.errors import clip_error, sanitize_unexpected_error
 from app.tasks.celery_app import task
 
@@ -113,6 +120,7 @@ def _daily_count(db: Session, project_id: int) -> int:
 def scan_project(project_id: int) -> dict:
     """Run the autopilot loop for one project. Never raises."""
     db = SessionLocal()
+    claimed = None
     try:
         project = db.get(Project, project_id)
         if project is None or not project.is_active:
@@ -124,6 +132,15 @@ def scan_project(project_id: int) -> dict:
         # by id from elsewhere.
         if project.user is None or not project.user.is_active:
             return {"project_id": project_id, "status": "skipped"}
+
+        # Before the watermark is read: between that read and the write at the
+        # bottom sits a whole generation, and a second scan inside it — this
+        # task redelivered, the sweep dispatching the project again because
+        # ``last_scanned_at`` has not moved yet, the Scan button — wrote the
+        # same post twice. See ``scan_lease``.
+        claimed = scan_lease.claim(db, project_id)
+        if claimed is None:
+            return {"project_id": project_id, "status": "in_progress"}
 
         full_name = project.repo_full_name
         if not full_name:
@@ -186,6 +203,12 @@ def scan_project(project_id: int) -> dict:
         err = sanitize_unexpected_error(exc)
         return {"project_id": project_id, "status": "error", "error": err}
     finally:
+        try:
+            if claimed is not None:
+                scan_lease.release(db, project_id, claimed)
+        except Exception:  # pragma: no cover - defensive
+            # The lease expires on its own; a failed release costs one sweep.
+            logger.exception("could not release scan claim on project %s", project_id)
         db.close()
 
 

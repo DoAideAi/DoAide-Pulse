@@ -363,6 +363,14 @@ class Project(Base, TimestampMixin):
     #: without this a renamed or private repo looked, on ``/api/v1/metrics``,
     #: exactly like one being scanned on schedule.
     last_scan_error: Mapped[str | None] = mapped_column(Text)
+    #: When a scan of this project started and has not yet finished, or
+    #: ``None``. A lease, taken by a conditional UPDATE before GitHub is read
+    #: and cleared when the scan ends: the gap between reading the watermark
+    #: and writing it spans a whole generation, and two scans in that gap —
+    #: a late-acked task redelivered, a sweep re-dispatching a project whose
+    #: scan is still queued, a hand-run scan — each wrote the same post. See
+    #: :mod:`app.services.scan_lease`.
+    scan_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     user: Mapped[User] = relationship(back_populates="projects")
     content: Mapped[list[Content]] = relationship(
@@ -395,9 +403,9 @@ class Project(Base, TimestampMixin):
         arithmetic.
 
         ``scan_count`` is incremented from the loaded value rather than with a
-        SQL ``+ 1``: one project is scanned by one task at a time — the sweep
-        dispatches by id and does not fan a project out to two workers — so
-        there is no race for an atomic update to win.
+        SQL ``+ 1``: one project is scanned by one scan at a time — every
+        caller holds ``scan_claimed_at`` (see :mod:`app.services.scan_lease`)
+        around it — so there is no race for an atomic update to win.
 
         Not called on the rate-limited path. Nothing was read there,
         ``last_scanned_at`` deliberately stays where it was so the next sweep
