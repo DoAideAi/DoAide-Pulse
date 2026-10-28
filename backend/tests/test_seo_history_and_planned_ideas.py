@@ -162,6 +162,38 @@ class TestCalendarIdeas:
         assert body["planned"][0]["project_name"] == project.name
         assert [i["headline"] for i in body["backlog"]] == ["A backlog idea"]
 
+    def test_a_capped_backlog_says_it_is_capped(self, client, auth, db, project):
+        from app.routers.calendar import IDEA_BACKLOG_LIMIT
+
+        for i in range(IDEA_BACKLOG_LIMIT):
+            db.add(
+                ContentIdea(
+                    project_id=project.id, content_type=ContentType.TUTORIAL, headline=f"Idea {i}"
+                )
+            )
+        db.commit()
+        body = client.get(IDEAS_URL, headers=auth).json()
+        assert len(body["backlog"]) == IDEA_BACKLOG_LIMIT
+        assert body["backlog_truncated"] is False
+
+        db.add(
+            ContentIdea(project_id=project.id, content_type=ContentType.TUTORIAL, headline="More")
+        )
+        db.commit()
+        body = client.get(IDEAS_URL, headers=auth).json()
+        assert len(body["backlog"]) == IDEA_BACKLOG_LIMIT
+        assert body["backlog_truncated"] is True
+
+    def test_the_window_is_capped_like_the_calendar(self, client, auth):
+        resp = client.get(
+            IDEAS_URL, headers=auth, params={"start": "1900-01-01", "end": "2100-12-31"}
+        )
+        assert resp.status_code == 400
+        assert "365 days" in resp.json()["detail"]
+        year = {"start": "2026-01-01", "end": "2026-12-31"}
+        ok = client.get(IDEAS_URL, headers=auth, params=year)
+        assert ok.status_code == 200
+
     def test_unplanning_sends_it_back_to_the_backlog(self, client, auth, db, project):
         idea = ContentIdea(
             project_id=project.id,

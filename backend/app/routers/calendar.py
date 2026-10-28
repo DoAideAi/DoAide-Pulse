@@ -366,6 +366,9 @@ def cadence_guide(
 #: The backlog shown beside the calendar. Capped: a pool to plan from, not an archive.
 IDEA_BACKLOG_LIMIT = 30
 
+#: Widest window GET /calendar/ideas answers for, as GET /calendar does.
+IDEA_WINDOW_MAX_DAYS = 365
+
 #: Hand-written ideas per account. Nothing else bounds them — the backlog
 #: *read* is capped at :data:`IDEA_BACKLOG_LIMIT`, the table is not — so
 #: without this a script could fill ``content_ideas`` faster than anyone
@@ -418,6 +421,14 @@ def calendar_ideas(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="end is before start."
         )
+    # The same ceiling GET /calendar holds its window to. Without it the planned
+    # half had no bound at all — the backlog is capped, the window was not —
+    # and start=1900&end=2100 returned every idea the account ever planned.
+    if window_end - window_start > timedelta(days=IDEA_WINDOW_MAX_DAYS):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Idea window cannot exceed {IDEA_WINDOW_MAX_DAYS} days.",
+        )
 
     base = (
         select(ContentIdea, Project.name)
@@ -432,11 +443,14 @@ def calendar_ideas(
     backlog = db.execute(
         base.where(ContentIdea.planned_date.is_(None))
         .order_by(ContentIdea.created_at.desc())
-        .limit(IDEA_BACKLOG_LIMIT)
+        # One past the cap, so the response can say there were more. A capped
+        # list that does not say so reads as the whole backlog.
+        .limit(IDEA_BACKLOG_LIMIT + 1)
     ).all()
     return CalendarIdeasOut(
         planned=[_idea_out(i, name) for i, name in planned],
-        backlog=[_idea_out(i, name) for i, name in backlog],
+        backlog=[_idea_out(i, name) for i, name in backlog[:IDEA_BACKLOG_LIMIT]],
+        backlog_truncated=len(backlog) > IDEA_BACKLOG_LIMIT,
     )
 
 

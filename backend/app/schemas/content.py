@@ -923,6 +923,13 @@ class CalendarIdeasOut(BaseModel):
     planned: list[CalendarIdeaOut] = []
     #: Unplanned ideas, newest first, capped — the pool to plan from.
     backlog: list[CalendarIdeaOut] = []
+    backlog_truncated: bool = Field(
+        default=False,
+        description=(
+            "True when there are more unplanned ideas than the backlog returns "
+            "(it is capped). The oldest ones are the ones left out."
+        ),
+    )
 
 
 class CalendarIdeaCreate(BaseModel):
