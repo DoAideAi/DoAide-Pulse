@@ -9,10 +9,16 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: pulse
-      POSTGRES_PASSWORD: pulse
+      # Overridable, and only a development default. Postgres applies it when
+      # the volume is first initialised; changing it later needs ALTER USER.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pulse}
       POSTGRES_DB: pulse
+    # Loopback only. Docker publishes ports with its own iptables rules, which
+    # bypass ufw — "5432:5432" put this database, with its well-known
+    # development password, on every interface of the host. The other services
+    # reach it over the compose network and never needed the port at all.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -29,8 +35,10 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    # Loopback only, for the same reason as the database: this Redis has no
+    # password, and it holds the Celery queue and every rate-limit counter.
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -51,12 +59,14 @@ services:
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 20"
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://pulse:pulse@db:5432/pulse
+      DATABASE_URL: postgresql+psycopg://pulse:${POSTGRES_PASSWORD:-pulse}@db:5432/pulse
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
+    # Loopback: put Caddy (or an SSH tunnel) in front rather than the raw
+    # uvicorn port on a public interface.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
       - ./keys:/app/keys
@@ -83,7 +93,7 @@ services:
     command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=2
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://pulse:pulse@db:5432/pulse
+      DATABASE_URL: postgresql+psycopg://pulse:${POSTGRES_PASSWORD:-pulse}@db:5432/pulse
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
     volumes:
@@ -112,7 +122,7 @@ services:
     command: celery -A app.tasks.celery_app.celery_app beat --loglevel=info
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://pulse:pulse@db:5432/pulse
+      DATABASE_URL: postgresql+psycopg://pulse:${POSTGRES_PASSWORD:-pulse}@db:5432/pulse
       CELERY_BROKER_URL: redis://redis:6379/1
       CELERY_RESULT_BACKEND: redis://redis:6379/2
     volumes:
