@@ -414,6 +414,7 @@ def test_publish_records_as_draft_on_the_publication(client, auth, project, db, 
         content_type=ContentType.ANNOUNCEMENT,
         title="Stage it",
         slug="stage-it",
+        body_markdown="Body.",
     )
     db.add(content)
     db.commit()
@@ -970,7 +971,7 @@ def test_bulk_publish_succeeds_for_connected_platform(client, auth, project, db,
     )
     content = Content(
         project_id=project.id, content_type=ContentType.ANNOUNCEMENT,
-        title="Stage it", slug="stage-it-bulk",
+        title="Stage it", slug="stage-it-bulk", body_markdown="Body.",
     )
     db.add(content)
     db.commit()

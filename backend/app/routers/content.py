@@ -2288,6 +2288,19 @@ class _PublishError(Exception):
         self.status_code = status_code
 
 
+#: Destinations whose post *is* the body. See :func:`_assert_publishable`.
+_BODY_PLATFORMS = frozenset(
+    {
+        Platform.MEDIUM,
+        Platform.DEVTO,
+        Platform.HASHNODE,
+        Platform.WORDPRESS,
+        Platform.GIT,
+        Platform.BUTTONDOWN,
+    }
+)
+
+
 def _assert_publishable(
     content: Content, payload: PublishRequestIn, owner: User
 ) -> datetime | None:
@@ -2352,6 +2365,21 @@ def _assert_publishable(
         raise _PublishError(
             f"Not connected to: {', '.join(missing)}. Add credentials in Settings."
         )
+
+    # A destination that publishes the article itself has nothing to publish
+    # from an empty body. Dev.to and Git refused at the worker, after this
+    # endpoint had said "queued"; Hashnode, Medium and WordPress posted an empty
+    # article; and Buttondown emailed the list a subject line and a link — the
+    # one send Pulse cannot take back. The short-form destinations compose from
+    # the excerpt or the title, so a body-less piece is still something there.
+    if not (content.body_markdown or "").strip():
+        needs_body = sorted(p.value for p in payload.platforms if p in _BODY_PLATFORMS)
+        if needs_body:
+            raise _PublishError(
+                f"This piece has no body, and {', '.join(needs_body)} publishes "
+                "the article itself. Write the body first.",
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+            )
 
     # Last cheap chance to catch a URL the model invented. Only a definitive 404
     # or 410 stops the publish — see app.services.link_check on why a timeout

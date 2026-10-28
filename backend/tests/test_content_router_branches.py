@@ -27,6 +27,7 @@ def _content(db, project, *, status=ContentStatus.REVIEW, ctype=ContentType.HOW_
         status=status,
         title=title,
         slug=slug,
+        body_markdown="Body.",
     )
     db.add(row)
     db.commit()
