@@ -709,12 +709,16 @@ export default function ContentEditor() {
           >
             Copy MD
           </button>
+          {/* Not disabled once published: sending the same piece somewhere it
+              is not yet is not an edit, the API has always allowed it, and the
+              dialog already refuses the platforms it is live on. Disabled here,
+              a published piece could never be cross-posted from the UI. */}
           <button
             className="btn-primary"
             onClick={() => setPublishing(true)}
-            disabled={locked}
+            title={locked ? "Send this piece to platforms it is not on yet" : undefined}
           >
-            Publish
+            {locked ? "Publish elsewhere" : "Publish"}
           </button>
         </div>
       </div>

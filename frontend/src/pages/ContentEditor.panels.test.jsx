@@ -1102,7 +1102,29 @@ describe("a piece that has already gone out", () => {
     expect(
       screen.queryByRole("button", { name: /Delete this piece/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+  });
+
+  it("can still be sent to a platform it is not on yet", async () => {
+    // Cross-posting is not an edit: the API allows it, and the dialog refuses
+    // the platforms the piece is already live on.
+    const user = userEvent.setup();
+    api.publishContent.mockResolvedValue([]);
+    await open(
+      {
+        status: "published",
+        publications: [publication({ platform: "devto", status: "published" })],
+      },
+      [platform("devto"), platform("medium")],
+    );
+
+    await user.click(screen.getByRole("button", { name: "Publish elsewhere" }));
+    expect(screen.getByRole("checkbox", { name: /Dev\.to/ })).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", { name: /Medium/ }));
+    await user.click(screen.getByRole("button", { name: "Publish now" }));
+
+    await waitFor(() =>
+      expect(api.publishContent).toHaveBeenCalledWith(3, expect.objectContaining({ platforms: ["medium"] })),
+    );
   });
 
   it("makes the editable fields read-only rather than merely ignoring edits", async () => {
