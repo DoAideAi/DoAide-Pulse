@@ -168,6 +168,7 @@ def get_translation(
     summary="Translate a piece",
     responses=errors(
         *OWNED,
+        status.HTTP_409_CONFLICT,
         status.HTTP_422_UNPROCESSABLE_CONTENT,
         status.HTTP_429_TOO_MANY_REQUESTS,
         status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -213,6 +214,8 @@ def translate_content(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         ) from exc
+    except translation.TranslationInProgress as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except translation.TranslationError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)

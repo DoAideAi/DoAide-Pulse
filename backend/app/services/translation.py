@@ -45,6 +45,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.content import Content
@@ -62,6 +63,10 @@ class TranslationError(RuntimeError):
 
 class TranslationUnavailable(TranslationError):
     """Every provider in the chain failed. Retrying later may well work."""
+
+
+class TranslationInProgress(TranslationError):
+    """Another request created this (piece, language) row a moment ago."""
 
 
 #: The longest body this will translate.
@@ -406,7 +411,18 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
 
     row = upsert_pending(db, content, code)
     source_version = content.version
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # Two requests for the same language — a double-click, two tabs — both
+        # found no row and both inserted; ``uq_translation_per_language`` let one
+        # through. The other was a bare 500. The winner is already paying for the
+        # model call, so the loser says so rather than paying for a second one.
+        db.rollback()
+        raise TranslationInProgress(
+            f"This piece is already being translated into {entry.name}. "
+            "Reload in a moment to see it."
+        ) from exc
 
     max_tokens = int(len(body) / 4 * _OUTPUT_TOKEN_MULTIPLIER) + _REASONING_ALLOWANCE_TOKENS
     try:
