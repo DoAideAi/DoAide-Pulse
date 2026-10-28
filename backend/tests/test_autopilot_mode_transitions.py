@@ -137,3 +137,53 @@ def test_another_projects_pieces_are_untouched(client, auth, db, project, user):
     _switch(client, auth, project, "off")
 
     assert _state(db, theirs)[:2] == (ContentStatus.APPROVED, [P.SCHEDULED])
+
+
+# A person acting on one of autopilot's own approvals makes it theirs. The flag
+# that says "autopilot approved this" is written once at routing time, so
+# without a record of the later review the switch could not tell the two apart
+# and cancelled the schedule its owner had just set by hand.
+
+
+def test_a_piece_its_owner_rescheduled_is_left_alone(client, auth, db, project):
+    project.autopilot_mode = AutopilotMode.AUTO
+    db.commit()
+    piece = _piece(db, project)
+    friday = (utcnow() + timedelta(days=3)).replace(microsecond=0)
+
+    resp = client.patch(
+        f"/api/v1/calendar/content/{piece}",
+        headers=auth,
+        json={"scheduled_for": friday.isoformat()},
+    )
+    assert resp.status_code == 200, resp.text
+    _switch(client, auth, project, "draft")
+
+    status, rows, when = _state(db, piece)
+    assert (status, rows) == (ContentStatus.APPROVED, [P.SCHEDULED])
+    assert when is not None
+
+
+def test_a_piece_its_owner_approved_is_left_alone(client, auth, db, project):
+    project.autopilot_mode = AutopilotMode.AUTO
+    db.commit()
+    piece = _piece(db, project)
+
+    resp = client.post(f"/api/v1/content/{piece}/approve?force=true", headers=auth)
+    assert resp.status_code == 200, resp.text
+    _switch(client, auth, project, "off")
+
+    assert _state(db, piece)[:2] == (ContentStatus.APPROVED, [P.SCHEDULED])
+
+
+def test_the_review_does_not_rewrite_what_autopilot_decided(client, auth, db, project):
+    project.autopilot_mode = AutopilotMode.AUTO
+    db.commit()
+    piece = _piece(db, project)
+
+    client.post(f"/api/v1/content/{piece}/approve?force=true", headers=auth)
+
+    db.expire_all()
+    routing = db.get(Content, piece).source["routing"]
+    assert routing["auto"] is True
+    assert routing["reviewed"] is True

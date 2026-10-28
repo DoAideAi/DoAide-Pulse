@@ -581,6 +581,27 @@ AUTOPILOT_OFF_ERROR = (
 )
 
 
+def mark_reviewed(content: Content) -> None:
+    """Record that a person has acted on an autopilot-approved piece.
+
+    ``source.routing.auto`` is written once, at routing time, and says what the
+    autopilot decided; it never said whether anybody looked afterwards. So
+    :func:`hold_unreviewed` — documented to leave "a piece a person approved or
+    scheduled" alone — could not tell that piece from one nobody had opened,
+    and switching a project to ``draft`` to stop the autopilot cancelled a
+    schedule its owner had set by hand and put the piece back in review.
+
+    Called by the doors a person uses to say yes to a piece: naming its status,
+    publishing or scheduling it, dragging it on the calendar. ``auto`` itself is
+    left as it was — the autopilot report reads it as the decision made, which
+    a later review does not change. Does not commit.
+    """
+    routing = (content.source or {}).get("routing")
+    if isinstance(routing, dict) and routing.get("auto") and not routing.get("reviewed"):
+        # Reassigned, not mutated: a plain JSON column does not see in-place edits.
+        content.source = {**content.source, "routing": {**routing, "reviewed": True}}
+
+
 def hold_unreviewed(db: Session, project: Project) -> list[Content]:
     """Send autopilot's own unsent approvals back to review. Does not commit.
 
@@ -593,8 +614,9 @@ def hold_unreviewed(db: Session, project: Project) -> list[Content]:
     Narrow on purpose. Only pieces still ``approved``, approved by the
     autopilot itself (``source.routing.auto``, as recorded at routing time),
     and not yet out anywhere: a piece a person approved or scheduled is that
-    person's decision and is left alone, and a piece already live on one
-    platform is partly published — holding the rest would split it.
+    person's decision and is left alone (:func:`mark_reviewed` records it), and
+    a piece already live on one platform is partly published — holding the rest
+    would split it.
     """
     held: list[Content] = []
     rows = db.scalars(
@@ -605,6 +627,8 @@ def hold_unreviewed(db: Session, project: Project) -> list[Content]:
     for content in rows:
         routing = (content.source or {}).get("routing")
         if not (isinstance(routing, dict) and routing.get("auto")):
+            continue
+        if routing.get("reviewed"):
             continue
         if any(p.status == PublicationStatus.PUBLISHED for p in content.publications):
             continue

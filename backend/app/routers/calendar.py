@@ -28,7 +28,14 @@ from app.schemas.content import (
     ScheduleUpdate,
 )
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
-from app.services import cadence, learned_cadence, publishing_service, scheduling, velocity
+from app.services import (
+    cadence,
+    content_pipeline,
+    learned_cadence,
+    publishing_service,
+    scheduling,
+    velocity,
+)
 
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
@@ -377,6 +384,7 @@ def reschedule(
     if targets:
         publishing_service.arming_approves(content)
         publishing_service.sync_content_status(content)
+        content_pipeline.mark_reviewed(content)
 
     db.commit()
     refresh_all(db, targets)

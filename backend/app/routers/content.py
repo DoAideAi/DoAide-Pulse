@@ -275,6 +275,7 @@ def _settle_status(db: Session, content: Content, previous: ContentStatus) -> No
     Does not commit. Idempotent: running it twice over the same piece changes
     nothing the first run did not.
     """
+    content_pipeline.mark_reviewed(content)
     if (
         previous == ContentStatus.ARCHIVED
         and content.status != ContentStatus.ARCHIVED
@@ -2389,6 +2390,7 @@ def _queue_publish(
     has returned.
     """
     when = _assert_publishable(content, payload, owner)
+    content_pipeline.mark_reviewed(content)
 
     publications = publishing_service.queue(
         db,
