@@ -1554,22 +1554,42 @@ function PublicationsPanel({ content, onChanged }) {
   );
 }
 
+/** A side panel whose data did not arrive — said as much, with a way to try again. */
+function PanelLoadFailed({ title, what, onRetry }) {
+  return (
+    <div className="panel p-5">
+      <h2 className="mb-1 text-sm font-semibold text-ink-900">{title}</h2>
+      <p className="text-xs text-bad" role="alert">
+        Could not load {what}.
+      </p>
+      <button type="button" className="btn-quiet mt-2 text-xs" onClick={onRetry}>
+        Retry
+      </button>
+    </div>
+  );
+}
+
 function TranslationsPanel({ contentId }) {
   const toast = useToast();
   const [translations, setTranslations] = useState(null);
   const [languages, setLanguages] = useState(null);
   const [loading, setLoading] = useState(true);
+  // A failed load used to fall through to "No translations yet." — which
+  // invites paying for a translation that may already exist.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [translating, setTranslating] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     Promise.all([api.listTranslations(contentId), api.listLanguages()]).then(
       ([t, l]) => { if (!cancelled) { setTranslations(t); setLanguages(l); setLoading(false); } },
-      () => { if (!cancelled) setLoading(false); },
+      () => { if (!cancelled) { setFailed(true); setLoading(false); } },
     );
     return () => { cancelled = true; };
-  }, [contentId]);
+  }, [contentId, attempt]);
 
   async function translate(language) {
     setTranslating(language);
@@ -1602,6 +1622,12 @@ function TranslationsPanel({ contentId }) {
         <h2 className="mb-1 text-sm font-semibold text-ink-900">Translations</h2>
         <p className="text-xs text-ink-400">Loading…</p>
       </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <PanelLoadFailed title="Translations" what="translations" onRetry={() => setAttempt((n) => n + 1)} />
     );
   }
 
@@ -1655,17 +1681,22 @@ function HistoryPanel({ contentId, onRestored }) {
   const toast = useToast();
   const [revisions, setRevisions] = useState(null);
   const [loading, setLoading] = useState(true);
+  // A failed load used to read "No earlier versions." — telling the user their
+  // history was gone when it had only failed to arrive.
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [restoring, setRestoring] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setFailed(false);
     api.listRevisions(contentId).then(
       (data) => { if (!cancelled) { setRevisions(data); setLoading(false); } },
-      () => { if (!cancelled) setLoading(false); },
+      () => { if (!cancelled) { setFailed(true); setLoading(false); } },
     );
     return () => { cancelled = true; };
-  }, [contentId]);
+  }, [contentId, attempt]);
 
   async function restore(revision) {
     setRestoring(revision);
@@ -1686,6 +1717,12 @@ function HistoryPanel({ contentId, onRestored }) {
         <h2 className="mb-1 text-sm font-semibold text-ink-900">History</h2>
         <p className="text-xs text-ink-400">Loading…</p>
       </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <PanelLoadFailed title="History" what="this piece's history" onRetry={() => setAttempt((n) => n + 1)} />
     );
   }
 

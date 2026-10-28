@@ -986,3 +986,42 @@ describe("a piece that has already gone out", () => {
     ).toBeInTheDocument();
   });
 });
+
+// --------------------------------------------------------------------------- //
+// History and translations when their data does not arrive                    //
+// --------------------------------------------------------------------------- //
+
+describe("a side panel whose load fails", () => {
+  it("says the history could not load, instead of 'No earlier versions.'", async () => {
+    api.listRevisions.mockRejectedValueOnce(new Error("offline"));
+    api.listRevisions.mockResolvedValueOnce({
+      items: [{ revision: 2, created_at: "2026-08-01T10:00:00Z", note: "title" }],
+      total: 1,
+      retained: 50,
+    });
+    const user = userEvent.setup();
+    await open();
+
+    expect(await screen.findByText("Could not load this piece's history.")).toBeInTheDocument();
+    expect(screen.queryByText("No earlier versions.")).not.toBeInTheDocument();
+
+    const history = screen.getByRole("heading", { name: "History" }).closest(".panel");
+    await user.click(within(history).getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("v2")).toBeInTheDocument();
+  });
+
+  it("says the translations could not load, instead of 'No translations yet.'", async () => {
+    api.listTranslations.mockRejectedValueOnce(new Error("offline"));
+    const user = userEvent.setup();
+    await open();
+
+    expect(await screen.findByText("Could not load translations.")).toBeInTheDocument();
+    expect(screen.queryByText("No translations yet.")).not.toBeInTheDocument();
+
+    const panel = screen.getByRole("heading", { name: "Translations" }).closest(".panel");
+    await user.click(within(panel).getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByText("No translations yet.")).toBeInTheDocument();
+  });
+});
