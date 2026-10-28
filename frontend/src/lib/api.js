@@ -70,7 +70,7 @@ async function request(
     const detail = data?.detail ?? (res.statusText || `HTTP ${res.status}`);
     // FastAPI validation errors arrive as a list of {loc, msg} objects.
     const message = Array.isArray(detail)
-      ? detail.map((d) => d.msg).join(", ")
+      ? detail.map(describeValidationError).join(", ")
       : typeof detail === "string"
         ? detail
         : JSON.stringify(detail);
@@ -92,6 +92,30 @@ async function request(
     return Number.isNaN(header) ? (Array.isArray(data) ? data.length : 0) : header;
   }
   return data;
+}
+
+/** The parts of a validation error's `loc` that say where, not which field. */
+const LOCATION_PREFIXES = new Set(["body", "query", "path", "header"]);
+
+/**
+ * One validation error as a sentence a person can act on.
+ *
+ * `msg` alone was what the toast showed: "Field required" or "String should
+ * have at least 8 characters", with nothing saying *which* field — on a form
+ * of eight of them. The field comes from the last named part of `loc`
+ * (`["body", "full_name"]` → "Full name"), and Pydantic's "Value error, "
+ * prefix on a custom validator's message is dropped, since the sentence after
+ * it was written for the reader.
+ */
+function describeValidationError(error) {
+  const msg = String(error?.msg ?? "").replace(/^Value error, /, "");
+  const loc = Array.isArray(error?.loc) ? error.loc : [];
+  const field = [...loc]
+    .reverse()
+    .find((part) => typeof part === "string" && !LOCATION_PREFIXES.has(part));
+  if (!field) return msg;
+  const label = field.replace(/_/g, " ");
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${msg}`;
 }
 
 /** Build a query string, dropping empty values so `?status=` never appears. */

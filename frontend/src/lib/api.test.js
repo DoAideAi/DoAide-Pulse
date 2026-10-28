@@ -95,6 +95,28 @@ describe("request", () => {
     await expect(api.listProjects()).rejects.toThrow("field required, too long");
   });
 
+  it("names the field each validation message is about", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respondWith({
+        status: 422,
+        body: JSON.stringify({
+          detail: [
+            { loc: ["body", "password"], msg: "String should have at least 8 characters" },
+            { loc: ["body", "variables", 0, "name"], msg: "Value error, 'a b' is not a usable variable name." },
+            { loc: ["body"], msg: "Input should be a valid dictionary" },
+          ],
+        }),
+      }),
+    );
+
+    await expect(api.listProjects()).rejects.toThrow(
+      "Password: String should have at least 8 characters, " +
+        "Name: 'a b' is not a usable variable name., " +
+        "Input should be a valid dictionary",
+    );
+  });
+
   it("returns null rather than throwing for an empty 204 body", async () => {
     vi.stubGlobal("fetch", respondWith({ status: 204, body: "" }));
 
