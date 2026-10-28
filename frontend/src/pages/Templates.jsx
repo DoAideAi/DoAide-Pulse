@@ -228,7 +228,7 @@ function TemplateCard({ template, project, opening, onEdit, onUse, onChanged }) 
           <button className="btn-ghost" disabled={opening} onClick={onEdit}>
             {opening ? "Opening…" : "Edit"}
           </button>
-          <button className="btn-ghost text-rose-600" disabled={busy} onClick={remove}>
+          <button className="btn-ghost text-bad" disabled={busy} onClick={remove}>
             Delete
           </button>
         </div>
@@ -523,7 +523,7 @@ function TemplateDialog({ template, projects, builtins, onClose, onSaved, onErro
                   onChange={(e) => setVariable(index, { name: e.target.value })}
                 />
                 {nameErrors[index] && (
-                  <p className="mt-1 text-xs text-rose-600">{nameErrors[index]}</p>
+                  <p className="mt-1 text-xs text-bad">{nameErrors[index]}</p>
                 )}
               </div>
               <div>
@@ -562,7 +562,7 @@ function TemplateDialog({ template, projects, builtins, onClose, onSaved, onErro
               </label>
               <button
                 type="button"
-                className="btn-ghost text-xs text-rose-600"
+                className="btn-ghost text-xs text-bad"
                 onClick={() => removeVariable(index)}
               >
                 Remove
@@ -755,7 +755,7 @@ function UseDialog({ template, projects, onClose, onDone }) {
         <div key={variable.name}>
           <label className="label" htmlFor={`use-${variable.name}`}>
             {variable.label || labelFor(variable.name)}
-            {variable.required && <span className="ml-1 text-rose-600">*</span>}
+            {variable.required && <span className="ml-1 text-bad">*</span>}
           </label>
           <textarea
             id={`use-${variable.name}`}
