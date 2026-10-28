@@ -47,6 +47,10 @@ FINITE_BY_CONSTRUCTION = {
     ("GET", "/content/{content_id}/schedule/suggestions"): (
         "one slot per requested platform, bounded by ?platforms"
     ),
+    ("GET", "/seo/optimal-slots"): (
+        "one slot per Platform at most — scheduling.optimal_slots dedupes "
+        "?platforms before computing anything, so repeating a name adds nothing"
+    ),
     ("GET", "/projects/{project_id}/ideas"): "a literal .limit(12) in the query",
     # Everything below answers with the publications of exactly one piece, so
     # the ceiling is platforms-per-piece — one row per Platform at the very
