@@ -43,6 +43,11 @@ project's **autopilot mode**:
 | `auto` | Published unreviewed **only if every gate below passes**. |
 | `full` | Skips the confidence test, but still subject to every other gate. |
 
+Switching from `auto`/`full` to `off`/`draft` sends pieces the autopilot
+approved by itself and has not yet sent anywhere back to review, with their
+schedule cancelled (`content_pipeline.hold_unreviewed`). Pieces a person
+approved, and pieces already live on a platform, are left as they are.
+
 A piece is a candidate for unreviewed publishing (`auto`) when the mode is
 `auto` or `full`, at least one destination is connected and publishable, and
 either:

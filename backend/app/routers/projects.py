@@ -26,7 +26,7 @@ from app.database import get_db
 from app.deps import ListOffset, RowId, get_current_user, owned_project
 from app.models.content import Content, ContentIdea, ContentStatus
 from app.models.mixins import elapsed_ms
-from app.models.project import Project, slugify
+from app.models.project import AutopilotMode, Project, slugify
 from app.models.publication import Publication
 from app.models.user import User
 from app.ratelimit import account_key, limiter
@@ -41,11 +41,21 @@ from app.schemas.project import (
     ProjectUpdate,
     RepoActivityOut,
 )
-from app.services import content_generator, github_client, project_import, rss
+from app.services import (
+    content_generator,
+    content_pipeline,
+    github_client,
+    project_import,
+    rss,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+#: The modes that publish a piece nobody read. Leaving them for ``off`` or
+#: ``draft`` is the user saying stop — see ``content_pipeline.hold_unreviewed``.
+_PUBLISHES_UNREVIEWED = frozenset({AutopilotMode.AUTO, AutopilotMode.FULL})
 
 
 def _unique_slug(db: Session, user_id: int, name: str, *, exclude_id: int | None = None) -> str:
@@ -388,8 +398,11 @@ def update_project(
     if "name" in data and data["name"] != project.name:
         project.slug = _unique_slug(db, user.id, data["name"], exclude_id=project.id)
 
+    was_unreviewed = project.autopilot_mode in _PUBLISHES_UNREVIEWED
     for key, value in data.items():
         setattr(project, key, value)
+    if was_unreviewed and project.autopilot_mode not in _PUBLISHES_UNREVIEWED:
+        content_pipeline.hold_unreviewed(db, project)
 
     db.commit()
     db.refresh(project)

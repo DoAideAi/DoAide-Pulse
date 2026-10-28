@@ -32,13 +32,14 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.content import Content, ContentStatus, ContentType, unique_content_slug
 from app.models.mixins import as_aware, utcnow
 from app.models.project import AutopilotMode, Project
-from app.models.publication import Platform, Publication
+from app.models.publication import Platform, Publication, PublicationStatus
 from app.models.webhook import WebhookEvent
 from app.services import (
     ai,
@@ -571,6 +572,52 @@ def generate_and_route(
         platforms=[p.platform.value for p in publications],
         is_fallback=generated.is_fallback,
     )
+
+
+#: What a held-back publication says, so the reason is on the row.
+AUTOPILOT_OFF_ERROR = (
+    "Autopilot was switched off before this went out, so it is back in review "
+    "rather than publishing without anyone reading it."
+)
+
+
+def hold_unreviewed(db: Session, project: Project) -> list[Content]:
+    """Send autopilot's own unsent approvals back to review. Does not commit.
+
+    Called when a project leaves ``auto``/``full`` for ``off``/``draft``. Those
+    modes mean "do not publish without me", and the switch is what somebody
+    reaches for to stop the autopilot — but a piece it had already approved on
+    its own and parked for a later slot went out anyway, at that slot, with
+    nobody having read it (C104 M3).
+
+    Narrow on purpose. Only pieces still ``approved``, approved by the
+    autopilot itself (``source.routing.auto``, as recorded at routing time),
+    and not yet out anywhere: a piece a person approved or scheduled is that
+    person's decision and is left alone, and a piece already live on one
+    platform is partly published — holding the rest would split it.
+    """
+    held: list[Content] = []
+    rows = db.scalars(
+        select(Content).where(
+            Content.project_id == project.id, Content.status == ContentStatus.APPROVED
+        )
+    )
+    for content in rows:
+        routing = (content.source or {}).get("routing")
+        if not (isinstance(routing, dict) and routing.get("auto")):
+            continue
+        if any(p.status == PublicationStatus.PUBLISHED for p in content.publications):
+            continue
+        publishing_service.cancel_armed(db, content, reason=AUTOPILOT_OFF_ERROR)
+        content.status = ContentStatus.REVIEW
+        held.append(content)
+    if held:
+        logger.info(
+            "autopilot switched off for project %s: %d unreviewed piece(s) back to review",
+            project.id,
+            len(held),
+        )
+    return held
 
 
 def release_approved(db: Session, content: Content) -> list[Publication]:
