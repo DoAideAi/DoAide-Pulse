@@ -43,4 +43,16 @@ describe.each([
     expect(contrast(t[ink], t.canvas)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(t[ink], t.paper)).toBeGreaterThanOrEqual(4.5);
   });
+
+  it("brand text is readable, and so is a primary button's label", () => {
+    // text-brand-500 links and eyebrows on either surface…
+    expect(contrast(t["brand-500"], t.canvas)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(t["brand-500"], t.paper)).toBeGreaterThanOrEqual(4.5);
+    // …and .btn-primary, which is canvas-coloured text on brand-500.
+    expect(contrast(t.canvas, t["brand-500"])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the primary button gets darker, not lighter, on hover", () => {
+    expect(luminance(t["brand-600"])).toBeLessThan(luminance(t["brand-500"]));
+  });
 });

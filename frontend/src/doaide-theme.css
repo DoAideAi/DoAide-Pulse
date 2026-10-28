@@ -28,7 +28,12 @@
   --c-line:        229 231 235;
   --c-line-strong: 209 213 219;
   --c-brand-300:    94 234 212;
-  --c-brand-500:    13 148 136;
+  /* Was 13 148 136 (#0D9488) — 3.7:1 against white, as button text
+     (.btn-primary is canvas on brand-500) and as link text both. The nearest
+     step of the same teal that clears 4.5:1 on canvas and paper; brand-600
+     (hover) stays darker. The shared --da-primary below is the DoAide-wide
+     brand and is left as it is. */
+  --c-brand-500:    11 127 117;
   --c-brand-600:    15 118 110;
   --c-brand-700:    17  94  89;
 
