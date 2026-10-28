@@ -2436,11 +2436,21 @@ def _queue_publish(
         status.HTTP_400_BAD_REQUEST,
         status.HTTP_409_CONFLICT,
         status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_429_TOO_MANY_REQUESTS,
     ),
 )
+# The same budget as ``GET /{content_id}/links`` (M4), because this runs the
+# same check: every link in the body is fetched from Pulse's address before
+# anything is queued. A body of dead links makes the call a 409 that changes
+# nothing, so without a limit it was the link checker with the limit taken
+# off — replayable as fast as the caller liked. ``POST /bulk/publish`` was
+# already limited; the single-piece doors were not.
+@limiter.limit(settings.rate_limit_link_check, key_func=account_key)
 def publish_content(
     content_id: RowId,
     payload: PublishRequestIn,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[PublicationOut]:
@@ -2530,11 +2540,21 @@ def schedule_suggestions(
         status.HTTP_400_BAD_REQUEST,
         status.HTTP_409_CONFLICT,
         status.HTTP_422_UNPROCESSABLE_CONTENT,
+        status.HTTP_429_TOO_MANY_REQUESTS,
     ),
 )
+# The same budget as ``GET /{content_id}/links`` (M4), because this runs the
+# same check: every link in the body is fetched from Pulse's address before
+# anything is queued. A body of dead links makes the call a 409 that changes
+# nothing, so without a limit it was the link checker with the limit taken
+# off — replayable as fast as the caller liked. ``POST /bulk/publish`` was
+# already limited; the single-piece doors were not.
+@limiter.limit(settings.rate_limit_link_check, key_func=account_key)
 def schedule_content(
     content_id: RowId,
     payload: ScheduleContentIn,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[PublicationOut]:

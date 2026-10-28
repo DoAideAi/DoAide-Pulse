@@ -131,6 +131,12 @@ _COSTLY_CALLS = (
     "ai.json_completion(",
     "github_client.fetch_activity",
     "_check_content_links",
+    # M4: the same link check, one call away. Every publish and schedule runs
+    # it through ``_queue_publish`` before queueing, and the sweep reads only
+    # the endpoint's own source — so ``POST /{id}/publish`` and
+    # ``POST /{id}/schedule`` ran the link checker with no limit while the
+    # checker's own endpoint had one.
+    "_queue_publish(",
     # Mail goes out through the install's single SMTP identity: one budget and
     # one sending reputation, shared by every account here.
     "digest.send(",
@@ -249,6 +255,13 @@ def test_the_costly_endpoints_are_the_ones_expected():
         # the sweep agreed with itself that there was nothing to find.
         "/settings/connections",
         "/settings/connections/{platform}/verify",
+        # M4: every door into ``_queue_publish``, which fetches each link in
+        # the body before queueing. Bulk publish was limited; the single-piece
+        # publish and schedule were not, and a body of dead links made them a
+        # 409 that changed nothing — replayable without end.
+        "/content/bulk/publish",
+        "/content/{content_id}/publish",
+        "/content/{content_id}/schedule",
     }
 
 
@@ -482,3 +495,35 @@ def test_headline_auto_select_carries_rate_limit(client, auth, linkless_draft):
     url = f"/api/v1/content/{linkless_draft.id}/headlines/auto-select"
     resp = client.post(url, headers=auth)
     assert resp.headers.get("x-ratelimit-limit"), "headline auto-select missing rate-limit header"
+
+
+def test_publishing_spends_the_link_checker_budget(client, auth, db, project, connect, monkeypatch):
+    """M4: a publish that is refused for dead links is still a link check.
+
+    Replaying it was the link checker with its limit taken off.
+    """
+    from app.models.content import Content, ContentStatus, ContentType
+    from app.services import link_check
+
+    connect("devto")
+    monkeypatch.setattr(settings, "link_check_enabled", True)
+    monkeypatch.setattr(link_check, "check_body", lambda *a, **k: [])
+    piece = Content(
+        project_id=project.id, content_type=ContentType.ANNOUNCEMENT,
+        status=ContentStatus.DRAFT, title="Links", slug="links",
+        body_markdown="Body with a link https://example.com/gone in it.",
+    )
+    db.add(piece)
+    db.commit()
+    limit = int(settings.rate_limit_link_check.split("/")[0])
+
+    doors = (
+        (f"/api/v1/content/{piece.id}/schedule",
+         {"platforms": ["devto"], "scheduled_for": "2099-01-01T09:00:00Z"}),
+        (f"/api/v1/content/{piece.id}/publish", {"platforms": ["devto"]}),
+    )
+    for url, body in doors:
+        codes = [client.post(url, json=body, headers=auth).status_code for _ in range(limit)]
+        assert 429 not in codes, (url, codes)
+        refused = client.post(url, json=body, headers=auth)
+        assert refused.status_code == 429, (url, refused.text)
