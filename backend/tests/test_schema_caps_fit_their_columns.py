@@ -24,25 +24,37 @@ import pytest
 from pydantic import BaseModel
 from sqlalchemy import String, inspect
 
+from app.models.activity import ActivityEvent
 from app.models.api_key import ApiKey
 from app.models.content import Content, ContentIdea
 from app.models.feedback import Feedback
 from app.models.platform_connection import PlatformConnection
+from app.models.product_event import ProductEvent
 from app.models.project import Project
+from app.models.subscriber import Subscriber
 from app.models.template import ContentTemplate
 from app.models.translation import ContentTranslation
 from app.models.trigger import Trigger
 from app.models.user import User
+from app.models.user_llm_key import UserLLMKey
 from app.models.webhook import Webhook
+from app.schemas.activity import ActivityEventIn
 from app.schemas.api_key import ApiKeyCreate, MachineIdeaCreate
 from app.schemas.auth import PreferencesUpdate, UserCreate
-from app.schemas.content import ContentCreate, ContentUpdate, HeadlineApplyIn
+from app.schemas.content import (
+    CalendarIdeaCreate,
+    ContentCreate,
+    ContentUpdate,
+    HeadlineApplyIn,
+)
 from app.schemas.feedback import FeedbackIn
+from app.schemas.product_activity import ProductEventIn
 from app.schemas.project import ProjectBase, ProjectCreate, ProjectUpdate
-from app.schemas.settings import ConnectionCreate
+from app.schemas.settings import ConnectionCreate, LLMKeyIn
 from app.schemas.template import TemplateBase, TemplateCreate, TemplateUpdate
 from app.schemas.translation import TranslationRequestIn
 from app.schemas.trigger import TriggerCreate, TriggerUpdate
+from app.schemas.viral import SubscribeIn
 from app.schemas.webhook import WebhookCreate, WebhookUpdate
 
 #: (request schema, model it writes). Every inbound schema in the tree that
@@ -75,6 +87,13 @@ WRITE_PAIRS: list[tuple[type[BaseModel], type]] = [
     # precisely the reasoning that stops being true the day somebody widens the
     # schema field and forgets the column.
     (TranslationRequestIn, ContentTranslation),
+    # M19: these five wrote columns and were never listed, so the check above
+    # never ran on them. All fit today; listed so the next widening is caught.
+    (CalendarIdeaCreate, ContentIdea),
+    (ActivityEventIn, ActivityEvent),
+    (ProductEventIn, ProductEvent),
+    (SubscribeIn, Subscriber),
+    (LLMKeyIn, UserLLMKey),
 ]
 
 
@@ -183,6 +202,18 @@ def test_every_write_schema_is_paired_with_its_model():
         # value that lands there — `tags.normalize` clips a rename's output to
         # the same TAG_MAX_LENGTH before it is written.
         "TagRenameIn",
+        # The batch wrappers: the cap is a list length. Each event inside is
+        # paired above as ActivityEventIn / ProductEventIn.
+        "ActivityBatchIn",
+        "ProductEventBatchIn",
+        "PublishRequestIn",  # platforms: a list of enum values, one row each
+        # values -> rendered text. use_template refuses a render over the
+        # piece's own title/body limits (``rendered.over_limit``) before any
+        # row is written; the preview writes nothing.
+        "RenderRequest",
+        "TemplateUseRequest",
+        "LinkSuggestionsIn",  # a draft searched against, never stored
+        "ContentIdeasIn",  # niche -> the prompt
     }
     paired = {schema.__name__ for schema, _ in WRITE_PAIRS}
 
