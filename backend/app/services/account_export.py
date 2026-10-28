@@ -1,8 +1,8 @@
 """Everything an account has written, as one JSON document (C104 M9).
 
 ``DELETE /auth/me`` erases an account; there was no way to take the work out
-first. This is that way: the profile, the projects, every piece with its body
-and where it went live, the templates and the idea backlog — what a person
+first. This is that way: the profile, the projects, every piece with its body,
+its translations and where it went live, the templates and the idea backlog — what a person
 would need to carry their writing somewhere else.
 
 Deliberately absent: anything that is a credential or a capability. Platform
@@ -24,7 +24,8 @@ from app.models.template import ContentTemplate
 from app.models.user import User
 
 #: Bumped when the shape changes, so a reader can tell two exports apart.
-FORMAT_VERSION = 1
+#: 2 — each piece carries its translations and its ``scheduled_for`` (M2).
+FORMAT_VERSION = 2
 
 
 def _iso(value: Any) -> str | None:
@@ -45,7 +46,9 @@ def build(db: Session, user: User) -> dict[str, Any]:
         db.scalars(
             select(Content)
             .where(Content.project_id.in_(project_ids or [0]))
-            .options(selectinload(Content.publications))
+            .options(
+                selectinload(Content.publications), selectinload(Content.translations)
+            )
             .order_by(Content.id)
         )
     )
@@ -107,7 +110,25 @@ def build(db: Session, user: User) -> dict[str, Any]:
                 "cover_image_url": c.cover_image_url,
                 "marketing_images": c.marketing_images,
                 "created_at": _iso(c.created_at),
+                "scheduled_for": _iso(c.scheduled_for),
                 "published_at": _iso(c.published_at),
+                # The piece in every other language it was written in. Left out
+                # until version 2, so an account that had translated its work
+                # and then erased itself took only the originals: the export is
+                # the one way out, and the translations went with the account.
+                "translations": [
+                    {
+                        "language": t.language,
+                        "status": _enum(t.status),
+                        "title": t.title,
+                        "body_markdown": t.body_markdown,
+                        "excerpt": t.excerpt,
+                        "meta_description": t.meta_description,
+                        "stale": t.is_stale(c),
+                        "translated_at": _iso(t.translated_at),
+                    }
+                    for t in sorted(c.translations, key=lambda t: t.language)
+                ],
                 "publications": [
                     {
                         "platform": _enum(p.platform),

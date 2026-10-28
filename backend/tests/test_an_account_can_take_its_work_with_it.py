@@ -64,7 +64,7 @@ def test_the_export_has_the_work(client, auth, account, project):
     assert resp.status_code == 200, resp.text
     body = resp.json()
 
-    assert body["format_version"] == 1
+    assert body["format_version"] == 2
     assert [p["name"] for p in body["projects"]] == [project.name]
     [piece] = body["content"]
     assert piece["title"] == "Retries, explained"
@@ -115,3 +115,49 @@ def test_another_accounts_work_is_not_in_it(client, auth, account, db):
 
 def test_it_needs_a_sign_in(client):
     assert client.get(URL).status_code == 401
+
+
+def test_the_export_carries_every_translation_of_a_piece(client, auth, db, account):
+    """M2: translations are writing, and the export is the only way out.
+
+    Before format 2 an account that had translated its work and then erased
+    itself left with the originals only.
+    """
+    from app.models.translation import ContentTranslation, TranslationStatus
+
+    piece = db.query(Content).filter_by(slug="retries").one()
+    db.add_all([
+        ContentTranslation(
+            content_id=piece.id, language="fr", status=TranslationStatus.READY,
+            title="Les reprises, expliquées", body_markdown="## Pourquoi\n\nTout le texte.",
+            excerpt="Court.", source_version=piece.version, translated_at=utcnow(),
+        ),
+        ContentTranslation(
+            content_id=piece.id, language="de", status=TranslationStatus.NEEDS_REVIEW,
+            title="Wiederholungen", body_markdown="## Warum", source_version=piece.version - 1,
+        ),
+    ])
+    db.commit()
+
+    [exported] = client.get(URL, headers=auth).json()["content"]
+
+    by_language = {t["language"]: t for t in exported["translations"]}
+    assert list(by_language) == ["de", "fr"]
+    assert by_language["fr"]["title"] == "Les reprises, expliquées"
+    assert by_language["fr"]["body_markdown"] == "## Pourquoi\n\nTout le texte."
+    assert by_language["fr"]["status"] == "ready"
+    assert by_language["fr"]["stale"] is False
+    assert by_language["de"]["status"] == "needs_review"
+    assert by_language["de"]["stale"] is True
+
+
+def test_the_export_keeps_a_scheduled_date(client, auth, db, account):
+    from datetime import timedelta
+
+    piece = db.query(Content).filter_by(slug="retries").one()
+    piece.scheduled_for = utcnow() + timedelta(days=3)
+    db.commit()
+
+    [exported] = client.get(URL, headers=auth).json()["content"]
+    assert exported["scheduled_for"] is not None
+    assert exported["translations"] == []
