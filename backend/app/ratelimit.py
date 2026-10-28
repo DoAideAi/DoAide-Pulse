@@ -257,6 +257,26 @@ def record_login_failure(email: str) -> None:
         logger.warning("login failure counter unavailable; not recorded", exc_info=True)
 
 
+def clear_login_failures(email: str) -> None:
+    """Forget *email*'s failed sign-ins.
+
+    Called when a password reset completes. The lockout tells its user to
+    "reset your password", and a reset proves control of the mailbox — the one
+    thing a guesser spreading attempts across addresses does not have — so the
+    budget they spent is not held against the new password. Without this the
+    reset succeeded, said "you can sign in with it now", and the sign-in that
+    followed was refused for up to the rest of the hour.
+    """
+    if not limiter.enabled:
+        return
+    key = _account_bucket(email)
+    try:
+        for item in _LOGIN_FAILURES:
+            limiter._limiter.clear(item, "login-failures", key)
+    except Exception:  # noqa: BLE001 - storage errors fail open
+        logger.warning("login failure counter unavailable; not cleared", exc_info=True)
+
+
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """429 in FastAPI's shape.
 
@@ -282,6 +302,7 @@ def reset() -> None:
 __all__ = [
     "account_key",
     "api_key_key",
+    "clear_login_failures",
     "client_key",
     "PulseLimiter",
     "limiter",

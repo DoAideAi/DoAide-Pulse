@@ -148,3 +148,35 @@ def _trust_forwarded_for(monkeypatch):
     from app.config import settings
 
     monkeypatch.setattr(settings, "rate_limit_trust_forwarded_for", True)
+
+
+def test_a_completed_password_reset_lifts_the_lock(client, user, db):
+    """The 429 says "reset your password"; after a reset, signing in works."""
+    from app.services import password_reset
+
+    for n in range(BUDGET):
+        _login(client, user.email, "wrong-password", f"203.0.113.{n}")
+    assert _login(client, user.email, "hunter2hunter2", "198.51.100.7").status_code == 429
+
+    raw = password_reset.issue(db, user)
+    resp = client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"token": raw, "new_password": "a-brand-new-passphrase"},
+    )
+    assert resp.status_code == 200, resp.text
+
+    resp = _login(client, user.email, "a-brand-new-passphrase", "198.51.100.8")
+    assert resp.status_code == 200, resp.text
+
+
+def test_a_failed_reset_does_not_lift_the_lock(client, user):
+    for n in range(BUDGET):
+        _login(client, user.email, "wrong-password", f"203.0.113.{n}")
+
+    resp = client.post(
+        "/api/v1/auth/password-reset/confirm",
+        json={"token": "x" * 43, "new_password": "a-brand-new-passphrase"},
+    )
+    assert resp.status_code == 400
+
+    assert login_locked(user.email)

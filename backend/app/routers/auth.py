@@ -35,7 +35,13 @@ from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
-from app.ratelimit import client_key, limiter, login_locked, record_login_failure
+from app.ratelimit import (
+    clear_login_failures,
+    client_key,
+    limiter,
+    login_locked,
+    record_login_failure,
+)
 from app.routers._patch import reject_nulls
 from app.schemas.auth import (
     MessageOut,
@@ -394,6 +400,9 @@ def confirm_password_reset(
             detail="This reset link is invalid, already used, or expired. "
             "Request a new one.",
         )
+    # The lockout's own message points here; the answer below promises the
+    # sign-in will work, so it has to.
+    clear_login_failures(user.email)
     return MessageOut(detail="Password updated. You can sign in with it now.")
 
 
