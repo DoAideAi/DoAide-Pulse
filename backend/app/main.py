@@ -173,6 +173,13 @@ class BodySizeLimitMiddleware:
                         f"Request body nested too deeply (limit is {MAX_JSON_DEPTH} levels)",
                     )
                     return {"type": "http.disconnect"}
+                if depth is not None and depth.has_nul:
+                    rejection = (
+                        400,
+                        "Request body contains a NUL character (\\u0000), "
+                        "which cannot be stored. Remove it and try again.",
+                    )
+                    return {"type": "http.disconnect"}
             return message
 
         async def _guarded_send(message: Message) -> None:
@@ -281,24 +288,42 @@ class _JSONDepthScanner:
     This is deliberately not a parser. It does not validate, and it is not asked
     to — an ill-formed body still fails at the real parse, and by then it has
     been established that the descent is short enough to be worth attempting.
-    Strings are tracked only so that a ``{`` inside a quoted value is not
-    counted as nesting.
+    Strings are tracked so that a ``{`` inside a quoted value is not counted as
+    nesting — and so that a ``\\u0000`` escape inside one can be noticed.
+    PostgreSQL stores no NUL in ``text`` or ``jsonb``: psycopg raises
+    ``DataError`` at the write, which surfaced as a 500 from whichever route
+    happened to persist the string first. SQLite stores it without complaint,
+    which is why no test ever saw it. ``has_nul`` lets the middleware refuse
+    the body up front, with an answer that says what is wrong with it.
     """
 
-    __slots__ = ("depth", "escaped", "in_string", "max_depth")
+    __slots__ = ("depth", "escaped", "has_nul", "hex_left", "hex_zero", "in_string", "max_depth")
 
     def __init__(self) -> None:
         self.depth = 0
         self.max_depth = 0
         self.in_string = False
         self.escaped = False
+        self.has_nul = False
+        #: Hex digits still to come in a ``\\uXXXX`` escape, and whether every
+        #: one so far was ``0``. Carried across chunks like the rest.
+        self.hex_left = 0
+        self.hex_zero = False
 
     def feed(self, chunk: bytes) -> int:
         """Scan *chunk* and return the deepest nesting seen in the body so far."""
         for byte in chunk:
             if self.in_string:
-                if self.escaped:
+                if self.hex_left:
+                    self.hex_zero = self.hex_zero and byte == 0x30  # "0"
+                    self.hex_left -= 1
+                    if not self.hex_left and self.hex_zero:
+                        self.has_nul = True
+                elif self.escaped:
                     self.escaped = False
+                    if byte == 0x75:  # "u"
+                        self.hex_left = 4
+                        self.hex_zero = True
                 elif byte == 0x5C:  # backslash
                     self.escaped = True
                 elif byte == 0x22:  # closing quote
