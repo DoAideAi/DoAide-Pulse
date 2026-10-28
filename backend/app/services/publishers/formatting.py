@@ -10,6 +10,7 @@ edge cases are testable without a network.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 import markdown as markdown_lib
 import nh3
@@ -354,6 +355,64 @@ def front_matter(fields: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def _joins_previous(ch: str) -> bool:
+    """Whether *ch* belongs to the character before it rather than starting one.
+
+    Combining marks (the accent in a decomposed "é"), variation selectors (what
+    makes ❤️ the emoji rather than the text glyph), skin-tone modifiers and the
+    tag characters of a subdivision flag all modify what precedes them, and so
+    does anything after a zero-width joiner.
+    """
+    code = ord(ch)
+    return (
+        unicodedata.category(ch) in ("Mn", "Me", "Mc")
+        or ch == "\u200d"
+        or 0xFE00 <= code <= 0xFE0F
+        or 0xE0100 <= code <= 0xE01EF
+        or 0x1F3FB <= code <= 0x1F3FF
+        or 0xE0020 <= code <= 0xE007F
+    )
+
+
+def _is_regional_indicator(ch: str) -> bool:
+    return 0x1F1E6 <= ord(ch) <= 0x1F1FF
+
+
+def safe_cut(text: str, at: int) -> int:
+    """The largest index ``<= at`` that does not split a user-perceived character.
+
+    A cut by code point can land inside one: half a flag (🇮🇳 is two code
+    points, and 🇮 alone renders as a boxed letter), a decomposed accent left
+    off its letter, a skin tone or emoji presentation dropped, a ZWJ family cut
+    down to some of its members, a conjunct left ending on its virama (C104 M2). Not the full grapheme algorithm,
+    which needs data Pulse does not ship — the clusters that occur in text
+    people write.
+    """
+    cut = max(0, min(at, len(text)))
+    while 0 < cut < len(text):
+        # After a joiner or a virama (combining class 9 — what fuses two
+        # consonants into one conjunct in Devanagari and its relatives), the next
+        # character belongs to the same cluster too.
+        if (
+            _joins_previous(text[cut])
+            or text[cut - 1] == "\u200d"
+            or unicodedata.combining(text[cut - 1]) == 9
+        ):
+            cut -= 1
+            continue
+        if _is_regional_indicator(text[cut]) and _is_regional_indicator(text[cut - 1]):
+            # Flags are pairs: count the run before the cut to see whether the
+            # cut falls between the two halves of one.
+            run = 0
+            while cut - run - 1 >= 0 and _is_regional_indicator(text[cut - run - 1]):
+                run += 1
+            if run % 2:
+                cut -= 1
+                continue
+        break
+    return cut
+
+
 def clip(text: str, budget: int) -> str:
     """*text* collapsed to one line and cut to *budget* characters.
 
@@ -373,7 +432,7 @@ def clip(text: str, budget: int) -> str:
         return ""
     if len(body) <= budget:
         return body
-    clipped = body[: budget - 1]
+    clipped = body[: safe_cut(body, budget - 1)]
     cut = clipped.rfind(" ")
     return (clipped[:cut] if cut > budget // 2 else clipped).rstrip(",;:.") + "…"
 
