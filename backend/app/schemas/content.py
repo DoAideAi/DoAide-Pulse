@@ -31,6 +31,29 @@ TIMEZONE_HELP = (
 )
 
 
+def _clean_tags(value: list[str] | None) -> list[str] | None:
+    """A tag list without blanks or repeats, in the order it was written.
+
+    Stored raw, ``["", "  "]`` became two empty chips on the piece, and
+    ``["Release", "release", " release "]`` three tags where the tag tree
+    (:func:`app.services.tags.normalize_all`) counts one. Trimmed, blanks
+    dropped, and a repeat that differs only in case dropped — the first
+    spelling kept. Deliberately not the tree's full normalisation, which clips
+    a segment to 24 characters: a 100-character tag the schema accepts must not
+    come back as a different one.
+    """
+    if value is None:
+        return None
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in value:
+        tag = raw.strip()
+        if tag and tag.casefold() not in seen:
+            seen.add(tag.casefold())
+            out.append(tag)
+    return out
+
+
 def _absolute_image_url(value: str | None) -> str | None:
     """Accept an absolute http(s) URL, or nothing.
 
@@ -182,6 +205,7 @@ class ContentCreate(BaseModel):
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
     _check_canonical = field_validator("canonical_url")(_absolute_canonical_url)
+    _normalise_tags = field_validator("tags")(_clean_tags)
 
 
 class ContentUpdate(BaseModel):
@@ -216,6 +240,7 @@ class ContentUpdate(BaseModel):
 
     _check_cover = field_validator("cover_image_url")(_absolute_image_url)
     _check_canonical = field_validator("canonical_url")(_absolute_canonical_url)
+    _normalise_tags = field_validator("tags")(_clean_tags)
 
     _settable = field_validator("status")(_settable_status)
 
