@@ -442,10 +442,15 @@ def cancel_publication(publication_id: int) -> dict:
             or publication.status == PublicationStatus.PUBLISHING
         ):
             return {"publication_id": publication_id, "cancelled": False}
-        publication.status = PublicationStatus.CANCELLED
-        publication.scheduled_for = None
+        # Conditional: a worker may claim and finish the row between the read
+        # above and this write, and ``cancelled`` must not land on a live post.
+        cancelled = publishing_service.cancel_if(
+            db,
+            publication,
+            (PublicationStatus.PENDING, PublicationStatus.SCHEDULED),
+        )
         publishing_service.sync_content_status(publication.content)
         db.commit()
-        return {"publication_id": publication_id, "cancelled": True}
+        return {"publication_id": publication_id, "cancelled": cancelled}
     finally:
         db.close()

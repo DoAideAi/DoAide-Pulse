@@ -121,3 +121,24 @@ def test_cancel_if_cancels_a_row_still_waiting(db, piece):
     assert row.status == PublicationStatus.CANCELLED
     assert row.scheduled_for is None
     assert row.error == "withdrawn"
+
+
+def test_the_cancel_task_leaves_a_row_published_mid_task_published(
+    db, piece, monkeypatch, task_session
+):
+    from app.tasks import publish_tasks
+
+    monkeypatch.setattr(publish_tasks, "SessionLocal", task_session)
+    devto = next(p for p in piece.publications if p.platform == Platform.DEVTO)
+    real = publishing_service.cancel_if
+
+    def racing(db_, publication, *args, **kwargs):
+        _worker_publishes(piece.id, Platform.DEVTO)
+        return real(db_, publication, *args, **kwargs)
+
+    monkeypatch.setattr(publishing_service, "cancel_if", racing)
+
+    assert publish_tasks.cancel_publication(devto.id)["cancelled"] is False
+    row = _status(db, piece, Platform.DEVTO)
+    assert row.status == PublicationStatus.PUBLISHED
+    assert row.external_url == LIVE
