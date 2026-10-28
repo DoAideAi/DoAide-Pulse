@@ -1357,7 +1357,7 @@ export function whatsappShareUrl(url) {
 
 function PreviewLinksPanel({ contentId }) {
   const toast = useToast();
-  const { data: links, loading, reload } = useApi(
+  const { data: links, error, loading, reload } = useApi(
     () => api.listPreviewLinks(contentId),
     [contentId],
   );
@@ -1415,7 +1415,18 @@ function PreviewLinksPanel({ contentId }) {
         </button>
       </div>
 
-      {!loading && live.length === 0 && !justCreated && (
+      {error && !links && (
+        // Without this a failed load looked like a piece with no links out —
+        // and a link that has leaked can only be revoked from this list.
+        <div role="alert" className="text-xs text-bad">
+          Could not load preview links.{" "}
+          <button type="button" className="underline" onClick={reload}>
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !(error && !links) && live.length === 0 && !justCreated && (
         <p className="text-xs text-ink-400">
           Read-only link for external reviewers.
         </p>

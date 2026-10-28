@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1284,6 +1284,29 @@ describe("sharing a preview link", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Revoke" })).not.toBeInTheDocument(),
     );
+  });
+
+  it("reports a failed list load, so live links are not mistaken for none", async () => {
+    api.listPreviewLinks.mockRejectedValueOnce(new Error("offline"));
+    api.listPreviewLinks.mockResolvedValueOnce([
+      {
+        id: 4,
+        url: null,
+        expires_at: "2026-08-16T10:00:00Z",
+        revoked_at: null,
+        view_count: 0,
+        last_viewed_at: null,
+      },
+    ]);
+    draw();
+
+    expect(await screen.findByText(/Could not load preview links/)).toBeInTheDocument();
+    expect(screen.queryByText(/Read-only link for external reviewers/)).not.toBeInTheDocument();
+
+    const alert = screen.getByText(/Could not load preview links/).closest("[role=alert]");
+    await userEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+
+    expect(await screen.findByRole("button", { name: "Revoke" })).toBeInTheDocument();
   });
 
   it("toasts a failed creation instead of leaving the button spinning", async () => {
