@@ -162,7 +162,8 @@ def create_webhook(
     if count >= MAX_WEBHOOKS_PER_USER:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"At most {MAX_WEBHOOKS_PER_USER} webhooks per account.",
+            detail=f"At most {MAX_WEBHOOKS_PER_USER} webhooks per account. "
+            "Delete an endpoint you no longer use to add another.",
         )
 
     url = _validated(payload.url)

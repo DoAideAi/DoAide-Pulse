@@ -280,7 +280,8 @@ def create_template(
     if count >= MAX_TEMPLATES_PER_USER:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"At most {MAX_TEMPLATES_PER_USER} templates.",
+            detail=f"At most {MAX_TEMPLATES_PER_USER} templates per account. "
+            "Delete one you no longer use to save another.",
         )
 
     template = ContentTemplate(

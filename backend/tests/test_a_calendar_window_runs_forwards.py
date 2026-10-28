@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 from app.models.content import Content, ContentStatus, ContentType
 from app.models.publication import Platform, Publication, PublicationStatus
+from app.routers import calendar as calendar_router
 
 
 def _iso(dt: datetime) -> str:
@@ -45,7 +46,8 @@ def test_end_before_start_is_refused(client, auth):
         headers=auth,
     )
     assert resp.status_code == 400
-    assert resp.json()["detail"] == "end is before start."
+    assert resp.json()["detail"] == calendar_router.WINDOW_INVERTED
+    assert "Swap them" in resp.json()["detail"]
 
 
 def test_start_alone_far_ahead_shows_what_is_scheduled_there(client, auth, db, project):

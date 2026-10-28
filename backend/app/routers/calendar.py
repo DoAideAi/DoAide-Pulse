@@ -33,6 +33,13 @@ from app.services import cadence, learned_cadence, publishing_service, schedulin
 router = APIRouter(prefix="/calendar", tags=["calendar"])
 
 
+
+#: Both windows here refuse the same mistake the same way. Says which bound
+#: is which, because ``start``/``end`` swapped is the usual cause.
+WINDOW_INVERTED = (
+    "end is before start. Swap them, or give an end on or after the start."
+)
+
 @router.get(
     "",
     response_model=CalendarOut,
@@ -78,7 +85,7 @@ def get_calendar(
     # page as "nothing scheduled", which is the one wrong answer that looks right.
     if window_end < window_start:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="end is before start."
+            status_code=status.HTTP_400_BAD_REQUEST, detail=WINDOW_INVERTED
         )
 
     # Cap the window so a careless or malicious request doesn't scan years of
@@ -453,7 +460,7 @@ def calendar_ideas(
     window_end = end or (utcnow().date() + timedelta(days=60))
     if window_end < window_start:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="end is before start."
+            status_code=status.HTTP_400_BAD_REQUEST, detail=WINDOW_INVERTED
         )
     # The same ceiling GET /calendar holds its window to. Without it the planned
     # half had no bound at all — the backlog is capped, the window was not —

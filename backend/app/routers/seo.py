@@ -140,7 +140,11 @@ def submit_sitemaps(
     elif site in seo_sites.BY_KEY:
         targets = (seo_sites.BY_KEY[site],)
     else:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown site.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown site key. Omit site to cover every site, "
+            "or use a key from GET /seo/sitemaps.",
+        )
     rows = sitemaps.check(db, targets)
     seo_history.record_run(db, "manual", rows)
     seo_history.record_snapshot(db)
@@ -241,7 +245,11 @@ def run_audit(
         response.status_code = status.HTTP_202_ACCEPTED
         return {"queued": True}
     if site not in seo_sites.BY_KEY:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown site.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Unknown site key. Omit site to cover every site, "
+            "or use a key from GET /seo/sitemaps.",
+        )
     meta_audit.run(db, [seo_sites.BY_KEY[site]])
     return _audit_payload(db)
 

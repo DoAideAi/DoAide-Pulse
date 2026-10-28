@@ -126,7 +126,9 @@ def list_feedback(
     """Newest first. ``X-Total-Count`` is the number matching the filters."""
     if since and until and until < since:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="until is before since."
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="until is before since. Swap them, or give an until on or "
+            "after the since.",
         )
     query = select(Feedback)
     if category is not None:

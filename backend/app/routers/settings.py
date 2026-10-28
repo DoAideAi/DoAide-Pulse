@@ -436,7 +436,8 @@ def save_llm_key(
         safe = redact(str(exc), [payload.api_key])
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"The key did not work: {clip_error(safe)}",
+            detail=f"The key did not work: {clip_error(safe)} Check that it was "
+            "copied whole and can use the model you chose, then save it again.",
         ) from exc
 
     try:

@@ -139,7 +139,8 @@ api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 _api_key_exc = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Invalid or expired API key.",
+    detail="Invalid or expired API key. Create a new one in Settings → API keys "
+    "and send it in the X-API-Key header.",
 )
 
 
@@ -185,7 +186,8 @@ def require_scope(*scopes: ApiKeyScope) -> Callable[..., ApiKey]:
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"This key is missing the {', '.join(missing)} scope.",
+                detail=f"This key is missing the {', '.join(missing)} scope. Create a "
+                "key that includes it in Settings → API keys.",
             )
         # After the scope check, not before: a key that is refused has not been
         # "used", and stamping it would make an audit of last_used_at read as

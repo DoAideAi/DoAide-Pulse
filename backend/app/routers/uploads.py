@@ -116,7 +116,8 @@ async def upload_image(
                 if size > limit:
                     raise HTTPException(
                         status_code=status.HTTP_413_CONTENT_TOO_LARGE,
-                        detail=f"File too large (max {limit // (1024 * 1024)} MB).",
+                        detail=f"File too large (max {limit // (1024 * 1024)} MB). "
+                        "Resize or compress the image and upload it again.",
                     )
                 if len(head) < _SNIFF_BYTES:
                     head += chunk[: _SNIFF_BYTES - len(head)]

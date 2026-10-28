@@ -275,7 +275,9 @@ def create_trigger(
     if count >= MAX_TRIGGERS_PER_PROJECT:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"At most {MAX_TRIGGERS_PER_PROJECT} triggers per project.",
+            detail=f"At most {MAX_TRIGGERS_PER_PROJECT} triggers per project. "
+            "Delete one of this project's triggers, or change one to watch this "
+            "source instead.",
         )
 
     trigger = Trigger(

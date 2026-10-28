@@ -164,7 +164,8 @@ def create_api_key(
     if live >= MAX_KEYS_PER_PROJECT:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"At most {MAX_KEYS_PER_PROJECT} live keys per project.",
+            detail=f"At most {MAX_KEYS_PER_PROJECT} live keys per project. "
+            "Revoke one you no longer use to create another.",
         )
 
     try:

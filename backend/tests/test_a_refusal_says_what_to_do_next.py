@@ -1,0 +1,74 @@
+"""A refusal says what happened and what to do about it (C103 M19).
+
+Each of these said the first half only — "At most 100 templates.", "end is
+before start.", "Invalid or expired API key." — which leaves the reader to
+work out the fix from the rule. Pinned on the endpoints themselves, so the
+sentence the user sees is the one checked.
+"""
+from __future__ import annotations
+
+from app.config import settings
+from app.routers import templates as templates_router
+from app.routers import triggers as triggers_router
+from app.routers import webhooks as webhooks_router
+
+
+def test_the_template_ceiling_says_to_delete_one(client, auth, monkeypatch):
+    monkeypatch.setattr(templates_router, "MAX_TEMPLATES_PER_USER", 0)
+    resp = client.post(
+        "/api/v1/templates",
+        json={"name": "T", "mode": "literal", "content_type": "announcement", "body_template": "x"},
+        headers=auth,
+    )
+    assert resp.status_code == 409
+    assert "Delete one you no longer use" in resp.json()["detail"]
+
+
+def test_the_webhook_ceiling_says_to_delete_one(client, auth, monkeypatch):
+    monkeypatch.setattr(webhooks_router, "MAX_WEBHOOKS_PER_USER", 0)
+    resp = client.post(
+        "/api/v1/webhooks",
+        json={"url": "https://hooks.example.com/pulse", "events": ["content.published"]},
+        headers=auth,
+    )
+    assert resp.status_code == 409
+    assert "Delete an endpoint you no longer use" in resp.json()["detail"]
+
+
+def test_the_trigger_ceiling_says_what_to_do(client, auth, project, monkeypatch):
+    monkeypatch.setattr(triggers_router, "MAX_TRIGGERS_PER_PROJECT", 0)
+    resp = client.post(
+        "/api/v1/triggers",
+        json={"project_id": project.id, "kind": "webhook", "name": "x", "config": {}},
+        headers=auth,
+    )
+    assert resp.status_code == 409
+    assert "Delete one of this project's triggers" in resp.json()["detail"]
+
+
+def test_an_unknown_api_key_says_where_to_get_one(client):
+    resp = client.get("/api/v1/machine/whoami", headers={"X-API-Key": "pk_nonsense"})
+    assert resp.status_code == 401
+    detail = resp.json()["detail"]
+    assert "Settings → API keys" in detail
+    assert "X-API-Key" in detail
+
+
+def test_a_bad_ingest_token_says_which_header(client, monkeypatch):
+    monkeypatch.setattr(settings, "product_ingest_token", "the-real-one")
+    resp = client.post(
+        "/api/v1/products/events",
+        json={"events": [{"product": "gst", "kind": "signup"}]},
+        headers={"X-Pulse-Ingest-Token": "wrong"},
+    )
+    assert resp.status_code == 401
+    assert "X-Pulse-Ingest-Token" in resp.json()["detail"]
+
+
+def test_an_inverted_feedback_window_says_to_swap_it(client, auth, monkeypatch):
+    from app.routers import feedback as feedback_router
+
+    monkeypatch.setattr(feedback_router.accounts, "is_operator", lambda user: True)
+    resp = client.get("/api/v1/feedback?since=2026-10-10&until=2026-10-01", headers=auth)
+    assert resp.status_code == 400, resp.text
+    assert "Swap them" in resp.json()["detail"]

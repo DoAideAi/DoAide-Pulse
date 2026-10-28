@@ -79,7 +79,9 @@ def require_ingest_token(
         x_pulse_ingest_token.encode(), expected.encode()
     ):
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ingest token."
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid ingest token. Send the value of PRODUCT_INGEST_TOKEN in "
+            "the X-Pulse-Ingest-Token header.",
         )
 
 
