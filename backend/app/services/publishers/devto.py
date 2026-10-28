@@ -31,6 +31,10 @@ _API = "https://dev.to/api"
 #: Forem rejects the whole article if a tag has anything but alphanumerics, and
 #: silently ignores a fifth.
 _TAG_LIMIT = 4
+#: Forem's own validation on an article title. Pulse takes titles up to
+#: ``TITLE_MAX_LENGTH`` (300), so a piece that is fine everywhere else is refused
+#: here with a 422 after the user has pressed Publish (C104 M2).
+_TITLE_LIMIT = 128
 
 
 class DevToAdapter(Adapter):
@@ -71,8 +75,8 @@ class DevToAdapter(Adapter):
         """What Forem will refuse, and what it will quietly drop.
 
         Dev.to takes the whole article, so there is no truncation to warn
-        about — the two things that go wrong here are a missing title, which
-        Forem 422s on, and the fifth tag, which it accepts and ignores. The
+        about — the things that go wrong here are a missing or over-long title,
+        which Forem 422s on, and the fifth tag, which it accepts and ignores. The
         second is the one worth reporting: a piece tagged
         ``python, fastapi, testing, ci, docker`` publishes successfully and is
         not tagged ``docker``, and nothing anywhere says so.
@@ -90,6 +94,17 @@ class DevToAdapter(Adapter):
                 PreflightFinding(
                     PREFLIGHT_ERROR,
                     "Dev.to publishes the article body, and this piece has none.",
+                )
+            )
+        if len(request.title) > _TITLE_LIMIT:
+            findings.append(
+                PreflightFinding(
+                    PREFLIGHT_ERROR,
+                    f"Dev.to takes titles up to {_TITLE_LIMIT} characters and this "
+                    f"one is {len(request.title)}. Shorten it, or try a headline "
+                    "variant.",
+                    limit=_TITLE_LIMIT,
+                    actual=len(request.title),
                 )
             )
 
