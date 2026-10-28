@@ -103,8 +103,9 @@ class TestContentAdversarialInput:
             },
             headers=auth,
         )
-        # Should either accept (stored as-is) or reject cleanly — not 500
-        assert resp.status_code in (201, 422)
+        # Rejected cleanly, not a 500: the body middleware refuses \u0000
+        # because PostgreSQL cannot store it (see test_json_nul_refused.py).
+        assert resp.status_code in (201, 400, 422)
 
     def test_unicode_bidi_override_in_title(self, client, auth, project):
         resp = client.post(
