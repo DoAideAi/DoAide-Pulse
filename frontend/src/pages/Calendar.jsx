@@ -15,7 +15,7 @@ import {
   summarize,
   visibleEntries,
 } from "../lib/calendar";
-import { formatDateTime, localDayKey, statusTone, titleize } from "../lib/format";
+import { formatDateTime, localDayKey, titleize } from "../lib/format";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
