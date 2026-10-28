@@ -56,6 +56,8 @@ Two deployment details shape the configuration:
 """
 from __future__ import annotations
 
+import logging
+
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -166,9 +168,34 @@ class PulseLimiter(Limiter):
         return super()._check_request_limit(request, endpoint_func, in_middleware)
 
 
+def storage_uri(config=settings) -> str:
+    """Where the limit counters live.
+
+    ``RATE_LIMIT_STORAGE_URI`` when it is set. When it is not, production uses
+    the Redis Pulse already runs (``REDIS_URL``) rather than process memory:
+    the API runs two uvicorn workers, and in-memory counters are per worker —
+    every limit doubled, the login brute-force budget included, and reset on
+    every restart. Production was only correct because its ``.env`` happened
+    to set the variable; ``.env.example`` leaves it blank, so a box built from
+    the example quietly ran with half the protection. Memory remains the
+    development default, and the last resort when there is no Redis at all —
+    said out loud, because it is not what anyone would choose.
+    """
+    if config.rate_limit_storage_uri:
+        return config.rate_limit_storage_uri
+    if config.is_production:
+        if config.redis_url:
+            return config.redis_url
+        logging.getLogger(__name__).warning(
+            "rate limits are counted per worker process: neither "
+            "RATE_LIMIT_STORAGE_URI nor REDIS_URL is set in production"
+        )
+    return "memory://"
+
+
 limiter = PulseLimiter(
     key_func=client_key,
-    storage_uri=settings.rate_limit_storage_uri or "memory://",
+    storage_uri=storage_uri(),
     enabled=settings.rate_limit_enabled,
     headers_enabled=True,
     # A dead Redis must not take the login page down with it: on a storage

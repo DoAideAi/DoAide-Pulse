@@ -142,9 +142,9 @@ class Settings(BaseSettings):
 
     # ---- Rate limiting ----
     rate_limit_enabled: bool = True
-    # Blank means in-process memory, which counts per uvicorn worker (2 in
-    # production, so the effective limit is doubled). Point it at
-    # ``redis://localhost:6379/3`` to share one counter across workers.
+    # Blank means REDIS_URL in production — one counter for every worker — and
+    # in-process memory in development; see app.ratelimit.storage_uri. Set it
+    # (e.g. ``redis://localhost:6379/3``) to give the limiter its own db.
     rate_limit_storage_uri: str = ""
     # Pulse sits behind Caddy, so ``request.client.host`` is always the proxy.
     # With this on, the *rightmost* X-Forwarded-For entry is used instead — the
