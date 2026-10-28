@@ -655,12 +655,21 @@ def review_queue(
     "/queue/publications",
     response_model=list[PublicationOut],
     summary="Publications in flight",
-    responses=errors(*AUTHENTICATED),
+    responses=errors(*AUTHENTICATED, status.HTTP_422_UNPROCESSABLE_CONTENT),
 )
 def publication_queue(
     response: Response,
     limit: int = Query(default=50, ge=1, le=200),
     offset: ListOffset = 0,
+    status_filter: PublicationStatus | None = Query(
+        default=None,
+        alias="status",
+        description=(
+            "Only rows in this state — one of the four the queue holds. With "
+            "limit=1, X-Total-Count is how many there are, which is what the "
+            "sidebar's failed-publications badge reads."
+        ),
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[PublicationOut]:
@@ -680,6 +689,16 @@ def publication_queue(
             Publication.status.in_(_QUEUE_STATUSES),
         )
     )
+    if status_filter is not None:
+        if status_filter not in _QUEUE_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    f"The queue holds {', '.join(s.value for s in _QUEUE_STATUSES)} "
+                    f"publications; {status_filter.value} ones are not in it."
+                ),
+            )
+        base = base.where(Publication.status == status_filter)
     total = db.scalar(
         select(func.count()).select_from(
             base.with_only_columns(Publication.id).subquery()
