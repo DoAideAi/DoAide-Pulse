@@ -30,6 +30,10 @@ vi.mock("../lib/api", () => ({
     // The Analytics page grew pipeline and activity panels; an unmocked call
     // threw "api.pipeline is not a function" and took the whole page down.
     pipeline: vi.fn(),
+    // And the M15 panels: feature usage, the content funnel, autopilot.
+    featureUsage: vi.fn(),
+    contentFunnel: vi.fn(),
+    autopilotEffectiveness: vi.fn(),
     activitySummary: vi.fn(),
     subscriberGrowth: vi.fn(),
     dashboard: vi.fn(),
@@ -139,6 +143,7 @@ describe("the analytics page", () => {
     api.activitySummary.mockResolvedValue({
       days: 30, page_views: 0, actions: 0, top_pages: [], top_actions: [], by_day: [],
     });
+    api.featureUsage.mockResolvedValue({ days: 30, features: [], unused: [], unmapped_actions: [] });
     api.subscriberGrowth.mockResolvedValue({
       total: 0, last_30_days: 0, series: [], by_source: [],
     });
