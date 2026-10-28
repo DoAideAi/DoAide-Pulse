@@ -49,7 +49,7 @@ from app.models.project import AutopilotMode, Project, repo_full_name, scan_due
 from app.models.trigger import Trigger, TriggerKind
 from app.models.user import User
 from app.services import content_generator, content_pipeline, dedup, github_client, llm_router
-from app.services.errors import sanitize_unexpected_error
+from app.services.errors import clip_error, sanitize_unexpected_error
 from app.tasks.celery_app import task
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,7 @@ def scan_project(project_id: int) -> dict:
             return {"project_id": project_id, "status": "rate_limited"}
         except github_client.GitHubError as exc:
             logger.warning("autopilot could not read %s: %s", full_name, exc)
-            project.record_scan(duration_ms=elapsed_ms(started))
+            project.record_scan(duration_ms=elapsed_ms(started), error=clip_error(str(exc)))
             db.commit()
             return {"project_id": project_id, "status": "unreachable"}
 

@@ -101,6 +101,7 @@ def scan_frequency(db: Session, user_id: int) -> list[dict[str, Any]]:
             Project.scan_count,
             Project.last_scanned_at,
             Project.last_scan_duration_ms,
+            Project.last_scan_error,
             Project.created_at,
         )
         .where(Project.user_id == user_id)
@@ -117,6 +118,7 @@ def scan_frequency(db: Session, user_id: int) -> list[dict[str, Any]]:
                 "scan_count": int(row.scan_count or 0),
                 "last_scanned_at": row.last_scanned_at,
                 "last_scan_duration_ms": row.last_scan_duration_ms,
+                "last_scan_error": row.last_scan_error,
                 "scans_per_day": (
                     round(int(row.scan_count or 0) / age_days, 2)
                     if age_days >= 1.0

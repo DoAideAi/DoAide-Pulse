@@ -357,6 +357,12 @@ class Project(Base, TimestampMixin):
     #: by one endpoint and the alternative is a table that grows forever to
     #: answer a question a counter answers.
     scan_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: Why the last scan could not read the repo, or ``None`` if it could. A
+    #: scan that reached GitHub and was refused still counts above — it spent
+    #: the quota and keeps the project from being re-polled every sweep — so
+    #: without this a renamed or private repo looked, on ``/api/v1/metrics``,
+    #: exactly like one being scanned on schedule.
+    last_scan_error: Mapped[str | None] = mapped_column(Text)
 
     user: Mapped[User] = relationship(back_populates="projects")
     content: Mapped[list[Content]] = relationship(
@@ -375,7 +381,7 @@ class Project(Base, TimestampMixin):
         back_populates="project", cascade="all, delete-orphan"
     )
 
-    def record_scan(self, *, duration_ms: int) -> None:
+    def record_scan(self, *, duration_ms: int, error: str | None = None) -> None:
         """Note that a scan of this repo finished, and how long it took.
 
         Does not commit — the caller is mid-transaction with the watermark it is
@@ -404,6 +410,8 @@ class Project(Base, TimestampMixin):
         # direction nobody sanity-checks.
         self.last_scan_duration_ms = max(0, int(duration_ms))
         self.scan_count = (self.scan_count or 0) + 1
+        # Every scan sets it, so a repo that becomes readable again clears it.
+        self.last_scan_error = error
 
     @property
     def campaign(self) -> str:

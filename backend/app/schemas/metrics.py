@@ -47,6 +47,13 @@ class ProjectScanOut(BaseModel):
     last_scan_duration_ms: int | None = Field(
         default=None, description="How long the last completed scan took, end to end."
     )
+    last_scan_error: str | None = Field(
+        default=None,
+        description=(
+            "Why the last scan could not read the repo, or null if it could. "
+            "A refused scan still counts in scan_count and scans_per_day."
+        ),
+    )
     scans_per_day: float | None = Field(
         default=None,
         description=(
