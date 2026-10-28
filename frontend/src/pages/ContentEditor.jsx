@@ -820,6 +820,9 @@ export default function ContentEditor() {
               contentId={data.id}
             />
           </SectionBoundary>
+          <SectionBoundary name="editor:social-copy">
+            <SocialCopyPanel contentId={data.id} />
+          </SectionBoundary>
           <SectionBoundary name="editor:links">
             <LinksPanel contentId={data.id} />
           </SectionBoundary>
@@ -1629,6 +1632,98 @@ function AutoPublishedNote({ source }) {
       Written and published by autopilot — it passed every check, so nobody reviewed it
       first{scores && ` (${scores})`}.
     </p>
+  );
+}
+
+/**
+ * A thread and a LinkedIn post drafted from the piece, to paste by hand.
+ *
+ * ``POST /content/{id}/repurpose`` has been there all along and nothing called
+ * it — and its two outputs are exactly the platforms Pulse cannot post to
+ * itself yet (Settings lists them under "Coming soon"), so pasting is the only
+ * way this copy gets used. Nothing is saved; asking again drafts afresh.
+ */
+function SocialCopyPanel({ contentId }) {
+  const toast = useToast();
+  const [copy, setCopy] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  async function draftCopy() {
+    setBusy(true);
+    try {
+      setCopy(await api.repurposeContent(contentId));
+    } catch (err) {
+      toast.error(`Could not draft social posts: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyText(text, what) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(`${what} copied`);
+    } catch {
+      toast.error("Could not copy — select the text and copy it manually.");
+    }
+  }
+
+  const thread = copy?.twitter_thread ?? [];
+  return (
+    <div className="panel space-y-3 p-5">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-ink-900">Social posts</h2>
+        <button className="btn-quiet -mr-2.5" onClick={draftCopy} disabled={busy}>
+          {busy ? "Drafting…" : copy ? "Draft again" : "Draft social posts"}
+        </button>
+      </div>
+      {!copy && (
+        <p className="text-xs text-ink-400">
+          A thread and a LinkedIn post from this piece, to paste where Pulse cannot post for you.
+        </p>
+      )}
+      {copy?.is_fallback && (
+        <p className="text-xs text-warn">
+          No AI provider was available, so this is a plain split of the piece. Edit before posting.
+        </p>
+      )}
+      {thread.length > 0 && (
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-xs font-medium text-ink-500">Thread ({thread.length})</h3>
+            <button
+              className="btn-quiet -mr-2.5 text-xs"
+              onClick={() => copyText(thread.join("\n\n"), "Thread")}
+            >
+              Copy thread
+            </button>
+          </div>
+          <ol className="space-y-1.5">
+            {thread.map((post, i) => (
+              <li key={i} className="rounded bg-canvas px-2 py-1.5 text-xs text-ink-800">
+                {post}
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+      {copy?.linkedin_post && (
+        <div>
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-xs font-medium text-ink-500">LinkedIn</h3>
+            <button
+              className="btn-quiet -mr-2.5 text-xs"
+              onClick={() => copyText(copy.linkedin_post, "LinkedIn post")}
+            >
+              Copy post
+            </button>
+          </div>
+          <p className="whitespace-pre-wrap rounded bg-canvas px-2 py-1.5 text-xs text-ink-800">
+            {copy.linkedin_post}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

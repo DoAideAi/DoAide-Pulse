@@ -46,6 +46,7 @@ vi.mock("../lib/api", () => ({
     unscheduleContent: vi.fn(),
     scheduleSuggestions: vi.fn(),
     platformCheck: vi.fn(),
+    repurposeContent: vi.fn(),
     publishContent: vi.fn(),
     listRevisions: vi.fn(),
     restoreRevision: vi.fn(),
@@ -1441,6 +1442,40 @@ describe("a piece autopilot published by itself", () => {
     await open({ status: "published", source: { kind: "manual" } });
 
     expect(screen.queryByText(/published by autopilot/)).not.toBeInTheDocument();
+  });
+});
+
+describe("social posts drafted from the piece", () => {
+  it("drafts a thread and a LinkedIn post on request, and copies them", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue();
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    api.repurposeContent.mockResolvedValue({
+      twitter_thread: ["1/ Pulse retries now.", "2/ With backoff."],
+      linkedin_post: "We made retries boring.",
+      is_fallback: false,
+    });
+    await open();
+
+    expect(api.repurposeContent).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Draft social posts" }));
+
+    expect(await screen.findByText("1/ Pulse retries now.")).toBeInTheDocument();
+    expect(screen.getByText("We made retries boring.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Copy thread" }));
+    expect(writeText).toHaveBeenCalledWith("1/ Pulse retries now.\n\n2/ With backoff.");
+    expect(screen.getByRole("button", { name: "Draft again" })).toBeInTheDocument();
+  });
+
+  it("says when it is the mechanical fallback", async () => {
+    const user = userEvent.setup();
+    api.repurposeContent.mockResolvedValue({
+      twitter_thread: ["Saved body"], linkedin_post: "Saved excerpt", is_fallback: true,
+    });
+    await open();
+
+    await user.click(screen.getByRole("button", { name: "Draft social posts" }));
+    expect(await screen.findByText(/No AI provider was available/)).toBeInTheDocument();
   });
 });
 

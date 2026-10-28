@@ -256,6 +256,9 @@ export const api = {
   // What each platform will refuse or quietly change about this piece — a
   // title over Dev.to's limit, a post Bluesky will shorten, tags dropped —
   // before anything is sent. Changes nothing.
+  // A thread and a LinkedIn post drafted from the piece, for the platforms
+  // Pulse cannot post to itself. Nothing is saved.
+  repurposeContent: (id) => request(`/content/${id}/repurpose`, { method: "POST" }),
   platformCheck: (id, platforms, asDraft = false) =>
     request(
       `/content/${id}/platform-check${qs({ platforms: platforms.join(","), as_draft: asDraft ? "true" : null })}`,
