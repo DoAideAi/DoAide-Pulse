@@ -41,6 +41,7 @@ import contextlib
 import email.utils
 import logging
 import random
+import re
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -578,6 +579,7 @@ class Adapter(ABC):
         but only when replaying the call cannot change the outcome — see
         :func:`_is_retryable`. Pass ``retries=0`` to opt one call out.
         """
+        _require_sendable_headers(self.display_name, headers)
         budget = settings.publish_request_retries if retries is None else retries
         attempt = 0
 
@@ -811,6 +813,32 @@ def _is_retryable(
 
     # No response: retry only when we know the request never got out.
     return isinstance(error.__cause__, httpx.ConnectError | httpx.ConnectTimeout)
+
+
+#: What may appear in an HTTP header value: visible ASCII, space and tab.
+_HEADER_VALUE = re.compile(r"[\t\x20-\x7e]*")
+
+
+def _require_sendable_headers(display_name: str, headers: dict[str, str] | None) -> None:
+    """Refuse a header value HTTP cannot carry, before anything is sent.
+
+    Header values are mostly credentials pasted into a form. A token with a
+    non-ASCII character in it (a curly quote from a password manager, a
+    lookalike letter) made httpx raise ``UnicodeEncodeError`` — not an
+    ``HTTPError``, so verifying the connection was a 500 and publishing fell to
+    the "unexpected error" catch-all. A CR or LF failed later, in the
+    transport, as a protocol error the retry policy read as a network blip and
+    replayed until the budget ran out. Either way the credential can never
+    work, which is a :class:`CredentialError`: terminal, and worded so the user
+    knows to re-paste it. The value itself is not quoted back.
+    """
+    for name, value in (headers or {}).items():
+        if not _HEADER_VALUE.fullmatch(str(value)):
+            raise CredentialError(
+                f"{display_name}: a stored credential contains characters that "
+                f"cannot be sent in an HTTP header ({name}). Paste it again — "
+                "a stray line break or a typographic character is the usual cause."
+            )
 
 
 def _outcome_unknown(
