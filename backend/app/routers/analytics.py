@@ -20,6 +20,7 @@ from app.schemas.analytics import (
     DigestSendOut,
     EngagementTrendPointOut,
     FeatureUsageOut,
+    FunnelOut,
     OverviewOut,
     PipelineOut,
     PlatformStatsOut,
@@ -31,7 +32,7 @@ from app.schemas.analytics import (
     VelocitySummaryOut,
 )
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
-from app.services import accounts, alerts, analytics_service, digest, feature_usage, mailer, velocity
+from app.services import accounts, alerts, analytics_service, digest, feature_usage, funnel, mailer, velocity
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -65,6 +66,26 @@ def features(
     recorded that no feature claims, so a new endpoint cannot go uncounted
     unnoticed. See :mod:`app.services.feature_usage`."""
     return feature_usage.usage(db, user.id, days=days)
+
+
+@router.get(
+    "/funnel",
+    response_model=FunnelOut,
+    summary="How far recent pieces got: written, reviewed, approved, published",
+    responses=errors(*AUTHENTICATED),
+)
+def content_funnel(
+    days: int = Query(default=90, ge=1, le=365),
+    stale_days: int = Query(
+        default=funnel.DEFAULT_STALE_DAYS, ge=1, le=90,
+        description="Days untouched in draft or review before a piece counts as stuck.",
+    ),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """The content funnel for pieces written in the last ``days``, overall and
+    by origin, with the pieces that have stalled. See :mod:`app.services.funnel`."""
+    return funnel.funnel(db, user.id, days=days, stale_days=stale_days)
 
 
 @router.get(

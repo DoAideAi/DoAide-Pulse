@@ -613,6 +613,52 @@ class FeatureUsageOut(BaseModel):
     unmapped_actions: list[UnmappedActionOut] = []
 
 
+class FunnelStepsOut(BaseModel):
+    """Cumulative funnel counts: each step includes everything past it."""
+
+    written: int
+    reached_review: int
+    approved: int
+    published: int
+    #: Archived without ever going out — rejected or withdrawn.
+    dropped: int
+    #: Step-to-step conversion; ``None`` when the step before is empty.
+    review_rate: float | None
+    approval_rate: float | None
+    publish_rate: float | None
+    overall_rate: float | None
+
+
+class FunnelOriginOut(FunnelStepsOut):
+    """The funnel for pieces from one origin (manual, autopilot, trigger, ...)."""
+
+    origin: str
+
+
+class StuckContentOut(BaseModel):
+    """A piece sitting in draft or review longer than the stale threshold."""
+
+    content_id: int
+    title: str
+    status: str
+    origin: str
+    idle_days: float
+
+
+class FunnelOut(BaseModel):
+    """How far the pieces written in the window got, and which have stalled."""
+
+    days: int
+    stale_days: int
+    overall: FunnelStepsOut
+    by_origin: list[FunnelOriginOut]
+    median_hours_to_publish: float | None
+    stuck_in_draft: int
+    stuck_in_review: int
+    #: The longest-idle stuck pieces, at most twenty.
+    stuck: list[StuckContentOut]
+
+
 class SubscriberGrowthOut(BaseModel):
     """Newsletter audience growth for the analytics page.
 
