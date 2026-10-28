@@ -51,7 +51,7 @@ def metrics(
         ge=1,
         le=720,
         description=(
-            "The window for the LLM section, in hours. Capped at 30 days "
+            "The window for the LLM section and webhook outcomes, in hours. Capped at 30 days "
             "because that is the default retention on the usage table — ask "
             "for more and the answer is bounded by the purge, not by the "
             "question. The other sections are all-time and ignore this."

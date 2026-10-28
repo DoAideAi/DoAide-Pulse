@@ -196,15 +196,46 @@ class BreakersOut(BaseModel):
     )
 
 
+class WebhookHealthOut(BaseModel):
+    """This account's outbound webhooks: the delivery queue and its failures."""
+
+    endpoints: int
+    failing_endpoints: int = Field(description="Endpoints whose last delivery failed.")
+    disabled_endpoints: int = Field(
+        description="Endpoints switched off, by hand or after repeated failures."
+    )
+    pending: int = Field(description="Deliveries waiting to be sent or retried — the queue depth.")
+    overdue: int = Field(
+        description="Pending deliveries whose next attempt is already past — a stopped sweep."
+    )
+    delivered: int = Field(description="Delivered, of those queued in the window.")
+    failed: int = Field(description="Given up on, of those queued in the window.")
+
+
+class TriggerHealthOut(BaseModel):
+    """This account's triggers, and how many are failing or turned themselves off."""
+
+    total: int
+    active: int
+    failing: int = Field(description="Active triggers with at least one failure in a row.")
+    disabled_by_failures: int = Field(
+        description="Inactive triggers that still carry a failure count."
+    )
+
+
 class MetricsOut(BaseModel):
     """The operational picture: how the install is running, not how posts did."""
 
     window_hours: int = Field(
-        description="The window the LLM section covers. The rest is all-time."
+        description=(
+            "The window the LLM section and webhook outcomes cover. The rest is all-time."
+        )
     )
     content: ContentCountsOut
     projects: list[ProjectScanOut]
     publishing: PublishRatesOut
+    webhooks: WebhookHealthOut
+    triggers: TriggerHealthOut
     llm: LLMUsageOut
     breakers: BreakersOut
 
@@ -219,4 +250,6 @@ __all__ = [
     "ProviderUsageOut",
     "PublishRatesOut",
     "PurposeUsageOut",
+    "TriggerHealthOut",
+    "WebhookHealthOut",
 ]

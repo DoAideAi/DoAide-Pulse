@@ -37,6 +37,7 @@ part that crosses the process boundary.
 """
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 
 from sqlalchemy import case, func, select
@@ -46,6 +47,8 @@ from app.models.content import Content, ContentStatus
 from app.models.mixins import as_aware, utcnow
 from app.models.project import Project
 from app.models.publication import Publication, PublicationStatus
+from app.models.trigger import Trigger
+from app.models.webhook import DeliveryStatus, Webhook, WebhookDelivery
 from app.services import llm_router, llm_usage
 from app.services.publishers import breaker as publishers_breaker
 
@@ -245,6 +248,119 @@ def _rate(published: int, failed: int) -> float | None:
     return round(published / settled, 4)
 
 
+def webhook_section(db: Session, user_id: int, *, hours: int) -> dict[str, Any]:
+    """This account's outbound webhooks: what is waiting, and what has failed.
+
+    ``pending`` is the delivery queue depth — rows the sweep has yet to send or
+    is backing off on — and ``overdue`` the part of it whose next attempt has
+    already come and gone, which is what a stopped sweep leaves behind.
+    Delivered and failed are over the window, by when the delivery was queued:
+    an all-time failure count only grows, and "is it failing now" is the
+    question. ``failing_endpoints`` counts endpoints whose last delivery
+    failed, ``disabled_endpoints`` the ones switched off — by hand or by the
+    auto-disable after repeated failures, which until now said so only in the
+    journal.
+    """
+    since = utcnow() - timedelta(hours=hours)
+    endpoints = db.execute(
+        select(
+            func.count(Webhook.id),
+            func.sum(case((Webhook.consecutive_failures > 0, 1), else_=0)),
+            func.sum(case((Webhook.is_active.is_(False), 1), else_=0)),
+        ).where(Webhook.user_id == user_id)
+    ).one()
+    deliveries = db.execute(
+        select(
+            func.sum(case((WebhookDelivery.status == DeliveryStatus.PENDING, 1), else_=0)),
+            func.sum(
+                case(
+                    (
+                        (WebhookDelivery.status == DeliveryStatus.PENDING)
+                        & (WebhookDelivery.next_attempt_at < utcnow()),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
+            func.sum(
+                case(
+                    (
+                        (WebhookDelivery.status == DeliveryStatus.DELIVERED)
+                        & (WebhookDelivery.created_at >= since),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
+            func.sum(
+                case(
+                    (
+                        (WebhookDelivery.status == DeliveryStatus.FAILED)
+                        & (WebhookDelivery.created_at >= since),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ),
+        )
+        .join(Webhook, Webhook.id == WebhookDelivery.webhook_id)
+        .where(Webhook.user_id == user_id)
+    ).one()
+    total, failing, disabled = (int(v or 0) for v in endpoints)
+    pending, overdue, delivered, failed = (int(v or 0) for v in deliveries)
+    return {
+        "endpoints": total,
+        "failing_endpoints": failing,
+        "disabled_endpoints": disabled,
+        "pending": pending,
+        "overdue": overdue,
+        "delivered": delivered,
+        "failed": failed,
+    }
+
+
+def trigger_section(db: Session, user_id: int) -> dict[str, Any]:
+    """This account's triggers, and how many are failing or were switched off.
+
+    A trigger that cannot fetch its feed fails on every sweep, and after
+    ``trigger_disable_after_failures`` of them it turns itself off. Both were on
+    the trigger's own row and nowhere a person looking at the install would see
+    them together, so a project quietly stopped hearing about releases.
+    ``failing`` is active triggers with at least one failure in a row;
+    ``disabled_by_failures`` is inactive ones that still carry their count,
+    which is how an auto-disable differs from a person pausing one.
+    """
+    total, active, failing, disabled = (
+        int(v or 0)
+        for v in db.execute(
+            select(
+                func.count(Trigger.id),
+                func.sum(case((Trigger.is_active.is_(True), 1), else_=0)),
+                func.sum(
+                    case(
+                        ((Trigger.is_active.is_(True)) & (Trigger.consecutive_failures > 0), 1),
+                        else_=0,
+                    )
+                ),
+                func.sum(
+                    case(
+                        ((Trigger.is_active.is_(False)) & (Trigger.consecutive_failures > 0), 1),
+                        else_=0,
+                    )
+                ),
+            )
+            .join(Project, Project.id == Trigger.project_id)
+            .where(Project.user_id == user_id)
+        ).one()
+    )
+    return {
+        "total": total,
+        "active": active,
+        "failing": failing,
+        "disabled_by_failures": disabled,
+    }
+
+
 def llm_section(db: Session, *, hours: int) -> dict[str, Any]:
     """Token spend, per-provider and per-purpose, plus average generation time.
 
@@ -288,6 +404,8 @@ def build(db: Session, user_id: int, *, hours: int) -> dict[str, Any]:
         "content": content_counts(db, user_id),
         "projects": scan_frequency(db, user_id),
         "publishing": publish_rates(db, user_id),
+        "webhooks": webhook_section(db, user_id, hours=hours),
+        "triggers": trigger_section(db, user_id),
         "llm": llm_section(db, hours=hours),
         "breakers": breaker_section(),
     }
@@ -300,4 +418,6 @@ __all__ = [
     "llm_section",
     "publish_rates",
     "scan_frequency",
+    "trigger_section",
+    "webhook_section",
 ]
