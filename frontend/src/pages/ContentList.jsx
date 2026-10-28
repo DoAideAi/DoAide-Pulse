@@ -510,6 +510,9 @@ function ReviewContentCard({ item, selected, onToggle, onApproved }) {
             type="checkbox"
             checked={selected}
             onChange={onToggle}
+            // The label wraps nothing but the box, so without this a screen
+            // reader announced a row of identical unnamed checkboxes.
+            aria-label={`Select “${item.title}”`}
             className="h-4 w-4 rounded border-line-strong text-brand-500"
           />
         </label>

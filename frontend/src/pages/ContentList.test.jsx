@@ -429,6 +429,21 @@ describe("review mode", () => {
     expect(api.updateContent).toHaveBeenCalledWith(42, { status: "draft" });
   });
 
+  it("names each review card's checkbox after its piece", async () => {
+    api.listContent.mockResolvedValue([
+      item({ id: 1, status: "review" }),
+      item({ id: 2, title: "Second", status: "review" }),
+    ]);
+    drawReview();
+
+    expect(
+      await screen.findByRole("checkbox", {
+        name: "Select “A retry budget that outlasts the outage”",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select “Second”" })).toBeInTheDocument();
+  });
+
   it("calls bulkReject for selected items when Reject selected is clicked", async () => {
     api.listContent.mockResolvedValue([
       item({ id: 1, status: "review" }),
