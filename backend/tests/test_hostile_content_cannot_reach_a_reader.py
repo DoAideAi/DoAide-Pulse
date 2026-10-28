@@ -163,7 +163,7 @@ def outgoing(monkeypatch):
             200, json={}, request=httpx.Request(method, "https://platform.test/api")
         )
 
-    monkeypatch.setattr(base.httpx, "request", fake_request)
+    monkeypatch.setattr(base, "_exchange", fake_request)
     return calls
 
 
@@ -438,7 +438,7 @@ def test_a_markdown_destination_receives_the_body_as_written():
         )
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(base.httpx, "request", fake_request)
+    monkeypatch.setattr(base, "_exchange", fake_request)
     try:
         with contextlib.suppress(PublishError):
             adapter.publish(_HOSTILE_REQUEST, {"api_key": "k"})

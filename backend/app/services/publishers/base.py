@@ -596,7 +596,7 @@ class Adapter(ABC):
         checked a host that never received the request.
         """
         if not self.user_supplied_host:
-            return _capped(httpx.request(
+            return _exchange(
                 method,
                 url,
                 headers=headers,
@@ -604,14 +604,14 @@ class Adapter(ABC):
                 params=params,
                 timeout=settings.publish_timeout_seconds,
                 follow_redirects=True,
-            ))
+            )
 
         current = url
         hop_method = method
         hop_body = json_body
         for _ in range(_MAX_REDIRECTS):
             self._require_public_url(current)
-            response = _capped(httpx.request(
+            response = _exchange(
                 hop_method,
                 current,
                 headers=headers,
@@ -619,7 +619,7 @@ class Adapter(ABC):
                 params=params,
                 timeout=settings.publish_timeout_seconds,
                 follow_redirects=False,
-            ))
+            )
             if not response.is_redirect:
                 return response
             following = response.next_request
@@ -808,14 +808,45 @@ def _retry_after(resp: httpx.Response) -> float | None:
     return max(0.0, (when - datetime.now(UTC)).total_seconds())
 
 
-def _capped(resp: httpx.Response) -> httpx.Response:
-    """Truncate the body to :data:`_MAX_RESPONSE_BYTES` so a platform error page
-    cannot fill the worker's heap.  Success bodies are typically small JSON;
-    error bodies can be megabytes of HTML from a misbehaving proxy.
+#: How long one exchange may take in all, as a multiple of the per-operation
+#: timeout. httpx's ``timeout`` bounds each read, not the response: a server
+#: that sends a byte every nine seconds never trips a ten-second read timeout.
+_DEADLINE_FACTOR = 3
+
+
+def _exchange(
+    method: str, url: str, *, timeout: float, follow_redirects: bool, **kwargs: Any
+) -> httpx.Response:
+    """One HTTP request, its body read to at most :data:`_MAX_RESPONSE_BYTES`.
+
+    ``httpx.request`` signature, so it is a drop-in at both call sites in
+    :meth:`Adapter._send` — and the one seam tests replace.
+
+    Streamed, because the cap used to be applied *after* ``httpx.request`` had
+    read the whole body: a self-hosted WordPress or Ghost answering with a
+    multi-gigabyte error page filled the worker's heap before anything was
+    truncated. And under one overall deadline, because a body dripped slowly
+    enough held a publish worker for hours. Past the deadline the exchange
+    raises ``ReadTimeout``, which the retry policy already treats as a timeout.
     """
-    if len(resp.content) > _MAX_RESPONSE_BYTES:
-        resp._content = resp.content[:_MAX_RESPONSE_BYTES]
-    return resp
+    deadline = time.monotonic() + timeout * _DEADLINE_FACTOR
+    with httpx.stream(
+        method, url, timeout=timeout, follow_redirects=follow_redirects, **kwargs
+    ) as response:
+        chunks: list[bytes] = []
+        total = 0
+        for chunk in response.iter_bytes():
+            chunks.append(chunk)
+            total += len(chunk)
+            if total >= _MAX_RESPONSE_BYTES:
+                break
+            if time.monotonic() > deadline:
+                raise httpx.ReadTimeout(
+                    f"response took longer than {timeout * _DEADLINE_FACTOR:.0f}s",
+                    request=response.request,
+                )
+        response._content = b"".join(chunks)[:_MAX_RESPONSE_BYTES]
+    return response
 
 
 def _sleep(seconds: float) -> None:

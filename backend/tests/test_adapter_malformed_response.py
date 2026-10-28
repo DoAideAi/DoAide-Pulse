@@ -71,7 +71,7 @@ def transport(monkeypatch):
 
     def install(response):
         monkeypatch.setattr(
-            base.httpx, "request", lambda method, url, **kwargs: response
+            base, "_exchange", lambda method, url, **kwargs: response
         )
 
     return install

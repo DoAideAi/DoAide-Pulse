@@ -76,7 +76,7 @@ def requests(monkeypatch):
                 raise AssertionError(f"unexpected extra request to {url}")
             return queued.pop(0)
 
-        monkeypatch.setattr(base.httpx, "request", fake_request)
+        monkeypatch.setattr(base, "_exchange", fake_request)
         return seen
 
     return install
@@ -353,7 +353,7 @@ def test_a_constant_host_adapter_lets_httpx_follow_redirects(monkeypatch):
         seen.append(kwargs["follow_redirects"])
         return _response(200, {"username": "ada"})
 
-    monkeypatch.setattr(base.httpx, "request", fake_request)
+    monkeypatch.setattr(base, "_exchange", fake_request)
     monkeypatch.setattr(
         link_check, "_unreachable_for_a_reader", lambda url: pytest.fail("resolved")
     )

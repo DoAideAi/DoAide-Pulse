@@ -68,7 +68,7 @@ def transport(monkeypatch):
                 200, json=body, request=httpx.Request(method, url)
             )
 
-        monkeypatch.setattr(base.httpx, "request", _respond)
+        monkeypatch.setattr(base, "_exchange", _respond)
 
     return install
 

@@ -391,8 +391,8 @@ def test_a_redirect_with_nowhere_to_go_is_handed_back_rather_than_guessed_at(
     """A 3xx with no ``Location``. Inventing a destination would be worse."""
     monkeypatch.setattr(link_check, "_unreachable_for_a_reader", lambda url: None)
     monkeypatch.setattr(
-        base.httpx,
-        "request",
+        base,
+        "_exchange",
         lambda method, url, **kwargs: httpx.Response(
             302, request=httpx.Request(method, url)
         ),

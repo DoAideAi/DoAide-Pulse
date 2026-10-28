@@ -335,7 +335,7 @@ def test_an_announced_outage_parks_the_row_until_the_platform_is_back(
             request=httpx.Request(method, url),
         )
 
-    monkeypatch.setattr(base.httpx, "request", fake_request)
+    monkeypatch.setattr(base, "_exchange", fake_request)
     monkeypatch.setattr(base, "_sleep", lambda seconds: pytest.fail(
         f"slept {seconds}s against a platform that asked for {announced}s"
     ))

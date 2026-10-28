@@ -175,7 +175,7 @@ def recorder(monkeypatch):
                 raise outcome
             return outcome
 
-        monkeypatch.setattr(base.httpx, "request", fake_request)
+        monkeypatch.setattr(base, "_exchange", fake_request)
         return calls
 
     return install
