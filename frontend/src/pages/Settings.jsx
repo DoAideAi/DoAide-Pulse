@@ -739,23 +739,7 @@ function WebhooksSection() {
       )}
 
       {secret && (
-        <Dialog label="Signing secret" onClose={() => setSecret(null)}>
-          <h2 className="font-display text-2xl text-ink-900">Signing secret</h2>
-          <p className="text-sm text-ink-700">
-            Copy this now — it will not be shown again.
-          </p>
-          <input
-            readOnly
-            className="input font-mono text-xs"
-            value={secret}
-            onFocus={(e) => e.target.select()}
-          />
-          <div className="flex justify-end pt-1">
-            <button className="btn-primary" onClick={() => setSecret(null)}>
-              Done
-            </button>
-          </div>
-        </Dialog>
+        <OneTimeSecret title="Signing secret" value={secret} onClose={() => setSecret(null)} />
       )}
     </section>
   );
@@ -1040,25 +1024,7 @@ function ApiKeysSection() {
         />
       )}
 
-      {token && (
-        <Dialog label="API token" onClose={() => setToken(null)}>
-          <h2 className="font-display text-2xl text-ink-900">API token</h2>
-          <p className="text-sm text-ink-700">
-            Copy this now — it will not be shown again.
-          </p>
-          <input
-            readOnly
-            className="input font-mono text-xs"
-            value={token}
-            onFocus={(e) => e.target.select()}
-          />
-          <div className="flex justify-end pt-1">
-            <button className="btn-primary" onClick={() => setToken(null)}>
-              Done
-            </button>
-          </div>
-        </Dialog>
-      )}
+      {token && <OneTimeSecret title="API token" value={token} onClose={() => setToken(null)} />}
     </section>
   );
 }
@@ -1341,5 +1307,61 @@ function CredentialInput({ field, value, onChange, autoFocus, placeholder }) {
         <p className="mt-1 text-xs text-ink-400">{field.help_text}</p>
       )}
     </div>
+  );
+}
+
+/**
+ * A secret the server shows exactly once.
+ *
+ * It had no copy button and no label, and the dialog closed on Escape or a
+ * stray click on the backdrop — after which the secret was gone and the only
+ * way back was to rotate it. Until it has been copied, only the explicit
+ * button closes the dialog (still a keyboard-reachable control, so nothing is
+ * trapped).
+ */
+export function OneTimeSecret({ title, value, onClose }) {
+  const [copied, setCopied] = useState(null);
+  const fieldId = `secret-${title.toLowerCase().replace(/\W+/g, "-")}`;
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied("ok");
+    } catch {
+      setCopied("failed");
+      document.getElementById(fieldId)?.select();
+    }
+  }
+
+  return (
+    <Dialog label={title} onClose={onClose} closable={copied === "ok"}>
+      <h2 id={`${fieldId}-title`} className="font-display text-2xl text-ink-900">
+        {title}
+      </h2>
+      <p className="text-sm text-ink-700">Copy this now — it will not be shown again.</p>
+      <div className="flex gap-2">
+        <input
+          id={fieldId}
+          aria-labelledby={`${fieldId}-title`}
+          readOnly
+          className="input flex-1 font-mono text-xs"
+          value={value}
+          onFocus={(e) => e.target.select()}
+        />
+        <button type="button" className="btn-ghost" onClick={copy}>
+          {copied === "ok" ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <p role="status" aria-live="polite" className="min-h-[1rem] text-xs text-ink-500">
+        {copied === "ok" && "Copied to the clipboard."}
+        {copied === "failed" &&
+          "Your browser blocked clipboard access — the value is selected, press Ctrl+C (⌘C) to copy it."}
+      </p>
+      <div className="flex justify-end pt-1">
+        <button type="button" className="btn-primary" onClick={onClose}>
+          {copied === "ok" ? "Done" : "I've saved it"}
+        </button>
+      </div>
+    </Dialog>
   );
 }
