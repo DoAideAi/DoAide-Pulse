@@ -918,7 +918,7 @@ def execute(db: Session, publication: Publication) -> Publication:
             field="external_id",
         )
         publication.external_url = _recorded(
-            result.external_url,
+            _web_link(result.external_url),
             EXTERNAL_URL_MAX_LENGTH,
             publication=publication,
             field="external_url",
@@ -940,6 +940,24 @@ def execute(db: Session, publication: Publication) -> Publication:
         result.external_url,
     )
     return publication
+
+
+def _web_link(value: object) -> str | None:
+    """*value* if it is an absolute ``http(s)`` URL, else ``None``.
+
+    ``external_url`` is rendered as an ``href`` on the content page and the
+    published-links list, and for WordPress, Mastodon and Bluesky it is whatever
+    the server the user named put in its response. A ``javascript:`` link there
+    was a script one click away inside Pulse, and a non-string (a JSON object
+    where a URL belongs) failed the commit that records the post as published —
+    the duplicate-publish path :func:`_recorded` describes.
+    """
+    if not isinstance(value, str):
+        return None
+    url = value.strip()
+    if not url.lower().startswith(("http://", "https://")):
+        return None
+    return url
 
 
 def _recorded(
@@ -1078,8 +1096,8 @@ def _adopt_canonical(
     if publication.as_draft:
         return
 
-    url = (result.external_url or "").strip()
-    if not url.startswith(("http://", "https://")):
+    url = _web_link(result.external_url)
+    if url is None:
         return
     # ``external_url`` is String(700) and ``canonical_url`` is String(500), so a
     # URL a platform happily returned can be one this column cannot hold. That

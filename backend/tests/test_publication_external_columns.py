@@ -149,3 +149,51 @@ def test_the_piece_still_reads_as_published(db, content, connected, monkeypatch)
     # An over-long URL is not adopted as the canonical either — it never was,
     # but it must not arrive there through the dropped field as an empty string.
     assert content.canonical_url is None
+
+
+@pytest.mark.parametrize(
+    "hostile",
+    [
+        "javascript:alert(document.cookie)",
+        "  JavaScript:alert(1)",
+        "data:text/html,<script>alert(1)</script>",
+        "//evil.example/x",
+    ],
+)
+def test_a_permalink_that_is_not_a_web_link_is_not_stored(
+    db, content, connected, monkeypatch, hostile
+):
+    """``external_url`` becomes an ``href`` in the editor and the links list.
+
+    A server the user named answering with a ``javascript:`` link must not turn
+    into a script one click away inside Pulse.
+    """
+    _publishes(monkeypatch, external_id="9", external_url=hostile)
+
+    publication = publishing_service.queue(db, content, ["devto"])[0]
+    publishing_service.execute(db, publication)
+
+    assert publication.status == PublicationStatus.PUBLISHED
+    assert publication.external_url is None
+
+
+def test_a_permalink_that_is_not_a_string_does_not_fail_the_publish(
+    db, content, connected, monkeypatch
+):
+    """A JSON object where the URL belongs must not roll back the commit."""
+    _publishes(monkeypatch, external_id="9", external_url={"href": "x"})
+
+    publication = publishing_service.queue(db, content, ["devto"])[0]
+    publishing_service.execute(db, publication)
+
+    assert publication.status == PublicationStatus.PUBLISHED
+    assert publication.external_url is None
+
+
+def test_a_web_permalink_is_kept(db, content, connected, monkeypatch):
+    _publishes(monkeypatch, external_id="9", external_url=" https://dev.to/a/b ")
+
+    publication = publishing_service.queue(db, content, ["devto"])[0]
+    publishing_service.execute(db, publication)
+
+    assert publication.external_url == "https://dev.to/a/b"
