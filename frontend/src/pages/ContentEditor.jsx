@@ -1318,11 +1318,17 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
                 {!locked && (
                   <button
                     type="button"
-                    className="absolute -right-1 -top-1 hidden rounded-full bg-bad p-0.5 text-white shadow group-hover:block"
+                    className="absolute -right-1 -top-1 rounded-full bg-bad p-0.5 text-white shadow sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                     onClick={() => removeGalleryImage(index)}
                     title="Remove image"
+                    aria-label={`Remove marketing image ${index + 1}`}
                   >
-                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l6 6M9 3l-6 6"/></svg>
+                    {/* Always in the DOM: ``hidden group-hover:block`` took it out
+                        until a mouse hovered, so a keyboard could not reach it and a
+                        phone — which cannot hover — could never remove an image.
+                        Shown outright on touch-sized screens; elsewhere revealed by
+                        hover or by focus, so tabbing to it shows it. */}
+                    <svg aria-hidden="true" className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l6 6M9 3l-6 6"/></svg>
                   </button>
                 )}
               </div>

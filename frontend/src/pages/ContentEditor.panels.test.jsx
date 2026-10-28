@@ -200,6 +200,21 @@ describe("the SEO panel", () => {
       expect(order()).toEqual([urls[1], urls[2], urls[0]]);
     });
 
+    it("removes an image with a named button a keyboard can reach", async () => {
+      // It was ``hidden`` until a mouse hovered: no tab stop, and nothing at
+      // all on a phone, which cannot hover.
+      const user = userEvent.setup();
+      await open({ marketing_images: urls });
+
+      const remove = screen.getByRole("button", { name: "Remove marketing image 2" });
+      expect(remove).not.toHaveClass("hidden");
+      remove.focus();
+      expect(remove).toHaveFocus();
+      await user.keyboard("{Enter}");
+
+      expect(order()).toEqual([urls[0], urls[2]]);
+    });
+
     it("offers no reordering for a single image", async () => {
       await open({ marketing_images: [urls[0]] });
 
