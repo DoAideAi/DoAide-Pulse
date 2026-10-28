@@ -30,6 +30,7 @@ def submit_sitemaps() -> dict:
         failed = [r.site_key for r in rows if r.fetch_error or r.submit_status == "error"]
         if failed:
             logger.warning("sitemaps: problems on %s", ", ".join(failed))
+        logger.info("sitemaps: %d checked, %d with problems", len(rows), len(failed))
         return {"checked": len(rows), "problems": failed}
     finally:
         db.close()
@@ -47,7 +48,18 @@ def audit_meta_tags() -> dict:
     try:
         rows = meta_audit.run(db)
         seo_history.record_snapshot(db)
-        return {"audited": len(rows), "issues": sum(r.issue_count for r in rows)}
+        issues = sum(r.issue_count for r in rows)
+        # A site whose sitemap could not be read was stored with its error and
+        # nothing else said so: the audit then covers one page and reports it
+        # clean, which reads as good news. Named here like the sitemap sweep's.
+        failed = [r.site_key for r in rows if r.error]
+        if failed:
+            logger.warning("meta audit: problems on %s", ", ".join(failed))
+        logger.info(
+            "meta audit: %d site(s), %d issue(s), %d with problems",
+            len(rows), issues, len(failed),
+        )
+        return {"audited": len(rows), "issues": issues}
     finally:
         db.close()
 
