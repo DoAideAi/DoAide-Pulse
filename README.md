@@ -213,6 +213,10 @@ what happens if you leave it blank. The ones that matter:
 | `SMTP_HOST` | Blank means no email is sent: a password reset logs only that a message was dropped (its subject, never the link — the link is a credential). `/health` shows whether mail is configured. |
 | `AUTOPILOT_AUTO_PUBLISH_CONFIDENCE` | The bar for publishing without review. Default 0.8. |
 
+When something fails, [`docs/ERRORS.md`](docs/ERRORS.md) explains each error
+message — HTTP answers and the errors shown on a publication that did not go
+out — with what causes it and what to do.
+
 `GET /api/v1/health` reports which of these are set, and the Settings page shows
 the same thing in English. It also probes Postgres and Redis and answers **503**
 when a required one is down — the reverse proxy uses it as a health check, so
