@@ -19,6 +19,9 @@ from app.tasks.celery_app import task
 
 logger = logging.getLogger(__name__)
 
+#: Consecutive refusals that mean the mail server, not the recipients.
+SMTP_DOWN_AFTER = 3
+
 
 @task(
     name="app.tasks.digest_tasks.send_weekly_digests",
@@ -45,6 +48,7 @@ def send_weekly_digests() -> dict:
     db = SessionLocal()
     sent = 0
     considered = 0
+    refused_in_a_row = 0
     try:
         users = list(
             db.scalars(
@@ -73,9 +77,12 @@ def send_weekly_digests() -> dict:
                 continue
             delivered = False
             try:
-                delivered = digest.send(db, user)
+                delivered = digest.send(db, user, strict=True)
                 if delivered:
                     sent += 1
+                    refused_in_a_row = 0
+            except digest.MailerRefused:
+                refused_in_a_row += 1
             except SoftTimeLimitExceeded:
                 logger.warning(
                     "digest sweep timed out after %d of %d", considered, len(users)
@@ -99,6 +106,17 @@ def send_weekly_digests() -> dict:
                     except Exception:
                         db.rollback()
                         logger.exception("could not release digest claim for user %s", user_id)
+            if refused_in_a_row >= SMTP_DOWN_AFTER:
+                # The mailer swallows every SMTP error, so the task's own
+                # ``autoretry_for`` never saw one: a mail server that blipped at
+                # 09:00 on the send day cost every subscriber their week, one
+                # 15-second timeout each. Raised as the ConnectionError the
+                # retry is declared for; the users already mailed hold their
+                # claim and are skipped when it runs again.
+                raise ConnectionError(
+                    f"SMTP refused {refused_in_a_row} digests in a row; "
+                    f"stopping after {sent} sent of {considered} considered"
+                )
     finally:
         db.close()
 

@@ -80,7 +80,7 @@ def test_a_digest_sweep_that_runs_out_of_time_keeps_what_it_sent(
 ):
     sent: list[int] = []
 
-    def _send(session, who):
+    def _send(session, who, **_kwargs):
         if len(sent) == 1:
             raise SoftTimeLimitExceeded()
         sent.append(who.id)
@@ -104,7 +104,7 @@ def test_a_digest_sweep_does_not_retry_the_user_it_timed_out_on(
     """
     attempts: list[int] = []
 
-    def _send(session, who):
+    def _send(session, who, **_kwargs):
         attempts.append(who.id)
         raise SoftTimeLimitExceeded()
 
@@ -124,7 +124,7 @@ def test_one_users_digest_failing_does_not_stop_the_others(
     """
     seen: list[int] = []
 
-    def _send(session, who):
+    def _send(session, who, **_kwargs):
         seen.append(who.id)
         if len(seen) == 1:
             raise RuntimeError("that user's metrics are a mess")

@@ -612,12 +612,17 @@ def render_html(digest: Digest) -> str:
     return "".join(parts)
 
 
+class MailerRefused(RuntimeError):
+    """The week had something in it and the mailer would not send it."""
+
+
 def send(
     db: Session,
     user: User,
     *,
     now: datetime | None = None,
     prebuilt: Digest | None = None,
+    strict: bool = False,
 ) -> bool:
     """Build and send one user's digest. Returns whether anything was sent.
 
@@ -633,18 +638,25 @@ def send(
     email does not carry. The preview endpoint exists so that what the UI shows
     and what lands in the inbox cannot drift; this is the same promise for the
     send button.
+
+    *strict* raises :class:`MailerRefused` instead of returning ``False`` when
+    the mailer refuses, so the weekly sweep can tell "nothing to say" from
+    "SMTP is down" — the mailer swallows every transport error by design.
     """
     digest = prebuilt if prebuilt is not None else build(db, user, now=now)
     if digest.is_empty:
         logger.info("digest for user %s skipped: nothing happened this week", user.id)
         return False
 
-    return mailer.send(
+    delivered = mailer.send(
         to=user.email,
         subject=digest.subject,
         body=render_text(digest),
         html=render_html(digest),
     )
+    if strict and not delivered:
+        raise MailerRefused(f"the mailer refused user {user.id}'s digest")
+    return delivered
 
 
 #: The shortest gap between two weekly digests to one person. A week less a
@@ -695,6 +707,7 @@ def release_week(db: Session, user_id: int, claimed: datetime, previous: datetim
 __all__ = [
     "MIN_INTERVAL",
     "Digest",
+    "MailerRefused",
     "Movement",
     "build",
     "claim_week",
