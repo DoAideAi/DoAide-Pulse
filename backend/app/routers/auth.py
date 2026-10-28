@@ -35,7 +35,7 @@ from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models.user import User
-from app.ratelimit import client_key, limiter
+from app.ratelimit import client_key, limiter, login_locked, record_login_failure
 from app.routers._patch import reject_nulls
 from app.schemas.auth import (
     MessageOut,
@@ -204,6 +204,18 @@ def login(
     # OAuth2PasswordRequestForm uses ``username``; we treat it as the email, and
     # match it the way a mailbox is addressed rather than as a case-sensitive
     # string — see :mod:`app.services.accounts`.
+    #
+    # First, though, the per-account budget: the per-IP limit on this route
+    # does nothing against guesses spread across many addresses. Checked before
+    # bcrypt so a locked address costs no hashing, and keyed on what was
+    # submitted so an unknown address answers exactly as a locked one does.
+    if login_locked(form.username):
+        _refused(request, "too many failed sign-ins for this address")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed sign-ins for this account. Wait a while and "
+            "try again, or reset your password.",
+        )
     user = accounts.find_by_email(db, form.username)
 
     # Always run bcrypt even when the user does not exist — otherwise the
@@ -213,6 +225,7 @@ def login(
     # one, because a dummy that is cheaper (or dearer) than the real hashes
     # re-opens that difference from the other side — see :func:`dummy_hash`.
     if not verify_password(form.password, user.hashed_password if user else dummy_hash()):
+        record_login_failure(form.username)
         _refused(
             request,
             "no such account" if user is None else f"wrong password for user {user.id}",

@@ -56,8 +56,10 @@ Two deployment details shape the configuration:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 
+from limits import parse_many
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
@@ -66,6 +68,8 @@ from starlette.responses import JSONResponse, Response
 
 from app.config import settings
 from app.security import decode_access_token
+
+logger = logging.getLogger(__name__)
 
 
 def client_key(request: Request) -> str:
@@ -205,6 +209,54 @@ limiter = PulseLimiter(
 )
 
 
+# ---- failed sign-ins per account ------------------------------------------ #
+
+#: Counted against the same storage as every other limit, so two workers share
+#: one budget and a restart does not reset it.
+_LOGIN_FAILURES = parse_many(settings.rate_limit_login_failures_per_account)
+
+
+def _account_bucket(email: str) -> str:
+    """The submitted address as a storage key, hashed.
+
+    Keyed on what was *submitted*, not on whether an account has it, so a
+    locked-out address and an unknown one answer alike. Hashed so the counter
+    store does not become a list of every address anyone tried.
+    """
+    normalized = (email or "").strip().lower()[:320]
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def login_locked(email: str) -> bool:
+    """Whether *email* has spent its failed-sign-in budget for now.
+
+    Fails open, like the rest of the limiter (``swallow_errors``): a Redis
+    outage must not lock the owner out of their own instance.
+    """
+    if not limiter.enabled:
+        return False
+    key = _account_bucket(email)
+    try:
+        return not all(
+            limiter._limiter.test(item, "login-failures", key) for item in _LOGIN_FAILURES
+        )
+    except Exception:  # noqa: BLE001 - storage errors fail open
+        logger.warning("login failure counter unavailable; not enforcing", exc_info=True)
+        return False
+
+
+def record_login_failure(email: str) -> None:
+    """Count one failed sign-in against *email*'s budget."""
+    if not limiter.enabled:
+        return
+    key = _account_bucket(email)
+    try:
+        for item in _LOGIN_FAILURES:
+            limiter._limiter.hit(item, "login-failures", key)
+    except Exception:  # noqa: BLE001 - storage errors fail open
+        logger.warning("login failure counter unavailable; not recorded", exc_info=True)
+
+
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """429 in FastAPI's shape.
 
@@ -233,6 +285,8 @@ __all__ = [
     "client_key",
     "PulseLimiter",
     "limiter",
+    "login_locked",
     "rate_limit_exceeded_handler",
+    "record_login_failure",
     "reset",
 ]

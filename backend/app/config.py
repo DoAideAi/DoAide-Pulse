@@ -154,6 +154,11 @@ class Settings(BaseSettings):
     # Per-endpoint budgets. Any format `limits` understands, including several
     # windows separated by ";" ("10/minute;100/hour").
     rate_limit_login: str = "10/minute;100/hour"
+    # Failed sign-ins per *account*, whatever address they come from. The
+    # per-IP limit above does nothing against guesses spread over many
+    # addresses, and Pulse has one account worth guessing at. Counted on
+    # failures only, so the owner signing in normally never spends from it.
+    rate_limit_login_failures_per_account: str = "20/hour"
     rate_limit_register: str = "5/hour"
     rate_limit_password_reset: str = "5/hour"
     rate_limit_auth_read: str = "60/minute"
