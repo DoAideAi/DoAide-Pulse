@@ -23,6 +23,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import settings
+from app import openapi_docs
 from app.logging_config import configure_logging, redact_path, request_id_var
 from app.ratelimit import limiter, rate_limit_exceeded_handler
 from app.routers import (
@@ -528,6 +529,10 @@ def create_app() -> FastAPI:
         )
 
     app.add_exception_handler(Exception, _unhandled_exception)
+
+    # The shared listing parameters (limit, offset, days, …) get descriptions
+    # generated from their own bounds — see ``app.openapi_docs``.
+    openapi_docs.install(app)
 
     # A database that cannot be reached is not a bug, and saying "something went
     # wrong on our end" sent people to report one — while the useful facts are

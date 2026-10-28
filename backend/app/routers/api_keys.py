@@ -102,7 +102,10 @@ def list_scopes(request: Request, response: Response) -> list[ApiKeyScopeOut]:
 def list_api_keys(
     response: Response,
     project_id: QueryRowId | None = Query(default=None),
-    include_revoked: bool = Query(default=False),
+    include_revoked: bool = Query(
+        default=False,
+        description="Also list revoked keys. Expired keys are listed either way.",
+    ),
     limit: int = Query(default=100, ge=1, le=500),
     offset: ListOffset = 0,
     db: Session = Depends(get_db),

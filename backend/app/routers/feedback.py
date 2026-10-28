@@ -110,7 +110,7 @@ def submit_feedback(
 )
 def list_feedback(
     response: Response,
-    category: FeedbackCategory | None = None,
+    category: FeedbackCategory | None = Query(default=None, description="Only feedback of this kind."),
     feature: str | None = Query(
         default=None,
         max_length=FEATURE_MAX_LENGTH,

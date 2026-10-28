@@ -686,7 +686,11 @@ def list_ideas(
     project_id: RowId,
     request: Request,
     response: Response,
-    refresh: bool = False,
+    refresh: bool = Query(
+        default=False,
+        description="Ask the model for fresh ideas (one LLM call, rate-limited). "
+        "Without it this is a free read of the ideas already banked.",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[IdeaOut]:

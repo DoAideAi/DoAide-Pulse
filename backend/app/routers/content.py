@@ -471,10 +471,14 @@ def list_content(
     response: Response,
     project_id: QueryRowId | None = None,
     status_filter: ContentStatus | None = Query(default=None, alias="status"),
-    content_type: ContentType | None = None,
+    content_type: ContentType | None = Query(default=None, description="Only pieces of this type."),
     # Matched case-insensitively against the title. Bounded so a pasted essay
     # does not become a pattern the database has to compile.
-    q: str | None = Query(default=None, max_length=200),
+    q: str | None = Query(
+        default=None,
+        max_length=200,
+        description="Case-insensitive substring of the title.",
+    ),
     # ``ge=1`` as well as ``le``: every other paginated endpoint here bounds
     # both ends, and this one bounded only the top. A negative ``limit`` reaches
     # SQLAlchemy's ``.limit()`` verbatim, and the two databases disagree about
@@ -1406,7 +1410,9 @@ def generate_headline_variants(
     content_id: RowId,
     request: Request,
     response: Response,
-    count: int = Query(default=4, ge=2, le=6),
+    count: int = Query(
+        default=4, ge=2, le=6, description="How many alternative headlines to draft."
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> HeadlineVariantsOut:
@@ -2480,7 +2486,11 @@ def _canonical_platform(content: Content) -> Platform | None:
 )
 def schedule_suggestions(
     content_id: RowId,
-    platforms: list[Platform] | None = Query(default=None),
+    platforms: list[Platform] | None = Query(
+        default=None,
+        description="Repeat for several (`?platforms=devto&platforms=mastodon`). "
+        "Omit for where the piece is already queued, else every connected platform.",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[SlotOut]:

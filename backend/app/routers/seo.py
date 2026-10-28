@@ -324,7 +324,11 @@ def link_suggestions(
     responses=errors(*AUTHENTICATED, status.HTTP_400_BAD_REQUEST),
 )
 def optimal_slots(
-    platforms: list[Platform] | None = Query(default=None),
+    platforms: list[Platform] | None = Query(
+        default=None,
+        description="Repeat for several (`?platforms=devto&platforms=mastodon`). "
+        "Omit for every connected platform.",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[SlotOut]:

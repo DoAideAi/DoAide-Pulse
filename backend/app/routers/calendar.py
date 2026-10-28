@@ -40,8 +40,16 @@ router = APIRouter(prefix="/calendar", tags=["calendar"])
     responses=errors(status.HTTP_400_BAD_REQUEST, *OWNED),
 )
 def get_calendar(
-    start: datetime | None = None,
-    end: datetime | None = None,
+    start: datetime | None = Query(
+        default=None,
+        description="Start of the window (ISO 8601). With neither bound the window is "
+        "30 days either side of now; with only one, it runs 60 days from it.",
+    ),
+    end: datetime | None = Query(
+        default=None,
+        description="End of the window (ISO 8601). Before `start` is a 400, not an "
+        "empty calendar.",
+    ),
     project_id: QueryRowId | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -355,7 +363,11 @@ def reschedule(
     responses=errors(*AUTHENTICATED),
 )
 def cadence_guide(
-    platform: Platform | None = Query(default=None),
+    platform: Platform | None = Query(
+        default=None,
+        description="One platform's guidance. Omit for every connected platform "
+        "(every platform when none is connected).",
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[CadenceGuideOut]:
@@ -424,8 +436,12 @@ def _owned_idea(idea_id: int, db: Session, user: User) -> tuple[ContentIdea, Pro
     responses=errors(status.HTTP_400_BAD_REQUEST, *AUTHENTICATED),
 )
 def calendar_ideas(
-    start: date | None = None,
-    end: date | None = None,
+    start: date | None = Query(
+        default=None, description="First planned day included (YYYY-MM-DD); default 30 days ago."
+    ),
+    end: date | None = Query(
+        default=None, description="Last planned day included (YYYY-MM-DD)."
+    ),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> CalendarIdeasOut:
