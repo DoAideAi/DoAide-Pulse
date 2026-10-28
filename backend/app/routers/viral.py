@@ -9,11 +9,12 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, lazyload
 
 from app.config import settings
 from app.database import get_db
 from app.models.content import Content, ContentStatus
+from app.models.project import Project
 from app.models.subscriber import Subscriber
 from app.ratelimit import limiter
 from app.schemas.errors import ErrorOut, errors
@@ -52,8 +53,16 @@ def get_public_article(
 ) -> PublicArticleOut:
     """Fetch a published article by slug. Unauthenticated."""
     logger.debug("article view: slug=%s", slug)
+    # One statement. Plain ``select(Content)`` was three on the page every
+    # shared link lands on: the row, then the ``lazy="selectin"`` publications
+    # this response never reads, then a lazy load of the project for its name.
     content = db.scalar(
-        select(Content).where(
+        select(Content)
+        .options(
+            lazyload(Content.publications),
+            joinedload(Content.project).load_only(Project.name),
+        )
+        .where(
             Content.slug == slug,
             Content.status == ContentStatus.PUBLISHED,
         )
@@ -169,11 +178,12 @@ def generate_content_ideas(
             detail="Content idea generation is temporarily unavailable. The AI service is not configured.",
         )
 
+    niche = json.dumps(payload.niche, ensure_ascii=False)
     prompt = (
         f"You are an expert content strategist. Generate {payload.count} unique, "
         # ``json.dumps`` so the niche stays one quoted string: a quote or a
         # newline in it used to close the quotes and start instructions of its own.
-        f"engaging content ideas for the niche: {json.dumps(payload.niche, ensure_ascii=False)}.\n\n"
+        f"engaging content ideas for the niche: {niche}.\n\n"
         "For each idea, provide:\n"
         "- title: A compelling headline\n"
         "- hook: A one-sentence hook explaining why readers would care\n"

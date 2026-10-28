@@ -681,3 +681,43 @@ def test_the_rss_feed_does_not_read_an_article_body(client, db, user, sql_log):
     assert len(_selects(sql_log, "content")) == 1, "\n".join(
         s[:200] for s in _selects(sql_log, "content")
     )
+
+
+def test_a_public_article_is_one_query(client, db, user, sql_log):
+    """The page every shared link lands on.
+
+    Plain ``select(Content)`` came back as three statements: the row, the
+    ``lazy="selectin"`` publications the response never reads, and a lazy load
+    of the project for its name.
+    """
+    project = Project(
+        user_id=user.id, name="Shared", slug="shared", description="d", tone=Tone.TECHNICAL
+    )
+    db.add(project)
+    db.flush()
+    content = Content(
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        status=ContentStatus.PUBLISHED,
+        title="Out now",
+        slug="out-now",
+        body_markdown="Body.",
+        published_at=datetime.now(UTC),
+    )
+    db.add(content)
+    db.flush()
+    db.add(
+        Publication(
+            content_id=content.id, platform=Platform.DEVTO, status=PublicationStatus.PUBLISHED
+        )
+    )
+    db.commit()
+    db.expire_all()
+
+    sql_log.clear()
+    resp = client.get("/api/v1/articles/out-now")
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["project_name"] == "Shared"
+    selects = [s for s in sql_log if s.startswith("SELECT")]
+    assert len(selects) == 1, "\n".join(s[:200] for s in selects)
