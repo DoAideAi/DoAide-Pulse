@@ -52,8 +52,26 @@ def get_calendar(
     the rhythm, enough future to plan into. Published items are included but
     flagged ``movable=False`` — you cannot reschedule the past.
     """
-    window_start = as_aware(start) if start else (utcnow() - timedelta(days=30))
-    window_end = as_aware(end) if end else (utcnow() + timedelta(days=30))
+    # A bound that is not given is measured from the one that is, so ``start``
+    # alone two months out is that window and not one that ends before it
+    # begins. With neither given, both of these are the month either side of now.
+    default_span = timedelta(days=60)
+    if start and not end:
+        window_start = as_aware(start)
+        window_end = window_start + default_span
+    elif end and not start:
+        window_end = as_aware(end)
+        window_start = window_end - default_span
+    else:
+        window_start = as_aware(start) if start else (utcnow() - timedelta(days=30))
+        window_end = as_aware(end) if end else (utcnow() + timedelta(days=30))
+
+    # An inverted window used to be an empty calendar with a 200 — read by the
+    # page as "nothing scheduled", which is the one wrong answer that looks right.
+    if window_end < window_start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="end is before start."
+        )
 
     # Cap the window so a careless or malicious request doesn't scan years of
     # publications into memory.
