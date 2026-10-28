@@ -299,6 +299,20 @@ def test_the_sweep_releases_a_piece_approved_before_the_fix(db, auto_project, mo
     assert db.query(Publication).count() == 2
 
 
+def test_the_sweep_releases_a_full_mode_project_too(db, auto_project, monkeypatch):
+    """``full`` publishes without asking as ``auto`` does, and ``release_approved``
+    accepts both — but the sweep selected only ``auto``, so a ``full`` project's
+    approved piece was never handed to it (C104 M3)."""
+    monkeypatch.setattr(publish_tasks, "SessionLocal", lambda: db)
+    monkeypatch.setattr(db, "close", lambda: None)
+    auto_project.autopilot_mode = AutopilotMode.FULL
+    db.commit()
+    _content(db, auto_project, status=ContentStatus.APPROVED)
+
+    assert publish_tasks.release_approved_content() == {"found": 1, "released": 1}
+    assert db.query(Publication).count() == 2
+
+
 def test_the_sweep_ignores_a_piece_that_is_already_queued(db, auto_project, monkeypatch):
     monkeypatch.setattr(publish_tasks, "SessionLocal", lambda: db)
     monkeypatch.setattr(db, "close", lambda: None)

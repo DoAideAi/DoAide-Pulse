@@ -343,7 +343,7 @@ def release_approved_content() -> dict:
     a future endpoint that forgets.
 
     :func:`app.services.content_pipeline.release_approved` decides — it queues
-    only for an active project on ``auto`` with destinations configured, and
+    only for an active project on ``auto`` or ``full`` with destinations configured, and
     only for a piece that has no publications at all.
     """
     db = SessionLocal()
@@ -372,7 +372,11 @@ def release_approved_content() -> dict:
                     Content.status == ContentStatus.APPROVED,
                     Project.is_active.is_(True),
                     User.is_active.is_(True),
-                    Project.autopilot_mode == AutopilotMode.AUTO,
+                    # Both modes that publish without asking — the set
+                    # ``release_approved`` itself accepts. Selecting only
+                    # ``auto`` here meant a ``full`` project's approved piece
+                    # was never handed to it, and sat approved for good (C104 M3).
+                    Project.autopilot_mode.in_((AutopilotMode.AUTO, AutopilotMode.FULL)),
                     Publication.id.is_(None),
                 )
                 # ``release_approved`` re-reads ``content.project`` and
