@@ -11,7 +11,6 @@ Checks added by the H034 improvement round:
 """
 from __future__ import annotations
 
-import re
 
 import pytest
 from fastapi.routing import APIRoute

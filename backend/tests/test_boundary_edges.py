@@ -1563,7 +1563,7 @@ class TestIsRestatementThresholds:
     """Near-threshold similarity checks."""
 
     def test_exactly_at_threshold(self):
-        from app.services.dedup import SIMILARITY_THRESHOLD, is_restatement
+        from app.services.dedup import SIMILARITY_THRESHOLD
 
         existing = frozenset({"a", "b", "c", "d", "e"})
         candidate_tokens = frozenset({"a", "b", "c", "d", "f"})

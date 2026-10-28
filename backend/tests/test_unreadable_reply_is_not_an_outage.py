@@ -163,7 +163,6 @@ def test_a_total_outage_still_holds_the_watermark_and_writes_nothing(
         raise ai.AIError("All LLM providers failed: openrouter 429; gemini 429")
 
     monkeypatch.setattr(content_generator.ai, "json_completion", _down)
-    monkeypatch.setattr(content_generator.ai, "chat_completion", _down)
     stub_github["set"](make_activity(commits=30, head="new-head"))
 
     result = autopilot_tasks.scan_project(armed.id)

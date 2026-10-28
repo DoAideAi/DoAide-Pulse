@@ -525,8 +525,6 @@ def test_check_absorbs_a_mark_checked_failure(db, writing_project, monkeypatch):
     trigger.state = {"seen_ids": ["e1", "e2"]}
     db.commit()
 
-    original = triggers._mark_checked
-
     def exploding_mark(session, trig, error=None):
         raise RuntimeError("commit failed")
 

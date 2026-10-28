@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import pytest
 from sqlalchemy import select
 
 from app.models.content import Content, ContentStatus, ContentType
@@ -61,7 +60,6 @@ def _published(db, project, index=0, *, platform=Platform.DEVTO, scheduled_for=N
 def test_due_publications_has_a_limit(db, project):
     """The query must carry a LIMIT so a large backlog does not load the whole
     table into memory."""
-    from datetime import timedelta
 
     now = utcnow()
     for i in range(5):

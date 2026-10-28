@@ -12,7 +12,6 @@ the response that creates it and the one that rotates it, and in no other.
 """
 from __future__ import annotations
 
-import re
 from datetime import datetime
 from typing import Any
 

@@ -146,7 +146,7 @@ def test_more_variables_than_a_template_may_declare_is_refused():
 # --------------------------------------------------------------------------- #
 
 
-def test_a_declared_variable_can_be_looked_up_by_name(db, user):
+def test_declared_variable_names_skip_malformed_entries(db, user):
     template = ContentTemplate(
         user_id=user.id,
         name="T",
@@ -160,8 +160,6 @@ def test_a_declared_variable_can_be_looked_up_by_name(db, user):
     db.add(template)
     db.commit()
 
-    assert template.variable("headline")["required"] is True
-    assert template.variable("absent") is None
     assert template.variable_names == ["headline"]
 
 
@@ -172,5 +170,4 @@ def test_a_template_with_no_variables_declares_none(db, user):
     db.add(template)
     db.commit()
 
-    assert template.variable("anything") is None
     assert template.variable_names == []

@@ -373,7 +373,7 @@ class AllProvidersFailed(RuntimeError):
     """Every configured provider failed or was skipped.
 
     Callers should fall back to their own deterministic template.
-    :func:`app.services.ai.chat_completion` converts this into ``AIError`` so
+    :func:`app.services.ai.chat_completion_detailed` converts this into ``AIError`` so
     the existing handlers at every call site keep working unchanged.
     """
 

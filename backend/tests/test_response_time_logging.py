@@ -24,7 +24,6 @@ def test_server_error_is_logged_as_warning(client, caplog):
     """A 500 is worth a log line even when it is fast."""
     with caplog.at_level(logging.WARNING, logger="app.main"):
         client.get("/api/v1/analytics/overview")
-    lines = [r for r in caplog.records if "server error" in r.message or r.levelno >= logging.WARNING]
     # The endpoint returns 401 (not authenticated), not 500 — so no server
     # error line. This proves the guard only fires on real 5xx.
     assert not any("server error" in r.message for r in caplog.records)

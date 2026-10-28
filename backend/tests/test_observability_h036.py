@@ -148,8 +148,6 @@ def test_link_check_logs_broken_summary(_no_dns, caplog):
 
 
 def test_link_check_logs_all_ok_at_debug(_no_dns, monkeypatch, caplog):
-    original_check = link_check.check_url
-
     def _always_ok(url, *, client):
         return link_check.LinkStatus(url, link_check.OK, http_status=200)
 

@@ -18,7 +18,6 @@ from app.models.revision import ContentRevision, RevisionSource
 from app.models.template import ContentTemplate, TemplateMode
 from app.models.translation import ContentTranslation, TranslationStatus
 from app.models.trigger import Trigger, TriggerEvent, TriggerKind
-from app.models.user import User
 from app.models.webhook import Webhook, WebhookDelivery, WebhookEvent
 
 

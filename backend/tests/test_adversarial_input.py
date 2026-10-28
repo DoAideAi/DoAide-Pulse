@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.models.project import Project, Tone
+from app.models.project import Project
 from app.models.content import Content, ContentStatus, ContentType
 
 

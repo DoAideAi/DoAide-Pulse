@@ -871,14 +871,11 @@ def test_sync_title_preserves_partial_outcomes_on_late_failure(db, piece, monkey
     """If the third publication's sync crashes, the first two outcomes survive."""
     from app.services.headline_sync import SyncOutcome
 
-    pubs = [
-        _publication(db, piece, Platform.DEVTO, external_id="ext-1"),
-        _publication(db, piece, Platform.WORDPRESS, external_id="ext-2"),
-        _publication(db, piece, Platform.HASHNODE, external_id="ext-3"),
-    ]
+    _publication(db, piece, Platform.DEVTO, external_id="ext-1")
+    _publication(db, piece, Platform.WORDPRESS, external_id="ext-2")
+    _publication(db, piece, Platform.HASHNODE, external_id="ext-3")
 
     call_count = {"n": 0}
-    real_sync_one = headline_sync._sync_one
 
     def explode_on_third(session, content, publication, user_id):
         call_count["n"] += 1

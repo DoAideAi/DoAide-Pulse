@@ -37,7 +37,7 @@ from __future__ import annotations
 # Imported at runtime, not under TYPE_CHECKING: SQLAlchemy 2.0 resolves the
 # `Mapped[...]` annotations at class-definition time and needs the real name.
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -140,13 +140,6 @@ class ContentTemplate(Base, TimestampMixin):
     use_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     user: Mapped[User] = relationship(back_populates="templates")
-
-    def variable(self, name: str) -> dict[str, Any] | None:
-        """One declared variable by name, or None."""
-        for entry in self.variables or []:
-            if isinstance(entry, dict) and entry.get("name") == name:
-                return entry
-        return None
 
     @property
     def variable_names(self) -> list[str]:

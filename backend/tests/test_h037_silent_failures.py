@@ -22,8 +22,8 @@ from app.models.content import Content, ContentStatus, ContentType
 from app.models.mixins import utcnow
 from app.models.project import AutopilotMode
 from app.models.publication import Platform, Publication, PublicationStatus
-from app.models.trigger import Trigger, TriggerEvent, TriggerEventStatus, TriggerKind
-from app.models.webhook import DeliveryStatus, Webhook, WebhookDelivery, WebhookEvent
+from app.models.trigger import Trigger, TriggerEventStatus, TriggerKind
+from app.models.webhook import Webhook, WebhookDelivery, WebhookEvent
 from app.services import (
     content_pipeline,
     headline_sync,

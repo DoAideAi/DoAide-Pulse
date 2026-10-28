@@ -1,7 +1,6 @@
 """Tests for the SEO preflight gate and scoring logic."""
 from __future__ import annotations
 
-import pytest
 
 from app.services.seo import seo_score
 

@@ -224,7 +224,6 @@ def test_dashboard_fewer_queries_than_before(db, user, project):
 
     with _QueryCounter(db) as qc:
         analytics_service.dashboard_summary(db, user.id)
-    old_separate_review_query_count = 1
     # The review count is folded into _status_counts, so the total should
     # be strictly less than it would be with one extra query on top.
     assert qc.count >= 1  # sanity: at least one query ran

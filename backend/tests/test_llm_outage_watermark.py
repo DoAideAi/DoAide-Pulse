@@ -34,7 +34,6 @@ def no_provider(monkeypatch):
         raise ai.AIError("All LLM providers failed: openrouter 429; gemini 429")
 
     monkeypatch.setattr(content_generator.ai, "json_completion", _down)
-    monkeypatch.setattr(content_generator.ai, "chat_completion", _down)
 
 
 @pytest.fixture

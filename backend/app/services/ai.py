@@ -1,7 +1,8 @@
 """The single entry point every AI feature calls, plus the text-hygiene helpers.
 
-:func:`chat_completion` delegates to :mod:`app.services.llm_router`, which tries
-OpenRouter, Gemini, Groq and Cerebras in order before giving up. Callers catch
+:func:`chat_completion_detailed` and :func:`json_completion` delegate to
+:mod:`app.services.llm_router`, which tries OpenRouter, Gemini, Groq and
+Cerebras in order before giving up. Callers catch
 :class:`AIError` and fall back to a deterministic template.
 
 We only ever use free-tier models (never Anthropic directly). Everything is
@@ -472,9 +473,9 @@ def chat_completion_detailed(
 ) -> llm_router.Completion:
     """Run the provider chain and return the text *plus* who served it.
 
-    Use this over :func:`chat_completion` when the caller wants to record which
-    model produced a piece of text — content rows do, so the analytics page can
-    answer "does the 120b model actually write better posts?".
+    The text comes back with the provider and model that produced it, which
+    content rows record so the analytics page can answer "does the 120b model
+    actually write better posts?".
 
     *fallback_models* names siblings of *model* to try on the same provider
     before moving to the next one. Free-tier quotas are metered per model, so a
@@ -494,32 +495,6 @@ def chat_completion_detailed(
         )
     except llm_router.AllProvidersFailed as exc:
         raise AIError(str(exc)) from exc
-
-
-def chat_completion(
-    messages: list[dict[str, str]],
-    *,
-    model: str | None = None,
-    fallback_models: tuple[str, ...] | list[str] = (),
-    temperature: float = 0.7,
-    max_tokens: int = 1200,
-    timeout: float = 90.0,
-    purpose: str = "",
-) -> str:
-    """Get a completion from the first provider in the chain that works.
-
-    Raises :class:`AIError` if no provider is configured or all of them fail —
-    the caller's cue to fall back to its own static template.
-    """
-    return chat_completion_detailed(
-        messages,
-        model=model,
-        fallback_models=fallback_models,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        timeout=timeout,
-        purpose=purpose,
-    ).text
 
 
 def json_completion(

@@ -135,12 +135,6 @@ def test_github_error_hides_api_path(client, auth, project, monkeypatch):
 def test_unhandled_500_hides_exception_message(client, auth, monkeypatch):
     from app.routers import misc
 
-    original_root = None
-    for route in _app.routes:
-        if hasattr(route, "endpoint") and getattr(route, "path", "") == "/":
-            original_root = route.endpoint
-            break
-
     def _boom():
         raise RuntimeError("SELECT * FROM users WHERE password='hunter2'")
 

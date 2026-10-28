@@ -177,7 +177,7 @@ def test_no_keys_means_the_chain_gives_up_immediately():
 
 def test_ai_error_wraps_chain_failure():
     with pytest.raises(ai.AIError):
-        ai.chat_completion([{"role": "user", "content": "hi"}])
+        ai.chat_completion_detailed([{"role": "user", "content": "hi"}])
 
 
 def test_providers_are_ordered_and_keyless_ones_skipped(monkeypatch):

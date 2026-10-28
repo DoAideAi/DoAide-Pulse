@@ -8,7 +8,6 @@ Three integration points now cap response bodies:
 from __future__ import annotations
 
 import httpx
-import pytest
 
 from app.services import webhooks
 from app.services.publishers import base
