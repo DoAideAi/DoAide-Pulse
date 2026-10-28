@@ -199,9 +199,29 @@ def storage_uri(config=settings) -> str:
     return "memory://"
 
 
+def storage_options(uri: str, config=settings) -> dict[str, float]:
+    """Socket timeouts for a Redis counter store, or nothing for any other.
+
+    ``swallow_errors`` below only helps once the client *raises*. A Redis that
+    refuses connections raises at once; one that is hung, or behind a network
+    that drops packets, raised nothing, because redis-py's default is no timeout
+    at all — every limited request (nearly all of them, login included) sat in
+    the OS's TCP connect timeout, a minute or more, before failing open. The
+    Celery broker on the same server already had its 2-second bound; this is the
+    limiter's. ``memory://`` takes no such options and would refuse them.
+    """
+    if not uri.startswith(("redis://", "rediss://", "redis+", "unix://")):
+        return {}
+    timeout = config.rate_limit_storage_timeout_seconds
+    return {"socket_connect_timeout": timeout, "socket_timeout": timeout}
+
+
+_STORAGE_URI = storage_uri()
+
 limiter = PulseLimiter(
     key_func=client_key,
-    storage_uri=storage_uri(),
+    storage_uri=_STORAGE_URI,
+    storage_options=storage_options(_STORAGE_URI),
     enabled=settings.rate_limit_enabled,
     headers_enabled=True,
     # A dead Redis must not take the login page down with it: on a storage

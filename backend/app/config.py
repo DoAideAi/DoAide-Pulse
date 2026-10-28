@@ -146,6 +146,11 @@ class Settings(BaseSettings):
     # in-process memory in development; see app.ratelimit.storage_uri. Set it
     # (e.g. ``redis://localhost:6379/3``) to give the limiter its own db.
     rate_limit_storage_uri: str = ""
+    # How long one counter read or write may wait on that Redis before the
+    # limiter gives up and lets the request through (``swallow_errors``). Nearly
+    # every route is limited, so this is added to every request while Redis is
+    # hung rather than down; see app.ratelimit.storage_options.
+    rate_limit_storage_timeout_seconds: float = 0.5
     # Pulse sits behind Caddy, so ``request.client.host`` is always the proxy.
     # With this on, the *rightmost* X-Forwarded-For entry is used instead — the
     # one Caddy appended, i.e. the peer it actually saw. A client-supplied
