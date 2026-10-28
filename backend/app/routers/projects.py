@@ -19,6 +19,7 @@ from fastapi import (
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only, selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.database import get_db
@@ -283,7 +284,10 @@ async def draft_from_documents(
         # whole thing first would buffer whatever size the client chose.
         data = await upload.read(project_import.MAX_FILE_BYTES + 1)
         try:
-            text = project_import.extract_text(filename, data)
+            # Off the event loop: a PDF is the uploader's to construct, and one
+            # built to be slow for pypdf stalled every request this worker was
+            # serving, not just this one.
+            text = await run_in_threadpool(project_import.extract_text, filename, data)
         except project_import.DocumentError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         documents.append(project_import.ExtractedDocument(filename=filename, text=text))
@@ -291,8 +295,6 @@ async def draft_from_documents(
     # The model call is blocking; keep it off the event loop. The context is
     # copied explicitly so the acting user (and their own LLM key) goes with it.
     import contextvars
-
-    from starlette.concurrency import run_in_threadpool
 
     context = contextvars.copy_context()
     draft = await run_in_threadpool(context.run, project_import.draft_project, documents)

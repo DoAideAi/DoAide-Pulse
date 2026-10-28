@@ -255,3 +255,29 @@ def test_draft_route_is_not_swallowed_by_the_project_id_route(client, auth):
     resp = client.post("/api/v1/projects/draft-from-documents", headers=auth)
     assert resp.status_code != 405
     assert resp.status_code in (400, 422)
+
+
+def test_documents_are_parsed_off_the_event_loop(client, auth, monkeypatch):
+    """A PDF is the uploader's to construct, and pypdf on a hostile one can be
+    slow; parsed on the loop, that stalled every request the worker held."""
+    import asyncio
+
+    real = project_import.extract_text
+    seen = []
+
+    def spy(filename, data):
+        try:
+            asyncio.get_running_loop()
+            seen.append("loop")
+        except RuntimeError:
+            seen.append("thread")
+        return real(filename, data)
+
+    monkeypatch.setattr(project_import, "extract_text", spy)
+    resp = client.post(
+        "/api/v1/projects/draft-from-documents",
+        headers=auth,
+        files=[("files", ("brief.md", BRIEF.encode(), "text/markdown"))],
+    )
+    assert resp.status_code == 200, resp.text
+    assert seen == ["thread"]
