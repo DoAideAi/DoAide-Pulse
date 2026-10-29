@@ -57,6 +57,27 @@ class TestDockerComposeHealthChecks:
         joined = " ".join(test) if isinstance(test, list) else test
         assert "ping" in joined
 
+    def test_redis_never_evicts_the_task_queue(self) -> None:
+        """This Redis is the Celery broker. ``allkeys-lru`` under memory pressure
+        evicted queued tasks — publishes and webhook deliveries silently gone."""
+        command = self.compose["services"]["redis"]["command"]
+        assert "--maxmemory-policy noeviction" in command, command
+
+    def test_the_worker_outlives_the_longest_task_it_can_be_running(self) -> None:
+        """The compose twin of pulse-worker.service's TimeoutStopSec: the weekly
+        meta-tag audit (960s) was killed by a 420s stop grace on every down."""
+        from app.tasks.celery_app import celery_app
+
+        celery_app.loader.import_default_modules()
+        longest = max(
+            task.time_limit or 0
+            for name, task in celery_app.tasks.items()
+            if name.startswith("app.tasks.")
+        )
+        grace = self.compose["services"]["worker"]["stop_grace_period"]
+        assert grace.endswith("s"), grace
+        assert int(grace[:-1]) > longest, (grace, longest)
+
 
 class TestDockerfile:
     @pytest.fixture(autouse=True)
