@@ -671,7 +671,7 @@ describe("every endpoint's path and verb", () => {
     ["deleteTranslation", [3, "hi"], "/content/3/translations/hi", "DELETE"],
     ["acceptTranslation", [3, "hi"], "/content/3/translations/hi/accept", "POST"],
 
-    ["listRevisions", [3], "/content/3/revisions", "GET"],
+    ["listRevisions", [3], "/content/3/revisions?limit=100&offset=0", "GET"],
     ["getRevision", [3, 2], "/content/3/revisions/2", "GET"],
     ["diffRevision", [3, 2], "/content/3/revisions/2/diff", "GET"],
     ["restoreRevision", [3, 2], "/content/3/revisions/2/restore", "POST"],
@@ -972,5 +972,37 @@ describe("publicationQueue", () => {
     expect(queue).toHaveLength(450);
     expect(queue.at(-1).status).toBe("failed");
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("listRevisions", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // Pulse keeps fifty versions of a piece and the history panel said "50
+  // versions" over a list of twenty: the API's default page. Versions 21 to 50
+  // were kept and could not be reached to restore. It reads every page now.
+  it("reads every page until it has every kept version", async () => {
+    const all = Array.from({ length: 50 }, (_, i) => ({ revision: 50 - i }));
+    const fetchMock = vi.fn(async (url) => {
+      const query = new URL(url, "http://x").searchParams;
+      const limit = Number(query.get("limit") || 20);
+      const offset = Number(query.get("offset") || 0);
+      return {
+        ok: true,
+        status: 200,
+        statusText: "",
+        headers: { get: () => null },
+        text: async () =>
+          JSON.stringify({ items: all.slice(offset, offset + limit), total: 50, retained: 50 }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const history = await api.listRevisions(3);
+
+    expect(history.items).toHaveLength(50);
+    expect(history.items.at(-1).revision).toBe(1);
+    expect(history.total).toBe(50);
+    expect(history.retained).toBe(50);
   });
 });

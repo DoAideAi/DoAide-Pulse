@@ -437,8 +437,26 @@ export const api = {
     request(`/content/${contentId}/translations/${language}/accept`, { method: "POST" }),
 
   // ---- revisions ----
-  listRevisions: (contentId, params = {}) =>
-    request(`/content/${contentId}/revisions${qs(params)}`),
+  // Every kept version, page by page. Pulse keeps fifty and the endpoint's
+  // default page is twenty, so the history panel said "50 versions" over a list
+  // of twenty, and versions 21 to 50 could not be reached to restore.
+  listRevisions: async (contentId, params = {}) => {
+    const limit = 100;
+    let first = null;
+    const items = [];
+    for (;;) {
+      const page = await request(
+        `/content/${contentId}/revisions${qs({ ...params, limit, offset: items.length })}`,
+      );
+      // Anything that is not a page is passed on as it came.
+      if (!Array.isArray(page?.items)) return page;
+      first ??= page;
+      items.push(...page.items);
+      if (page.items.length === 0 || items.length >= page.total) {
+        return { ...first, items, total: page.total };
+      }
+    }
+  },
   getRevision: (contentId, revision) =>
     request(`/content/${contentId}/revisions/${revision}`),
   diffRevision: (contentId, revision, against) =>
