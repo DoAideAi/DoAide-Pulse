@@ -10,6 +10,7 @@ import {
   statusBucket,
   summarize,
   visibleEntries,
+  weekdayLabels,
 } from "./calendar";
 
 function entry(overrides = {}) {
@@ -232,5 +233,24 @@ describe("canDropOn", () => {
   it("refuses when there is nothing being dragged", () => {
     expect(canDropOn(null, new Date(2026, 7, 20), { now })).toBe(false);
     expect(canDropOn(undefined, new Date(2026, 7, 20), { now })).toBe(false);
+  });
+});
+
+describe("weekdayLabels", () => {
+  // The month above the grid was written in the reader's language
+  // ("Oktober 2026", "अक्तूबर 2026") while the seven headers under it were a
+  // hardcoded English "Mon … Sun" — one widget, two languages.
+  it("names the days in the same locale as the month, Monday first", () => {
+    expect(weekdayLabels("en-US")).toEqual(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
+    const german = weekdayLabels("de-DE");
+    expect(german).toHaveLength(7);
+    expect(german[0]).toMatch(/^Mo/);
+    expect(german[6]).toMatch(/^So/);
+  });
+
+  it("follows the browser when no locale is named, as the month label does", () => {
+    const expected = new Intl.DateTimeFormat(undefined, { weekday: "short", timeZone: "UTC" })
+      .format(new Date(Date.UTC(2024, 0, 1)));
+    expect(weekdayLabels()[0]).toBe(expected);
   });
 });

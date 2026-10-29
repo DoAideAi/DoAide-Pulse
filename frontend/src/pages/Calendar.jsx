@@ -14,10 +14,12 @@ import {
   platformsIn,
   summarize,
   visibleEntries,
+  weekdayLabels,
 } from "../lib/calendar";
 import { formatDateTime, localDayKey, titleize } from "../lib/format";
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// In the browser's locale, like the month label — see weekdayLabels.
+const WEEKDAYS = weekdayLabels();
 
 /** Monday-first grid covering the whole month plus the padding days. */
 function monthGrid(anchor) {

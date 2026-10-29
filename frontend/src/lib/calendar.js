@@ -139,3 +139,18 @@ export function summarize(entries) {
   }
   return counts;
 }
+
+/**
+ * The seven column headers, Monday first, in *locale* (the browser's when
+ * omitted — the same locale the month label above them is written in).
+ *
+ * They were a hardcoded English "Mon … Sun" under a month name the browser
+ * localised, so a German reader saw "Oktober 2026" over "Mon Tue Wed".
+ * Formatted from a fixed Monday in UTC, so the reader's own timezone cannot
+ * shift any of them onto the neighbouring day.
+ */
+export function weekdayLabels(locale = undefined) {
+  const format = new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" });
+  // 1 January 2024 was a Monday.
+  return Array.from({ length: 7 }, (_, i) => format.format(new Date(Date.UTC(2024, 0, 1 + i))));
+}
