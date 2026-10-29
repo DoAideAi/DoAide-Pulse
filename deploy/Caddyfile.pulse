@@ -19,8 +19,17 @@ pulse.doaide.com {
 	@api path /api/*
 	handle @api {
 		reverse_proxy 172.18.0.1:3006 {
+			# One upstream, so "unhealthy" means "answer every API request
+			# 503". A single poll landing in the second or two a deploy's
+			# restart takes used to mark it down for the full 30s interval —
+			# a short outage on every deploy. Now three misses in a row are
+			# needed, polled every 10s, and a request arriving mid-restart waits
+			# up to 10s for the new process instead of failing.
 			health_uri /api/v1/health
-			health_interval 30s
+			health_interval 10s
+			health_fails 3
+			lb_try_duration 10s
+			lb_try_interval 250ms
 		}
 	}
 

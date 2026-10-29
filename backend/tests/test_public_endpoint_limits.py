@@ -267,15 +267,24 @@ def redis_up(monkeypatch):
 def test_health_leaves_caddy_an_order_of_magnitude_of_headroom():
     """The number is load-bearing in a way the others are not.
 
-    Caddy polls ``/api/v1/health`` every 30s (deploy/Caddyfile.pulse) and pulls
-    the upstream out of the pool when it does not get a 200 — so a limit set
-    below the poll rate would not throttle an attacker, it would take the site
-    down by itself. Two requests a minute against sixty is the margin, and a
-    deploy's health retries share that same bucket.
+    Caddy polls ``/api/v1/health`` (deploy/Caddyfile.pulse) and pulls the
+    upstream out of the pool when it does not get a 200 — so a limit set below
+    the poll rate would not throttle an attacker, it would take the site down
+    by itself. Ten times the poll rate is the margin, and a deploy's health
+    retries share that same bucket. Read from the Caddyfile rather than written
+    here: the interval went from 30s to 10s, and a number copied into this test
+    would have gone on vouching for the old one.
     """
+    import re
+    from pathlib import Path
+
+    caddyfile = (Path(__file__).resolve().parents[2] / "deploy" / "Caddyfile.pulse").read_text()
+    interval = re.search(r"health_interval (\d+)s", caddyfile)
+    assert interval, "the API's reverse_proxy no longer names a health_interval"
+    caddy_polls_per_minute = 60 / int(interval.group(1))
+
     limit, _, window = settings.rate_limit_health.partition("/")
     assert window == "minute"
-    caddy_polls_per_minute = 2
     assert int(limit) >= caddy_polls_per_minute * 10
 
 
@@ -325,3 +334,24 @@ def test_the_constant_lists_still_return_their_contents(client, url):
     body = client.get(url).json()
     assert isinstance(body, list) and body
     assert "request" not in body[0]
+
+
+def test_one_missed_poll_during_a_restart_does_not_take_the_api_out():
+    """With a single upstream, "unhealthy" is "every API request answers 503".
+
+    Caddy marked it down on the first failed poll and kept it down for the
+    whole interval, so a poll landing in the second or two of a deploy's
+    restart meant up to 30s of 503s for everybody — seen after deploys as a
+    run of 503s on /health itself. It now takes three misses in a row, and a
+    request arriving mid-restart waits for the new process rather than failing.
+    """
+    import re
+    from pathlib import Path
+
+    caddyfile = (Path(__file__).resolve().parents[2] / "deploy" / "Caddyfile.pulse").read_text()
+    block = re.search(r"reverse_proxy 172\.18\.0\.1:3006 \{(.*?)\n\t\t\}", caddyfile, re.DOTALL)
+    assert block, "the API's reverse_proxy block was not found"
+    body = block.group(1)
+    fails = re.search(r"health_fails (\d+)", body)
+    assert fails and int(fails.group(1)) >= 2
+    assert re.search(r"lb_try_duration \d+s", body)

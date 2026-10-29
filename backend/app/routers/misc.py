@@ -266,8 +266,8 @@ def health(
 
     Limited despite that, and safely: Caddy's own poll originates from the proxy
     and carries no ``X-Forwarded-For``, so it counts against the proxy's address
-    rather than any visitor's, at two requests a minute against a budget of
-    sixty. Public callers arrive *through* Caddy and are bucketed per visitor by
+    rather than any visitor's, at six requests a minute (every 10s) against a
+    budget of sixty. Public callers arrive *through* Caddy and are bucketed per visitor by
     the rightmost forwarded entry, which is the one they cannot choose. The
     ``request`` parameter is not decoration — slowapi reads the limiter off it.
     """
