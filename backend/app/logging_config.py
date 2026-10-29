@@ -94,7 +94,12 @@ class RequestIDFilter(logging.Filter):
 #: the draft. Both arrive in the path, and every path is logged — by uvicorn's
 #: access log on every request, and by the slow-request and server-error lines
 #: in ``app.main`` — so journald kept a working copy of each.
-_SECRET_PATH = re.compile(r"(/triggers/inbound/|/content/preview/)[^/?#\s]+")
+#: The digest's one-click unsubscribe link carries an HMAC token after the
+#: account id; tests/test_every_credential_in_a_path_is_redacted_from_logs.py
+#: walks the route table so the next such route cannot be left off this list.
+_SECRET_PATH = re.compile(
+    r"(/triggers/inbound/|/content/preview/|/digest/unsubscribe/\d+/)[^/?#\s]+"
+)
 
 
 def redact_path(path: str) -> str:
