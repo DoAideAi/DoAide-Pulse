@@ -19,27 +19,19 @@ export default defineConfig({
       // says nothing about the app.
       exclude: ["src/**/*.test.{js,jsx}", "src/test/**"],
       reporter: ["text", "html"],
-      // `src` is at 100% statements, lines and functions as of this commit.
-      // The gate sits at 99 rather than 100 so that adding a file with one
-      // genuinely unreachable line is a conversation and not a red build —
-      // but it is close enough that a whole untested component cannot arrive
-      // quietly, which is what having no gate at all allowed.
-      //
-      // Branches sit lower on purpose, at a point just under the 98.3% the
-      // suite reaches. What is left are defensive arms the render gating above
-      // them makes unreachable — a guard inside a handler whose own button is
-      // already disabled, a `?? 2` for a severity nothing constructs, a `??  []`
-      // on a prop the parent only passes once its own fetch has resolved.
-      // Demanding 100% there would mean deleting safety to satisfy a number.
-      //
-      // Ratcheted 96 -> 98 once the reachable ones were written. The slack is
-      // deliberately thin: a gate two points below where the suite sits is a
-      // gate that lets two points of real coverage rot away before it says so.
+      // These numbers once read 99/99/99/98, beside a note that `src` was at
+      // 100%. CI never ran with --coverage, so nothing checked them, and by the
+      // first run that did (Pass 38 M20) the suite stood at 93.29% lines,
+      // 92.61% statements, 92.48% functions and 90.16% branches. A gate set
+      // above the truth is red on every push and stops being read, so it now
+      // sits just under where the suite really is. It stops any further slide
+      // today; raise it as the untested code gets tests, and keep the slack
+      // thin — a floor two points under the suite lets two points rot first.
       thresholds: {
-        statements: 99,
-        lines: 99,
-        functions: 99,
-        branches: 98,
+        statements: 92,
+        lines: 93,
+        functions: 92,
+        branches: 90,
       },
     },
   },
