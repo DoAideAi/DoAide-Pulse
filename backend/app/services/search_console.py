@@ -193,16 +193,39 @@ class SearchConsoleClient:
         as "not reported" rather than "nothing indexed".
         """
         data = self._call("GET", self._path(site_url, feedpath))
-        contents = data.get("contents") or []
+        # Read defensively, as the token answer is: every caller catches
+        # ``SearchConsoleError`` and nothing else, so a list where the object
+        # should be, or "n/a" where a count should be, used to escape as an
+        # AttributeError/ValueError and stop the sitemap check for every site
+        # in the run. Counts are clamped to the 32-bit columns they land in.
+        if not isinstance(data, dict):
+            raise SearchConsoleError("Search Console's sitemap answer was not an object")
+        contents = [c for c in (data.get("contents") or []) if isinstance(c, dict)]
         return {
-            "submitted": sum(int(c.get("submitted") or 0) for c in contents),
-            "indexed": sum(int(c.get("indexed") or 0) for c in contents),
+            "submitted": _count(sum(_count(c.get("submitted")) for c in contents)),
+            "indexed": _count(sum(_count(c.get("indexed")) for c in contents)),
             "last_submitted": data.get("lastSubmitted"),
             "last_downloaded": data.get("lastDownloaded"),
             "is_pending": bool(data.get("isPending")),
-            "errors": int(data.get("errors") or 0),
-            "warnings": int(data.get("warnings") or 0),
+            "errors": _count(data.get("errors")),
+            "warnings": _count(data.get("warnings")),
         }
+
+
+def _count(value: object) -> int:
+    """A count from Google's JSON as a column takes it: 0 when it is not one.
+
+    Google sends counts as strings (``"42"``). Anything that does not read as a
+    non-negative whole number is 0, which the dashboard already shows as "not
+    reported"; anything past the 32-bit column is clamped to it.
+    """
+    if isinstance(value, bool):
+        return 0
+    try:
+        number = int(str(value).strip()) if value is not None else 0
+    except ValueError:
+        return 0
+    return min(max(number, 0), 2**31 - 1)
 
 
 _client: SearchConsoleClient | None = None

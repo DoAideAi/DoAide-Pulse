@@ -100,3 +100,38 @@ def test_an_oversized_search_console_answer_is_refused_without_reading_it_all(ac
     with pytest.raises(SearchConsoleError, match="more than"):
         gsc.sitemap("sc-domain:example.com", "https://example.com/s.xml")
     assert sum(served) < 2 * search_console.MAX_RESPONSE_BYTES
+
+
+@pytest.mark.parametrize(
+    "answer,expected",
+    [
+        ({"contents": [{"submitted": "12", "indexed": "3"}], "errors": "1"}, (12, 3, 1)),
+        (
+            {"contents": [{"submitted": "n/a"}, "junk", {"indexed": -5}], "errors": "lots"},
+            (0, 0, 0),
+        ),
+        ({"contents": [{"submitted": str(10**12)}]}, (2**31 - 1, 0, 0)),
+    ],
+    ids=["normal", "garbage", "huge"],
+)
+def test_a_sitemap_answer_is_read_as_counts_or_zero(account, answer, expected):
+    def handler(request):
+        if request.url.path == "/token":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        return httpx.Response(200, json=answer)
+
+    gsc = SearchConsoleClient(account, transport=httpx.MockTransport(handler))
+    got = gsc.sitemap("sc-domain:example.com", "https://example.com/s.xml")
+
+    assert (got["submitted"], got["indexed"], got["errors"]) == expected
+
+
+def test_a_sitemap_answer_that_is_not_an_object_is_a_search_console_error(account):
+    def handler(request):
+        if request.url.path == "/token":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        return httpx.Response(200, json=["not", "an", "object"])
+
+    gsc = SearchConsoleClient(account, transport=httpx.MockTransport(handler))
+    with pytest.raises(SearchConsoleError):
+        gsc.sitemap("sc-domain:example.com", "https://example.com/s.xml")
