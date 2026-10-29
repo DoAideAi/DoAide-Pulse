@@ -1905,7 +1905,20 @@ def generate_content(
             "fallback": generated.is_fallback,
         },
     )
-    content_store.commit_new(db, content)
+    try:
+        content_store.commit_new(db, content)
+    except IntegrityError:
+        # The project was checked before the model call and the connection
+        # given back for it; a project deleted in that wait — another tab, an
+        # account erase — took the foreign key this piece points at. That is a
+        # 404 with a reason, not a 500 after twenty seconds of waiting.
+        if db.get(Project, project.id) is not None:
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="This project was deleted while the draft was being written, "
+            "so the draft was not saved.",
+        ) from None
     return to_detail(content)
 
 
