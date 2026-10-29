@@ -111,10 +111,11 @@ def test_the_two_sweeps_are_the_size_they_should_be():
     usage, content funnel and autopilot reports, which landed without moving
     the pin and left this failing on main. 140 with ``DELETE /auth/me``. 141
     with ``GET /auth/me/export``, which landed while ``/openapi.json`` was a 500
-    and this whole module failed before reaching the pin.
+    and this whole module failed before reaching the pin. 142 with
+    ``POST /content/{id}/translations/{language}/accept``.
     """
-    assert len(AUTHENTICATED) == 141
-    assert len(BY_ID) == 67
+    assert len(AUTHENTICATED) == 142
+    assert len(BY_ID) == 68
 
 
 def _assert_error_shape(resp, url: str) -> None:

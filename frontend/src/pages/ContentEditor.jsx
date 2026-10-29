@@ -2070,6 +2070,17 @@ function TranslationsPanel({ contentId }) {
     }
   }
 
+  async function accept(language) {
+    try {
+      await api.acceptTranslation(contentId, language);
+      const t = await api.listTranslations(contentId);
+      setTranslations(t);
+      toast.success(`Accepted the ${language} translation — it will publish`);
+    } catch (err) {
+      toast.error(`Could not accept the ${language} translation: ${err.message}`);
+    }
+  }
+
   async function remove(language) {
     try {
       await api.deleteTranslation(contentId, language);
@@ -2125,6 +2136,14 @@ function TranslationsPanel({ contentId }) {
                     disabled={translating !== null}
                   >
                     {translating === t.language ? "Translating…" : t.stale ? "Update" : "Retry"}
+                  </button>
+                )}
+                {/* Held for review: the issues are advice to whoever reads it, and
+                    until someone accepts it every destination in this language
+                    publishes the original instead. */}
+                {t.status === "needs_review" && !t.stale && (
+                  <button className="btn-quiet" onClick={() => accept(t.language)}>
+                    Accept
                   </button>
                 )}
                 <button className="btn-quiet text-bad" onClick={() => remove(t.language)}>

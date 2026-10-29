@@ -688,6 +688,59 @@ class PublishChoice:
         }
 
 
+def accept(db: Session, content: Content, row: ContentTranslation, *, by_user: int) -> None:
+    """A person has read a translation held for review and says it may go out.
+
+    ``needs_review`` is documented as "publishable by a human who has read it",
+    and nothing let a human say so: :func:`for_publishing` falls back to the
+    original while ``quality_issues`` is non-empty, and no route cleared it. A
+    reviewer who read the French and found it fine could only delete it or
+    translate again and hope, so the state had no way forward.
+
+    Only from ``needs_review``, and only while the translation is of the text as
+    it stands — accepting a stale one would sign off a translation of words the
+    piece no longer has. The move is a conditional UPDATE, so a re-translation
+    that reset the row in between is not overwritten. The issues waved through
+    are logged, which is the record of what was accepted. Commits.
+    """
+    if row.status != TranslationStatus.NEEDS_REVIEW:
+        raise TranslationError(
+            f"Only a translation waiting for review can be accepted; this one is "
+            f"{row.status.label.lower()}."
+        )
+    if row.is_stale(content):
+        raise TranslationError(
+            "The piece has been edited since this translation was made. Update the "
+            "translation, then review the new one."
+        )
+    waived = len(row.quality_issues or [])
+    moved = db.execute(
+        update(ContentTranslation)
+        .where(
+            ContentTranslation.id == row.id,
+            ContentTranslation.status == TranslationStatus.NEEDS_REVIEW,
+            ContentTranslation.source_version == row.source_version,
+        )
+        .values(status=TranslationStatus.READY, quality_issues=[], updated_at=utcnow())
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not moved:
+        db.rollback()
+        raise TranslationInProgress(
+            "This translation changed while you were reviewing it. Reload and look again."
+        )
+    db.commit()
+    db.refresh(row)
+    logger.info(
+        "translation %s (%s) of content %s accepted by user %s with %d quality issue(s) waived",
+        row.id,
+        row.language,
+        content.id,
+        by_user,
+        waived,
+    )
+
+
 def for_publishing(db: Session, content: Content, language: str | None) -> PublishChoice:
     """The text to publish for a destination that wants *language*.
 

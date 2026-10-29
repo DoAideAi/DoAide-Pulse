@@ -273,3 +273,37 @@ def delete_translation(
     )
     db.delete(row)
     db.commit()
+
+
+@router.post(
+    "/content/{content_id}/translations/{language}/accept",
+    response_model=TranslationOut,
+    summary="Accept a translation held for review",
+    responses=errors(*OWNED, status.HTTP_409_CONFLICT),
+)
+def accept_translation(
+    content_id: RowId,
+    language: str = Path(max_length=16),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TranslationOut:
+    """Say that a ``needs_review`` translation has been read and may go out.
+
+    The quality checks are advice to a reader, and this is the reader answering:
+    the row becomes ``ready`` and destinations in that language publish it
+    instead of falling back to the original. 409 for any other state — there is
+    nothing to accept in a pending, failed or ready row — and for a stale one,
+    which is a translation of text the piece no longer has.
+    """
+    content = _owned(content_id, db, user)
+    row = translation.get(db, content, language)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"This piece has no {language} translation.",
+        )
+    try:
+        translation.accept(db, content, row, by_user=user.id)
+    except translation.TranslationError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return _to_out(row, content)

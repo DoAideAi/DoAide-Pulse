@@ -336,6 +336,8 @@ export const api = {
     request(`/content/${contentId}/translations`, { method: "POST", body: { language } }),
   deleteTranslation: (contentId, language) =>
     request(`/content/${contentId}/translations/${language}`, { method: "DELETE" }),
+  acceptTranslation: (contentId, language) =>
+    request(`/content/${contentId}/translations/${language}/accept`, { method: "POST" }),
 
   // ---- revisions ----
   listRevisions: (contentId, params = {}) =>

@@ -89,7 +89,7 @@ FEATURES: tuple[Feature, ...] = (
         (ACTION, r"POST /content/:id/headlines(/apply|/auto-select)?"),
     )),
     Feature("translation", "Translation", (
-        (ACTION, r"(POST|DELETE) /content/:id/translations(/[a-z-]+)?"),
+        (ACTION, r"(POST|DELETE) /content/:id/translations(/[a-z-]+|/:id)?(/accept)?"),
     )),
     Feature("templates", "Templates", (
         (ACTION, r"(POST|PATCH|DELETE) /templates(/:id)?(/use|/preview)?"),

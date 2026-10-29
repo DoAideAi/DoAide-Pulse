@@ -55,6 +55,7 @@ vi.mock("../lib/api", () => ({
     listTranslations: vi.fn(),
     translateContent: vi.fn(),
     deleteTranslation: vi.fn(),
+    acceptTranslation: vi.fn(),
   },
 }));
 
@@ -1272,6 +1273,34 @@ describe("a side panel whose load fails", () => {
       await within(panel).findByText("Ready");
       expect(within(panel).queryByRole("button", { name: /^(Retry|Update)$/ })).not.toBeInTheDocument();
       expect(within(panel).getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    });
+
+    it("can be accepted when it is held for review", async () => {
+      const held = row({ status: "needs_review", quality_issues: [{ code: "length" }] });
+      api.listTranslations
+        .mockResolvedValueOnce({ items: [held], source_language: "en" })
+        .mockResolvedValue({ items: [row({})], source_language: "en" });
+      api.acceptTranslation.mockResolvedValue({});
+      const user = userEvent.setup();
+      await open();
+
+      const panel = (await screen.findByRole("heading", { name: "Translations" })).closest(".panel");
+      await user.click(await within(panel).findByRole("button", { name: "Accept" }));
+
+      expect(api.acceptTranslation).toHaveBeenCalledWith(expect.anything(), "fr");
+      expect(await within(panel).findByText("Ready")).toBeInTheDocument();
+    });
+
+    it("offers no Accept for a stale one, which needs updating first", async () => {
+      api.listTranslations.mockResolvedValue({
+        items: [row({ status: "needs_review", stale: true, quality_issues: [{ code: "length" }] })],
+        source_language: "en",
+      });
+      await open();
+
+      const panel = (await screen.findByRole("heading", { name: "Translations" })).closest(".panel");
+      await within(panel).findByRole("button", { name: "Update" });
+      expect(within(panel).queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
     });
   });
 });
