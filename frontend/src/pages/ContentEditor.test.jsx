@@ -883,6 +883,10 @@ describe("editing one passage", () => {
     expect(toast.error).toHaveBeenCalledWith(
       expect.stringContaining("That passage has changed"),
     );
+    // The edit to the body schedules the editor's own follow-up updates; let
+    // them land inside the test, where a slow CI runner failed it as an
+    // unwrapped act() (the same flake 7179c39 fixed in the splice test).
+    await act(async () => {});
   });
 
   it("passes the chosen tone, and nothing at all for the project's own", async () => {
