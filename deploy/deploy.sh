@@ -126,16 +126,21 @@ else
 fi
 
 echo "==> installing backend dependencies (before the code changes)"
+# Both files, side by side and under their own names: requirements.txt says
+# "-c constraints.txt", which pip resolves next to it, and the stamp covers both
+# so a change to a transitive pin alone is installed rather than skipped.
 rsync -az -e "ssh -i $SSH_KEY" \
-  backend/requirements.txt "root@$HOST:$REMOTE/.deploy-requirements.txt"
+  backend/requirements.txt backend/constraints.txt "root@$HOST:$REMOTE/.deploy-deps/"
 "${SSH[@]}" bash -euo pipefail <<'DEPS_SCRIPT'
-req=/opt/Pulse/.deploy-requirements.txt
+deps=/opt/Pulse/.deploy-deps
+req=$deps/requirements.txt
 stamp=/opt/Pulse/.venv/.requirements.sha256
-want=$(sha256sum "$req" | cut -d' ' -f1)
+want=$(cat "$req" "$deps/constraints.txt" | sha256sum | cut -d' ' -f1)
 if [ "$(cat "$stamp" 2>/dev/null || true)" = "$want" ]; then
   echo "requirements unchanged since the last install, skipping pip"
 else
-  chmod 0644 "$req"
+  chmod 0755 "$deps"
+  chmod 0644 "$req" "$deps/constraints.txt"
   # pip itself first. The Dockerfile and CI upgrade it and this did not, so the
   # box's venv sat on pip 24.0 with seven published advisories (M17), and pip
   # is what fetches and unpacks every package installed below.
@@ -144,7 +149,7 @@ else
   echo "$want" > "$stamp"
   chown pulse:pulse "$stamp"
 fi
-rm -f "$req"
+rm -rf "$deps"
 DEPS_SCRIPT
 
 echo "==> syncing to $HOST:$REMOTE"

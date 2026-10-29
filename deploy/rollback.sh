@@ -125,7 +125,10 @@ stamp=/opt/Pulse/.venv/.requirements.sha256
 rm -f "$stamp"
 sudo -u pulse /opt/Pulse/.venv/bin/pip install -q --upgrade pip
 sudo -u pulse /opt/Pulse/.venv/bin/pip install -q -r /opt/Pulse/backend/requirements.txt
-sha256sum /opt/Pulse/backend/requirements.txt | cut -d' ' -f1 > "$stamp"
+# The same formula deploy.sh compares against: both files, or the next deploy
+# would see a stamp it never writes and reinstall needlessly — or worse, match.
+cat /opt/Pulse/backend/requirements.txt /opt/Pulse/backend/constraints.txt \
+  | sha256sum | cut -d' ' -f1 > "$stamp"
 chown pulse:pulse "$stamp"
 
 systemctl stop pulse-beat pulse-worker || true

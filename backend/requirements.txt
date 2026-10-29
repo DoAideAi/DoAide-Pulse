@@ -1,6 +1,9 @@
 # Pulse backend — runtime dependencies.
 # Python 3.12 (3.11+ works; 3.14 lacks wheels for some of these).
 
+# Their dependencies, pinned too: see constraints.txt for why the two files.
+-c constraints.txt
+
 # ---- Web ----
 # Exact pins (C103 M20). These were >= floors, which made every deploy install
 # whatever was newest that morning — production and a fresh checkout could run

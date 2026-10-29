@@ -115,6 +115,7 @@ check_alembic_heads() {
 check_required_files() {
     local required=(
         "backend/requirements.txt"
+        "backend/constraints.txt"
         "backend/alembic.ini"
         "backend/alembic/env.py"
         "deploy/deploy.sh"

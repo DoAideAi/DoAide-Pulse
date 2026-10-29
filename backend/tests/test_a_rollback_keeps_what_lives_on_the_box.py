@@ -89,9 +89,13 @@ def test_a_rollback_rewrites_the_stamp_for_what_it_installed():
     installed = ROLLBACK.index("pip install -q -r /opt/Pulse/backend/requirements.txt")
     rewritten = ROLLBACK.index('> "$stamp"')
     assert removed < installed < rewritten
-    # The same digest deploy.sh compares against.
-    assert "sha256sum /opt/Pulse/backend/requirements.txt | cut -d' ' -f1" in ROLLBACK
-    assert "sha256sum \"$req\" | cut -d' ' -f1" in DEPLOY
+    # The same digest deploy.sh compares against: requirements.txt then
+    # constraints.txt, the pair pip resolves together.
+    assert (
+        "cat /opt/Pulse/backend/requirements.txt /opt/Pulse/backend/constraints.txt" in ROLLBACK
+    )
+    assert "| sha256sum | cut -d' ' -f1" in ROLLBACK
+    assert 'cat "$req" "$deps/constraints.txt" | sha256sum | cut -d\' \' -f1' in DEPLOY
 
 
 def test_the_deploy_refuses_to_start_short_of_disk():

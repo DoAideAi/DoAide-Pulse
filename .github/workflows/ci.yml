@@ -60,6 +60,7 @@ jobs:
           cache: pip
           cache-dependency-path: |
             backend/requirements.txt
+            backend/constraints.txt
             backend/requirements-dev.txt
 
       - name: Install dependencies
