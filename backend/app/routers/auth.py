@@ -562,8 +562,21 @@ def delete_me(
     The password is asked for again. A wrong one is a 403 rather than a 401:
     the token is fine, and a 401 would sign the person out of the page they
     are typing into. Rate limited like a login, because it is a password check.
+
+    And budgeted like one. The per-IP limit above is the bound :func:`login`
+    found was not enough on its own, and this check had nothing else: a stolen
+    session could guess here from any number of addresses, and went on doing
+    so while the sign-in form was refusing the account. A wrong password here
+    is a failed sign-in for the account's address, and a locked address waits
+    out its lock before it can erase anything.
     """
+    if login_locked(current_user.email):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=login_lock_detail(current_user.email),
+        )
     if not verify_password(payload.password, current_user.hashed_password):
+        record_login_failure(current_user.email)
         # A password check like a login, refused like one — and logged like
         # one, so a stolen session guessing at the password is in the journal.
         logger.warning(
