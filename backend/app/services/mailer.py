@@ -23,6 +23,7 @@ import ssl
 import time
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, parseaddr
+from urllib.parse import urlsplit
 
 from app.config import settings
 from app.logging_config import mask_email
@@ -36,7 +37,32 @@ def configured() -> bool:
 
 
 def _from_address() -> str:
-    return settings.smtp_from.strip() or f"pulse@{settings.smtp_host.strip()}"
+    """Who the mail is from: ``SMTP_FROM``, else the best guess that is not a forgery.
+
+    The old fallback was ``pulse@<SMTP_HOST>`` — mail "from"
+    ``pulse@smtp.sendgrid.net`` — which forges the relay operator's own domain.
+    Receivers check that domain's DMARC policy, the big providers publish
+    strict ones, and resets and digests went to junk or were refused with
+    nothing in this log, because the SMTP hop itself succeeded. Next best is
+    the login when it is an address (what the relay authenticates, and what
+    providers align on), then this site's own domain.
+    """
+    explicit = settings.smtp_from.strip()
+    if explicit:
+        return explicit
+    login = settings.smtp_user.strip()
+    guess = (
+        login
+        if "@" in login
+        else f"pulse@{urlsplit(settings.frontend_url).hostname or 'localhost'}"
+    )
+    if settings.is_production:
+        logger.warning(
+            "SMTP_FROM is not set; sending as %s. Set it to an address the relay "
+            "is allowed to send for, or mail may be junked or refused.",
+            mask_email(guess),
+        )
+    return guess
 
 
 def _message_id_domain(from_address: str) -> str:

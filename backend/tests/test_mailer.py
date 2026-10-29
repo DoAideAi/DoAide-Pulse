@@ -121,10 +121,12 @@ def test_send_failures_are_reported_not_raised(smtp, monkeypatch, error):
     assert mailer.send(to="dev@example.com", subject="s", body="b") is False
 
 
-def test_from_address_falls_back_to_the_host(smtp, monkeypatch):
+def test_from_address_falls_back_to_the_login_not_the_relay_s_domain(smtp, monkeypatch):
+    """``pulse@<SMTP_HOST>`` forged the relay's domain; see
+    test_mail_is_never_sent_from_the_relay_s_own_domain."""
     monkeypatch.setattr(settings, "smtp_from", "")
     mailer.send(to="dev@example.com", subject="s", body="b")
-    assert smtp.instances[0].message["From"] == "pulse@smtp.example.com"
+    assert smtp.instances[0].message["From"] == "pulse@example.com"
 
 
 def test_a_password_smtplib_cannot_encode_fails_like_a_bad_password(smtp, monkeypatch):
