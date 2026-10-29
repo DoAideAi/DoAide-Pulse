@@ -219,6 +219,17 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
             raise ValueError("commit_threshold must be a whole number.") from exc
         if threshold < 1:
             raise ValueError("commit_threshold must be at least 1.")
+        # A scan sees one page of commits at most, so a threshold above that
+        # can never be met: the trigger polled forever and never fired, with
+        # nothing saying why.
+        from app.services.github_client import MAX_COMMITS_PER_SCAN
+
+        if threshold > MAX_COMMITS_PER_SCAN:
+            raise ValueError(
+                f"commit_threshold can be at most {MAX_COMMITS_PER_SCAN}: that is "
+                "as many new commits as one scan of the repository can see, so a "
+                "higher number would never be reached."
+            )
         body["commit_threshold"] = threshold
 
     if body.get("repo") is not None:

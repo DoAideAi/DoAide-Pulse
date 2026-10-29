@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 #: One page of commits. Enough for any sane scan interval; see module docstring.
 _COMMIT_PAGE_SIZE = 100
+#: The most new commits one scan can ever see: one page. A trigger's
+#: ``commit_threshold`` above this could never be reached, so it is refused —
+#: see ``schemas.trigger.validate_config``.
+MAX_COMMITS_PER_SCAN = _COMMIT_PAGE_SIZE
 
 
 class GitHubError(RuntimeError):
