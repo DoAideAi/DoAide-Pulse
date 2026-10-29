@@ -201,15 +201,13 @@ def _walk(node: ElementTree.Element, out: list[str]) -> None:
         if child.tag == _MC_FALLBACK:
             continue
         if child.tag == f"{_W}p":
-            nested: list[ElementTree.Element] = []
-            out.append("".join(_own_text(child, nested)))
-            for paragraph in nested:
-                _walk_paragraph(paragraph, out)
+            _walk_paragraph(child, out)
         else:
             _walk(child, out)
 
 
 def _walk_paragraph(paragraph: ElementTree.Element, out: list[str]) -> None:
+    """*paragraph* as one line, then any text-box paragraphs inside it, each once."""
     nested: list[ElementTree.Element] = []
     out.append("".join(_own_text(paragraph, nested)))
     for inner in nested:

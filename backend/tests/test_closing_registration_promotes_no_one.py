@@ -72,3 +72,10 @@ def test_the_admin_list_still_decides_when_it_is_set(monkeypatch, user, invitee)
 
     assert accounts.is_operator(invitee)
     assert not accounts.is_operator(user)
+
+
+def test_an_account_outside_any_session_is_not_the_operator(closed, user, db):
+    """No session to ask which account came first: refuse, do not guess."""
+    db.expunge(user)
+
+    assert not accounts.is_operator(user)

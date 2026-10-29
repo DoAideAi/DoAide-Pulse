@@ -145,3 +145,38 @@ def test_a_new_repo_resets_a_github_trigger(client, auth, db, writing_project):
     assert resp.status_code == 200, resp.text
     db.refresh(row)
     assert row.state == {}
+
+
+def test_a_poll_of_the_old_repo_cannot_write_over_the_edit(db, writing_project, monkeypatch):
+    from app.services import github_client
+    from app.services.github_client import RepoActivity
+
+    row = Trigger(
+        project_id=writing_project.id,
+        kind=TriggerKind.GITHUB,
+        name="Repo",
+        config={"repo": "acme/old"},
+        state={"last_sha": "abc123"},
+    )
+    db.add(row)
+    db.commit()
+
+    def fetch_while_edited(repo, **kwargs):
+        db.execute(
+            update(Trigger)
+            .where(Trigger.id == row.id)
+            .values(config={"repo": "acme/new"}, state={})
+            .execution_options(synchronize_session=False)
+        )
+        db.commit()
+        return RepoActivity(
+            full_name=repo, new_commits=[], new_release=None, head_sha="def456", latest_tag=None
+        )
+
+    monkeypatch.setattr(github_client, "fetch_activity", fetch_while_edited)
+
+    result = triggers.check(db, row)
+
+    assert result["status"] == "source_changed"
+    db.expire_all()
+    assert db.get(Trigger, row.id).state == {}

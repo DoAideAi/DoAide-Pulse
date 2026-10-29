@@ -71,3 +71,25 @@ def test_a_hyperlink_s_text_is_still_part_of_its_paragraph():
     )
 
     assert extract_text("brief.docx", data) == "See the docs for more."
+
+
+def test_a_text_box_inside_a_text_box_is_read_once_too():
+    inner = "<w:r><w:drawing>" + _box("Inner note") + "</w:drawing></w:r>"
+    outer = (
+        "<w:txbxContent><w:p><w:r><w:t>Outer note</w:t></w:r>"
+        f"{inner}</w:p></w:txbxContent>"
+    )
+    data = _docx(f"<w:p><w:r><w:t>Body</w:t></w:r><w:r><w:drawing>{outer}</w:drawing></w:r></w:p>")
+
+    assert extract_text("brief.docx", data).splitlines() == ["Body", "Outer note", "Inner note"]
+
+
+def test_a_fallback_between_paragraphs_is_skipped_as_well():
+    data = _docx(
+        "<w:p><w:r><w:t>Kept</w:t></w:r></w:p>"
+        "<mc:AlternateContent><mc:Choice><w:p><w:r><w:t>Chosen</w:t></w:r></w:p></mc:Choice>"
+        "<mc:Fallback><w:p><w:r><w:t>Chosen</w:t></w:r></w:p></mc:Fallback>"
+        "</mc:AlternateContent>"
+    )
+
+    assert extract_text("brief.docx", data).splitlines() == ["Kept", "Chosen"]
