@@ -193,10 +193,15 @@ def test_inline_mode_says_disabled_rather_than_broken(client, auth, redis_up):
 def test_a_real_outage_still_fails_the_check_with_a_dead_worker_beside_it(
     client, auth, celery_on, monkeypatch
 ):
-    """The worker probe must not *mask* a required dependency either."""
+    """The worker probe must not *mask* a required dependency either.
+
+    The database: Redis is reported but not required (see
+    tests/test_a_redis_outage_does_not_take_the_site_down.py).
+    """
     monkeypatch.setattr(
-        misc, "_check_redis", lambda: misc._Probe(False, "ConnectionError")
+        misc, "_check_database", lambda db: misc._Probe(False, "OperationalError")
     )
+    monkeypatch.setattr(misc, "_check_redis", lambda: misc._Probe(True))
     _ping(monkeypatch, [])
 
     resp = client.get(f"{HEALTH}/detail", headers=auth)
@@ -275,8 +280,9 @@ def test_the_worker_line_is_not_the_degraded_line(
     just been rebooted, and an operator reading only "health check failed" would
     restart Postgres and stop looking.
     """
-    down = misc._Probe(False, "ConnectionError", "ConnectionError: refused")
-    monkeypatch.setattr(misc, "_check_redis", lambda: down)
+    down = misc._Probe(False, "OperationalError", "OperationalError: refused")
+    monkeypatch.setattr(misc, "_check_database", lambda db: down)
+    monkeypatch.setattr(misc, "_check_redis", lambda: misc._Probe(True))
     _ping(monkeypatch, [])
 
     with caplog.at_level(logging.WARNING, logger="app.routers.misc"):

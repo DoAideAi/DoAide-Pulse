@@ -11,6 +11,7 @@ Four findings:
 """
 from __future__ import annotations
 
+import inspect
 import json
 import logging
 from types import SimpleNamespace
@@ -156,7 +157,11 @@ class TestGeminiParseFailureIncludesBody:
 
         with caplog.at_level(logging.ERROR, logger="app.routers.viral"):
             with pytest.raises(Exception):
-                viral.generate_content_ideas.__wrapped__(
+                # ``inspect.unwrap``, not ``__wrapped__``: the route wears two
+                # limits (per address and install-wide), and one layer down
+                # is still a limiter, which raised on ``request=None`` before
+                # the handler ran — passing ``pytest.raises`` for the wrong reason.
+                inspect.unwrap(viral.generate_content_ideas)(
                     request=None,
                     response=None,
                     payload=fake_payload,
