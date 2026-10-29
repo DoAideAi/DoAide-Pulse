@@ -177,6 +177,10 @@ _api_key_exc = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
     detail="Invalid or expired API key. Create a new one in Settings → API keys "
     "and send it in the X-API-Key header.",
+    # Every 401 names its scheme (RFC 7235 §3.1); the bearer ones always did.
+    # Not a registered scheme, which the RFC allows, and it tells a client the
+    # credential it needs is the key, not a session token.
+    headers={"WWW-Authenticate": "ApiKey"},
 )
 
 

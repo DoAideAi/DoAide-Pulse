@@ -244,3 +244,11 @@ def test_the_response_still_says_nothing_it_did_not_before(client, db, key):
 
     assert expired.status_code == unknown.status_code == 401
     assert expired.json() == unknown.json()
+
+
+def test_a_machine_401_names_the_scheme_it_wants(client):
+    """Every 401 carries WWW-Authenticate; the bearer ones always did."""
+    resp = client.get("/api/v1/machine/whoami")
+
+    assert resp.status_code == 401
+    assert resp.headers["WWW-Authenticate"] == "ApiKey"
