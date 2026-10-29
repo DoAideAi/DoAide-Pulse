@@ -75,7 +75,14 @@ class CircuitBreaker:
         with self._lock:
             state = self._state.setdefault(name, _BreakerState())
             state.failures += 1
-            if state.failures >= self.threshold:
+            # Half-open: a breaker that has tripped (``open_until`` is only ever
+            # set by a trip, and only cleared by a success) and whose cool-down
+            # has run out has let this call through as a probe, and it failed.
+            # Reopen now. Counting up to ``threshold`` again sent that many more
+            # calls — each waiting out its full timeout — into an upstream that
+            # was still down, on every cycle of the outage.
+            half_open = 0 < state.open_until <= now
+            if half_open or state.failures >= self.threshold:
                 state.open_until = now + self.cooldown
                 state.failures = 0
                 return True
