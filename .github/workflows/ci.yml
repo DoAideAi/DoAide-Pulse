@@ -92,6 +92,18 @@ jobs:
           DATABASE_URL: postgresql+psycopg://pulse:pulse@localhost:5432/pulse_ci
         run: alembic upgrade head
 
+      - name: Roll every migration back and forward again
+        # rollback.sh --db-only runs alembic downgrade, and nothing had ever run
+        # one on PostgreSQL: the first would have been during the incident it
+        # is for, and a downgrade that raised there leaves the database between
+        # two revisions with the old code waiting to start. Down to base and up
+        # again proves every downgrade executes and the chain still rebuilds.
+        env:
+          DATABASE_URL: postgresql+psycopg://pulse:pulse@localhost:5432/pulse_ci
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
   frontend:
     name: Frontend (test, build)
     runs-on: ubuntu-latest
