@@ -18,9 +18,10 @@ from fastapi import (
     Response,
     status,
 )
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, defer, joinedload, selectinload
+from sqlalchemy.orm import Session, defer, joinedload, object_session, selectinload
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.config import settings
 from app.database import get_db, refresh_all, release_for_slow_work
@@ -2764,7 +2765,7 @@ def unschedule_content(
     return [PublicationOut.model_validate(p) for p in targets]
 
 
-def _rearm(content: Content, publication: Publication) -> bool:
+def _rearm(content: Content, publication: Publication) -> bool | None:
     """Put one stopped publication back in the queue. Returns "dispatch it now".
 
     The three retry endpoints — one publication, one piece, a batch of pieces —
@@ -2775,17 +2776,39 @@ def _rearm(content: Content, publication: Publication) -> bool:
     for it to point at. See :func:`app.services.publishing_service.retry_hold`.
     Three copies of that rule is three chances for one of them to lose it.
 
+    Returns ``None`` when the row is no longer stopped by the time it is
+    written — another request re-armed it first — and changes nothing then.
+
     Does not commit — the caller decides the transaction boundary, because the
     batch endpoints re-arm many rows and a commit per row would leave a partly
     retried batch behind if one of them raised.
     """
     hold = publishing_service.retry_hold(content, publication)
-    publication.status = (
-        PublicationStatus.SCHEDULED if hold else PublicationStatus.PENDING
-    )
-    publication.attempts = 0
-    publication.error = None
-    publication.scheduled_for = hold
+    # A conditional UPDATE on the state the caller checked, not attribute
+    # writes. Two Retry clicks both read the row failed; the first re-armed it
+    # and its worker took it to ``publishing`` and ``published``, and the
+    # second then wrote ``pending`` over that and dispatched it again — a
+    # second post wherever the piece itself had not changed, since then no
+    # version check stood in the way. ``None`` is "somebody else has it".
+    db = object_session(publication)
+    db.flush()
+    values = {
+        "status": PublicationStatus.SCHEDULED if hold else PublicationStatus.PENDING,
+        "attempts": 0,
+        "error": None,
+        "scheduled_for": hold,
+    }
+    claimed = db.execute(
+        update(Publication)
+        .where(Publication.id == publication.id, Publication.status.in_(RETRYABLE))
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not claimed:
+        db.expire(publication)
+        return None
+    for field_, value in values.items():
+        set_committed_value(publication, field_, value)
     # A retry is a human saying "send it", which on a draft is an approval —
     # a draft with an armed row is the contradiction ``_settle_status`` exists
     # to prevent, and this path used to create it.
@@ -2901,6 +2924,13 @@ def retry_publication(
         )
 
     dispatchable = _rearm(content, publication)
+    if dispatchable is None:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This publication was retried by another request a moment ago, "
+            "so it is not being sent again.",
+        )
     db.commit()
 
     # A held row would be refused by ``publish_one``'s claim anyway; not
@@ -2957,9 +2987,18 @@ def retry_content(
     to_dispatch: list[int] = []
     for publication in content.publications:
         if publication.status in RETRYABLE:
-            if _rearm(content, publication):
-                to_dispatch.append(publication.id)
-            retried.append(publication.id)
+            armed = _rearm(content, publication)
+            if armed is not None:
+                if armed:
+                    to_dispatch.append(publication.id)
+                retried.append(publication.id)
+                continue
+            skipped.append(
+                PublicationSkipOut(
+                    publication_id=publication.id,
+                    reason="Retried by another request a moment ago",
+                )
+            )
             continue
         skipped.append(
             PublicationSkipOut(
