@@ -6,3 +6,11 @@
 export const TITLE_MAX = 300;
 export const META_DESCRIPTION_MAX = 320;
 export const EXCERPT_MAX = 1000;
+
+// A *new* password's bounds: UserCreate and PasswordResetConfirm. Only ever on
+// a field that sets one — sign-in checks what an existing password is, and an
+// account made before a rule changed (or seeded with a short SEED_PASSWORD) was
+// refused by the browser before the server was asked. Kept equal to the API by
+// the same test.
+export const PASSWORD_MIN = 8;
+export const PASSWORD_MAX = 128;

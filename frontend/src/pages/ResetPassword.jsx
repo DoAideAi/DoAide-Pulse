@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import PublicNav from "../components/PublicNav";
 import { api } from "../lib/api";
+import { PASSWORD_MAX, PASSWORD_MIN } from "../lib/limits";
 import { usePageMeta } from "../lib/pageMeta";
 
 /**
@@ -155,10 +156,10 @@ function SetPassword({ token }) {
         className="input"
         type="password"
         required
-        minLength={8}
-        maxLength={128}
+        minLength={PASSWORD_MIN}
+        maxLength={PASSWORD_MAX}
         autoComplete="new-password"
-        placeholder="At least 8 characters"
+        placeholder={`At least ${PASSWORD_MIN} characters`}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
@@ -170,8 +171,8 @@ function SetPassword({ token }) {
         className="input"
         type="password"
         required
-        minLength={8}
-        maxLength={128}
+        minLength={PASSWORD_MIN}
+        maxLength={PASSWORD_MAX}
         autoComplete="new-password"
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}

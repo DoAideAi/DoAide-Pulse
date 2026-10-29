@@ -108,6 +108,24 @@ describe("LandingPage", () => {
       );
     });
 
+    // The sign-up rule is the server's for new passwords; it is not a test an
+    // existing one has to pass. A seed account with a short SEED_PASSWORD, or
+    // anyone from before the rule changed, was stopped by the browser.
+    it("does not hold an existing password to the sign-up length rule", () => {
+      wrap();
+      const password = screen.getByLabelText("Password");
+      expect(password).not.toHaveAttribute("minLength");
+      expect(password).not.toHaveAttribute("maxLength");
+    });
+
+    it("holds a new password to the API's own bounds", () => {
+      wrap();
+      fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
+      const password = screen.getByLabelText("Password");
+      expect(password).toHaveAttribute("minLength", "8");
+      expect(password).toHaveAttribute("maxLength", "128");
+    });
+
     it("does not offer it while creating an account", () => {
       wrap();
       fireEvent.click(screen.getByRole("tab", { name: "Create account" }));

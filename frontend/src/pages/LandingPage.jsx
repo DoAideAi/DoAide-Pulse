@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { SESSION_ENDED } from "../lib/api";
+import { PASSWORD_MAX, PASSWORD_MIN } from "../lib/limits";
 import { useAuth } from "../hooks/useAuth";
 import AnalyticsMockup from "../components/AnalyticsMockup";
 import CrossProductLinks from "../components/CrossProductLinks";
@@ -709,11 +710,12 @@ export default function LandingPage() {
                   id="password"
                   type="password"
                   required
-                  minLength={8}
+                  minLength={isSignUp ? PASSWORD_MIN : undefined}
+                  maxLength={isSignUp ? PASSWORD_MAX : undefined}
                   className="landing-input"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSignUp ? "At least 8 characters" : "••••••••"}
+                  placeholder={isSignUp ? `At least ${PASSWORD_MIN} characters` : "••••••••"}
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                 />
               </div>
