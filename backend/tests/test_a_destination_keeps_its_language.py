@@ -55,3 +55,12 @@ def test_a_language_the_translator_cannot_produce_is_refused(client, auth):
         json={"platform": "buttondown", "credentials": {"api_key": "bd"}, "language": "xx"},
     )
     assert resp.status_code == 422
+
+
+def test_the_language_is_in_the_connect_log_line(client, auth, caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="app.routers.settings"):
+        _save(client, auth, language="fr")
+
+    assert "language=fr" in caplog.text

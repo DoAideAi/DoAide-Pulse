@@ -233,10 +233,13 @@ def upsert_connection(
         _store(connection)
     db.refresh(connection)
     logger.info(
-        "user %s connected %s (display=%s)",
+        "user %s connected %s (display=%s, language=%s)",
         user.id,
         payload.platform.value,
         display_name,
+        # Logged because it changes what text goes out: "why did Dev.to get
+        # French?" is answered by when this was set, and nowhere else says.
+        connection.language,
     )
     return ConnectionOut.model_validate(connection)
 
