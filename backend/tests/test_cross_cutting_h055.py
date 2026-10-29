@@ -169,8 +169,11 @@ _RATE_LIMIT_EXEMPT = {
     "POST /content/bulk/publish",
     "POST /content/bulk/retry",
     "POST /content/bulk/archive-old",
-    # Translation delete — simple DB write
+    # Translation delete and accept — simple DB writes, no model call. Accept
+    # (7830b93) is one conditional UPDATE on a row the caller owns, and landed
+    # without being listed here, which left this check red.
     "DELETE /content/{content_id}/translations/{language}",
+    "POST /content/{content_id}/translations/{language}/accept",
     # Calendar drag-and-drop, and planning or dismissing an idea: each moves or
     # removes one row the caller already owns. Creating an idea is limited.
     "PATCH /calendar/content/{content_id}",
