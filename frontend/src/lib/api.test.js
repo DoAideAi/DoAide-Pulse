@@ -635,7 +635,7 @@ describe("every endpoint's path and verb", () => {
     ["bulkReject", [[1, 2]], "/content/bulk/reject", "POST"],
     ["bulkPublish", [[1, 2], ["devto"]], "/content/bulk/publish", "POST"],
     ["bulkRetry", [[1, 2]], "/content/bulk/retry", "POST"],
-    ["publicationQueue", [], "/content/queue/publications", "GET"],
+    ["publicationQueue", [], "/content/queue/publications?limit=200&offset=0", "GET"],
     ["setContentStatus", [3, "approved"], "/content/3/status", "POST"],
     ["archiveOld", [{ days: 30 }], "/content/bulk/archive-old", "POST"],
     ["listIdeas", [5], "/projects/5/ideas", "GET"],
@@ -918,5 +918,39 @@ describe("listAllTriggers", () => {
     expect(triggers).toHaveLength(1100);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock.mock.calls[0][0]).toContain("project_id=4");
+  });
+});
+
+describe("publicationQueue", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // The Publish page took the default page of 50 as the whole queue. A week of
+  // scheduling across a few platforms is more than that, and a failed row
+  // sorted after the fiftieth never appeared — while the sidebar badge, which
+  // reads X-Total-Count, said it was there.
+  it("reads every page until it has the whole queue", async () => {
+    const all = Array.from({ length: 450 }, (_, i) => ({
+      id: i + 1,
+      status: i === 449 ? "failed" : "scheduled",
+    }));
+    const fetchMock = vi.fn(async (url) => {
+      const query = new URL(url, "http://x").searchParams;
+      const limit = Number(query.get("limit"));
+      const offset = Number(query.get("offset"));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "",
+        headers: { get: (n) => (n === "X-Total-Count" ? String(all.length) : null) },
+        text: async () => JSON.stringify(all.slice(offset, offset + limit)),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const queue = await api.publicationQueue();
+
+    expect(queue).toHaveLength(450);
+    expect(queue.at(-1).status).toBe("failed");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

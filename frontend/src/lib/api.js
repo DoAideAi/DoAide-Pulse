@@ -370,7 +370,22 @@ export const api = {
       method: "POST",
       body: { content_ids: contentIds },
     }),
-  publicationQueue: () => request("/content/queue/publications"),
+  // The whole queue, page by page. The Publish page took the default page of 50
+  // as all of it, so a failure sorted after the fiftieth pending row was never
+  // shown there — while the sidebar badge, reading X-Total-Count, counted it.
+  // A short page ends it too, so a response without a total cannot loop.
+  publicationQueue: async () => {
+    const limit = 200;
+    const out = [];
+    for (;;) {
+      const page = await request(
+        `/content/queue/publications${qs({ limit, offset: out.length })}`,
+        { page: true },
+      );
+      out.push(...page.items);
+      if (page.items.length < limit || out.length >= page.total) return out;
+    }
+  },
   // What the sidebar badges show. One row of each list and its X-Total-Count:
   // counting `reviewQueue()` and the failed rows of `publicationQueue()` read
   // the first page of each, so the badges topped out at 50 and missed any
