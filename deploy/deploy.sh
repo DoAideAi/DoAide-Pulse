@@ -43,17 +43,45 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   (cd frontend && npm run build)
 fi
 
+# Dependencies go in before the code they serve, from the requirements file
+# alone. Installed after the sync, a pip failure (PyPI down, a yanked pin) left
+# the new code on disk under services still running with the old packages —
+# and Celery recycles its pool children every 200 tasks, so the worker went on
+# to import the new code against them without anyone restarting it. Now the
+# failure stops the deploy with the box exactly as it was.
+#
+# Skipped when the file is the one last installed, so a deploy that changes no
+# pin does not need PyPI to be up at all. The stamp lives in the venv: it is
+# about what is installed there, and rsync never touches it.
+echo "==> installing backend dependencies (before the code changes)"
+rsync -az -e "ssh -i $SSH_KEY" \
+  backend/requirements.txt "root@$HOST:$REMOTE/.deploy-requirements.txt"
+"${SSH[@]}" bash -euo pipefail <<'DEPS_SCRIPT'
+req=/opt/Pulse/.deploy-requirements.txt
+stamp=/opt/Pulse/.venv/.requirements.sha256
+want=$(sha256sum "$req" | cut -d' ' -f1)
+if [ "$(cat "$stamp" 2>/dev/null || true)" = "$want" ]; then
+  echo "requirements unchanged since the last install, skipping pip"
+else
+  chmod 0644 "$req"
+  # pip itself first. The Dockerfile and CI upgrade it and this did not, so the
+  # box's venv sat on pip 24.0 with seven published advisories (M17), and pip
+  # is what fetches and unpacks every package installed below.
+  sudo -u pulse /opt/Pulse/.venv/bin/pip install -q --upgrade pip
+  sudo -u pulse /opt/Pulse/.venv/bin/pip install -q -r "$req"
+  echo "$want" > "$stamp"
+  chown pulse:pulse "$stamp"
+fi
+rm -f "$req"
+DEPS_SCRIPT
+
 echo "==> syncing to $HOST:$REMOTE"
-# The excludes are also what protects them from --delete: .env, the server's
-# venv, the beat schedule, the deploy history and user uploads live only on the
-# box and must survive a deploy. Uploads were safe before only while the local
-# copy happened to hold every file the server did.
-rsync -az --delete \
-  --exclude '.git' --exclude '.env' --exclude '.env.*' --exclude 'keys/' \
-  --exclude '.deploy-history' --exclude 'backend/uploads/' \
-  --exclude '.venv/' --exclude 'node_modules/' --exclude '__pycache__/' \
-  --exclude '*.pyc' --exclude '.pytest_cache/' --exclude '.ruff_cache/' \
-  --exclude '*.egg-info/' --exclude 'celerybeat-schedule*' --exclude '.claude/' \
+# The excludes (deploy/rsync-excludes, shared with rollback.sh) are also what
+# protects them from --delete: .env, the server's venv, the beat schedule, the
+# deploy history and user uploads live only on the box and must survive a
+# deploy. Uploads were safe before only while the local copy happened to hold
+# every file the server did.
+rsync -az --delete --exclude-from deploy/rsync-excludes \
   -e "ssh -i $SSH_KEY" \
   ./ "root@$HOST:$REMOTE/"
 
@@ -61,17 +89,11 @@ rsync -az --delete \
 rsync -az --delete -e "ssh -i $SSH_KEY" \
   frontend/dist/ "root@$HOST:$REMOTE/frontend/dist/"
 
-echo "==> installing deps, migrating, restarting"
+echo "==> migrating, restarting"
 "${SSH[@]}" bash -euo pipefail <<REMOTE_SCRIPT
 # rsync runs as root; leaving root-owned files under a service that runs as
 # \`pulse\` is the classic post-deploy 500.
 chown -R pulse:pulse /opt/Pulse
-
-# pip itself first. The Dockerfile and CI upgrade it and this did not, so the
-# box's venv sat on pip 24.0 with seven published advisories (M17), and pip
-# is what fetches and unpacks every package installed below.
-sudo -u pulse /opt/Pulse/.venv/bin/pip install -q --upgrade pip
-sudo -u pulse /opt/Pulse/.venv/bin/pip install -q -r /opt/Pulse/backend/requirements.txt
 
 # Unit files. rsync puts them under /opt/Pulse/deploy/systemd, which is not
 # where systemd looks — until this ran, editing a unit and deploying changed

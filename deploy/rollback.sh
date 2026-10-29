@@ -66,19 +66,47 @@ echo
 read -r -p "Proceed? [y/N] " confirm
 [[ "$confirm" =~ ^[Yy]$ ]] || { echo "Aborted."; exit 0; }
 
+# Read now: commits from before the shared list existed do not have it.
+EXCLUDES=$(mktemp)
+trap 'rm -f "$EXCLUDES"' EXIT
+cp deploy/rsync-excludes "$EXCLUDES"
+
 echo "==> checking out $ROLLBACK_COMMIT"
 git stash -u --quiet 2>/dev/null || true
 git checkout "$ROLLBACK_COMMIT" --quiet
 
+# The schema the rollback commit was written for. Only its script directory is
+# read — ``alembic heads`` does not touch a database.
+TARGET_REV=$(cd backend && .venv/bin/alembic heads 2>/dev/null | grep -oE '^[a-z0-9]+' || true)
+[ "$(printf '%s\n' "$TARGET_REV" | grep -c .)" -eq 1 ] \
+    || die "could not read a single alembic head at $ROLLBACK_COMMIT: '$TARGET_REV'"
+
 echo "==> building frontend at rollback commit"
 (cd frontend && npm run build) || die "frontend build failed at rollback commit"
 
+# Downgrade *before* the old code lands. The migrations to undo exist only in
+# the code being rolled back from: once the old tree is synced, alembic there
+# cannot find the database's revision, so the ``upgrade head`` below used to
+# stop the rollback with the code swapped, the schema not, and worker and beat
+# left stopped.
+echo "==> downgrading the database to $TARGET_REV (with the code still deployed)"
+"${SSH[@]}" bash -euo pipefail <<REMOTE_SCRIPT
+cd /opt/Pulse/backend
+DB_URL=\$(grep -E '^DATABASE_URL=' /opt/Pulse/.env | head -1 | cut -d= -f2-)
+CURRENT=\$(sudo -u pulse env DATABASE_URL="\$DB_URL" /opt/Pulse/.venv/bin/alembic current 2>/dev/null \
+  | grep -oE '^[a-z0-9]+' || true)
+if [ "\$CURRENT" != "$TARGET_REV" ]; then
+  systemctl stop pulse-beat pulse-worker || true
+  sudo -u pulse env DATABASE_URL="\$DB_URL" /opt/Pulse/.venv/bin/alembic downgrade $TARGET_REV
+fi
+REMOTE_SCRIPT
+
 echo "==> syncing rollback to $HOST:$REMOTE"
-rsync -az --delete \
-    --exclude '.git' --exclude '.env' --exclude '.env.*' --exclude 'keys/' \
-    --exclude '.venv/' --exclude 'node_modules/' --exclude '__pycache__/' \
-    --exclude '*.pyc' --exclude '.pytest_cache/' --exclude '.ruff_cache/' \
-    --exclude '*.egg-info/' --exclude 'celerybeat-schedule*' \
+# The same excludes as deploy.sh, from the same file. This list used to be
+# its own copy and had lost backend/uploads/ and .deploy-history, so with
+# --delete a rollback erased every image uploaded since the local checkout
+# last held them, and the record of which deploys had run.
+rsync -az --delete --exclude-from "$EXCLUDES" \
     -e "ssh -i $SSH_KEY" \
     ./ "root@$HOST:$REMOTE/"
 

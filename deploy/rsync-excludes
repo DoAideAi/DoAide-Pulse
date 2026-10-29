@@ -1,0 +1,22 @@
+# What an rsync to /opt/Pulse must never touch. Read by deploy.sh and
+# rollback.sh (--exclude-from), so the two cannot drift: both sync with
+# --delete, and an entry missing here is a file deleted on the box.
+#
+# Live only on the server: secrets, deploy history, user uploads, the venv
+# and the beat schedule.
+.git
+.env
+.env.*
+keys/
+.deploy-history
+backend/uploads/
+.venv/
+celerybeat-schedule*
+# Local-only clutter that has no business on the box.
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.claude/
