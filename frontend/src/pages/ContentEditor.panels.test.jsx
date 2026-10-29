@@ -28,6 +28,7 @@ vi.mock("../lib/api", () => ({
   api: {
     getContent: vi.fn(),
     platforms: vi.fn(),
+    uploadImage: vi.fn(),
     updateContent: vi.fn(),
     approveContent: vi.fn(),
     deleteContent: vi.fn(),
@@ -171,6 +172,44 @@ describe("the SEO panel", () => {
       [...document.querySelectorAll("aside img[alt^='Marketing image']")].map((i) =>
         i.getAttribute("src"),
       );
+
+    // The batch used to stop at the first refusal and add nothing — the images
+    // already on the server were dropped and the toast named no file.
+    it("keeps the images that uploaded when one in the batch is refused", async () => {
+      api.uploadImage
+        .mockResolvedValueOnce({ url: "https://cdn.test/new1.png" })
+        .mockRejectedValueOnce(new Error("That file is not a JPG, PNG, WebP or GIF image."))
+        .mockResolvedValueOnce({ url: "https://cdn.test/new3.png" });
+      await open({ marketing_images: [urls[0]] });
+      const input = document.querySelector("input[type='file'][multiple]");
+      const files = ["one.png", "two.txt", "three.png"].map(
+        (name) => new File(["x"], name, { type: "image/png" }),
+      );
+
+      fireEvent.change(input, { target: { files } });
+
+      await waitFor(() => expect(order()).toEqual([urls[0], "https://cdn.test/new1.png", "https://cdn.test/new3.png"]));
+      expect(toast.error).toHaveBeenCalledTimes(1);
+      const [message] = toast.error.mock.calls[0];
+      expect(message).toMatch(/^2 of 3 images added/);
+      expect(message).toContain("two.txt");
+    });
+
+    it("says which file it is on while a batch uploads", async () => {
+      let release;
+      api.uploadImage
+        .mockResolvedValueOnce({ url: "https://cdn.test/n1.png" })
+        .mockImplementationOnce(() => new Promise((resolve) => { release = resolve; }));
+      await open({ marketing_images: [] });
+      const input = document.querySelector("input[type='file'][multiple]");
+      const files = ["a.png", "b.png"].map((n) => new File(["x"], n, { type: "image/png" }));
+
+      fireEvent.change(input, { target: { files } });
+
+      expect(await screen.findByRole("button", { name: "Uploading 2 of 2…" })).toBeDisabled();
+      release({ url: "https://cdn.test/n2.png" });
+      expect(await screen.findByRole("button", { name: "+ Add images" })).toBeEnabled();
+    });
 
     it("moves an image with the buttons", async () => {
       const user = userEvent.setup();

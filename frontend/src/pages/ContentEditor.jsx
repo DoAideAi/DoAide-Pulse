@@ -970,6 +970,8 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
   const [uploading, setUploading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [galleryUploading, setGalleryUploading] = useState(false);
+  // "2 of 5" while a multi-file pick uploads; null otherwise.
+  const [galleryProgress, setGalleryProgress] = useState(null);
   const [aiRanFor, setAiRanFor] = useState("");
   const [suggesting, setSuggesting] = useState(false);
   const cover = draft.cover_image_url.trim();
@@ -1041,23 +1043,37 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     setGalleryUploading(true);
+    // One file at a time, each on its own. The batch used to stop at the first
+    // failure and add nothing: images that had already reached the server were
+    // dropped from the draft, the toast did not say which file was refused, and
+    // the author had to pick all of them again.
+    const urls = [];
+    const failed = [];
     try {
-      const urls = [];
-      for (const file of files) {
-        const result = await api.uploadImage(file);
-        urls.push(result.url);
+      for (const [index, file] of files.entries()) {
+        setGalleryProgress(files.length > 1 ? { done: index, total: files.length } : null);
+        try {
+          const result = await api.uploadImage(file);
+          urls.push(result.url);
+        } catch (err) {
+          failed.push(`${file.name} (${err.message})`);
+        }
       }
-      setDraft((d) => ({
-        ...d,
-        marketing_images: [...(d.marketing_images || []), ...urls],
-      }));
-    } catch (err) {
-      toast.error(
-        `Image upload failed: ${err.message}. ` +
-          "Check the file is a JPEG, PNG, WebP, or GIF under 10 MB.",
-      );
     } finally {
+      if (urls.length) {
+        setDraft((d) => ({
+          ...d,
+          marketing_images: [...(d.marketing_images || []), ...urls],
+        }));
+      }
+      if (failed.length) {
+        toast.error(
+          `${failed.length === files.length ? "Image upload failed" : `${urls.length} of ${files.length} images added; not uploaded`}: ` +
+            `${failed.join("; ")}. Check each is a JPEG, PNG, WebP, or GIF under 10 MB.`,
+        );
+      }
       setGalleryUploading(false);
+      setGalleryProgress(null);
       if (galleryInputRef.current) galleryInputRef.current.value = "";
     }
   }
@@ -1258,7 +1274,11 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
             onClick={() => galleryInputRef.current?.click()}
             disabled={locked || galleryUploading}
           >
-            {galleryUploading ? "Uploading…" : "+ Add images"}
+            {galleryUploading
+              ? galleryProgress
+                ? `Uploading ${galleryProgress.done + 1} of ${galleryProgress.total}…`
+                : "Uploading…"
+              : "+ Add images"}
           </button>
         </div>
         {(draft.marketing_images?.length > 0) ? (
