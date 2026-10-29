@@ -1355,7 +1355,13 @@ def repurpose_content(
     against a shared free-tier quota.
     """
     content = _owned_content(content_id, db, user)
-    result = repurpose.generate(content, content.project)
+    project = content.project
+    # Hand the connection back before the model call, as ``generate_content``
+    # does and for its reason: the read above left the session checked out and
+    # idle in a transaction for the whole wait, and a few overlapping assists
+    # starved every other request of the pool's fifteen.
+    release_for_slow_work(db, content, project)
+    result = repurpose.generate(content, project)
     return RepurposeOut(
         twitter_thread=result.twitter_thread,
         linkedin_post=result.linkedin_post,
@@ -1411,13 +1417,19 @@ def edit_passage(
             ),
         )
 
+    project = content.project
+    # Hand the connection back before the model call, as ``generate_content``
+    # does and for its reason: the read above left the session checked out and
+    # idle in a transaction for the whole wait, and a few overlapping assists
+    # starved every other request of the pool's fifteen.
+    release_for_slow_work(db, content, project)
     try:
         result = inline_edit.edit(
             body_markdown=content.body_markdown,
             selection=selection,
             operation=payload.operation,
             title=content.title,
-            project=content.project,
+            project=project,
             tone=payload.tone,
         )
     except inline_edit.EditUnavailable as exc:
@@ -1458,7 +1470,13 @@ def generate_headline_variants(
     is the separate step that actually swaps the live title.
     """
     content = _owned_content(content_id, db, user)
-    result = headlines.generate_variants(content, content.project, count=count)
+    project = content.project
+    # Hand the connection back before the model call, as ``generate_content``
+    # does and for its reason: the read above left the session checked out and
+    # idle in a transaction for the whole wait, and a few overlapping assists
+    # starved every other request of the pool's fifteen.
+    release_for_slow_work(db, content, project)
+    result = headlines.generate_variants(content, project, count=count)
     return HeadlineVariantsOut(
         variants=result.variants,
         provider=result.provider,

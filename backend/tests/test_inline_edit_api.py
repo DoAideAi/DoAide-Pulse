@@ -102,10 +102,14 @@ def test_nothing_is_persisted(client, auth, content, stub_llm, db):
     Persisting here would also mean the editor's unsaved changes were silently
     discarded by an action that reads as "improve this paragraph".
     """
+    content_id = content.id
     _post(client, auth, content)
 
-    db.refresh(content)
-    assert content.body_markdown == BODY
+    # Read back by id: the endpoint hands its rows back to the pool before the
+    # model call (release_for_slow_work), which in this shared test session
+    # detaches the fixture's instance.
+    db.expire_all()
+    assert db.get(type(content), content_id).body_markdown == BODY
 
 
 @pytest.mark.parametrize("operation", [op.value for op in inline_edit.EditOperation])
