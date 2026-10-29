@@ -1877,15 +1877,25 @@ def collect_metrics(
         logger.warning("metrics poll for publication %s failed: %s", publication.id, exc)
         return None
 
-    metric = ContentMetric(
-        publication_id=publication.id,
-        views=_count(snapshot.views),
-        reads=_count(snapshot.reads),
-        clicks=_count(snapshot.clicks),
-        reactions=_count(snapshot.reactions),
-        comments=_count(snapshot.comments),
-        shares=_count(snapshot.shares),
-    )
+    raw = {field: getattr(snapshot, field) for field in _METRIC_FIELDS}
+    counts = {field: _count(value) for field, value in raw.items()}
+    # A value the platform sent that is not a count is stored as "not
+    # reported" — which, unlogged, read exactly like a platform that does not
+    # report that number at all. A format change on the platform's side, or a
+    # self-hosted instance answering with nonsense, should show up somewhere.
+    dropped = {
+        field: repr(value)[:40]
+        for field, value in raw.items()
+        if value is not None and counts[field] is None
+    }
+    if dropped:
+        logger.warning(
+            "metrics for publication %s on %s: not counts, stored as not reported: %s",
+            publication.id,
+            publication.platform.value,
+            ", ".join(f"{field}={value}" for field, value in sorted(dropped.items())),
+        )
+    metric = ContentMetric(publication_id=publication.id, **counts)
     db.add(metric)
     if commit:
         db.commit()
@@ -1917,6 +1927,9 @@ def _count(value: object) -> int | None:
         return value
     return None
 
+
+#: The engagement fields a metrics snapshot carries, as ``content_metrics`` names them.
+_METRIC_FIELDS = ("views", "reads", "clicks", "reactions", "comments", "shares")
 
 #: The largest count a ``content_metrics`` column holds (32-bit ``Integer``).
 _COUNT_MAX = 2**31 - 1

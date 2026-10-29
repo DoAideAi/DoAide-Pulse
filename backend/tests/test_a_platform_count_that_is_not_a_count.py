@@ -93,3 +93,48 @@ def test_one_negative_count_does_not_cost_the_batch(
     assert rows[good.id].views == 40
     assert rows[bad.id].views is None
     assert rows[bad.id].reactions == 3
+
+
+def test_a_dropped_value_is_logged_with_the_platform_and_field(
+    db, project, connected, monkeypatch, caplog
+):
+    """Stored as "not reported", and said so — or a platform's format change
+    would look exactly like a platform that does not report the number."""
+    import logging
+
+    from app.services import publishing_service
+
+    monkeypatch.setattr(
+        publishers.get_adapter(Platform.DEVTO),
+        "fetch_metrics",
+        lambda external_id, credentials: MetricsSnapshot(
+            views=2**40, reactions="lots", comments=4
+        ),
+    )
+    publication = _published(db, project, "odd")
+
+    with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
+        publishing_service.collect_metrics(db, publication)
+
+    line = next(r.getMessage() for r in caplog.records if "not counts" in r.getMessage())
+    assert f"publication {publication.id} on devto" in line
+    assert "views=1099511627776" in line and "reactions='lots'" in line
+    assert "comments" not in line
+
+
+def test_a_clean_snapshot_logs_nothing(db, project, connected, monkeypatch, caplog):
+    import logging
+
+    from app.services import publishing_service
+
+    monkeypatch.setattr(
+        publishers.get_adapter(Platform.DEVTO),
+        "fetch_metrics",
+        lambda external_id, credentials: MetricsSnapshot(views=10, reactions=None),
+    )
+    publication = _published(db, project, "clean")
+
+    with caplog.at_level(logging.WARNING, logger="app.services.publishing_service"):
+        publishing_service.collect_metrics(db, publication)
+
+    assert "not counts" not in caplog.text
