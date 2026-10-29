@@ -426,10 +426,11 @@ def digest_unsubscribe(
     status_code=status.HTTP_303_SEE_OTHER,
     response_class=RedirectResponse,
     summary="Open the digest setting (a GET never unsubscribes)",
-    # Nothing it does can fail; the size guard in front of every route can.
-    responses=errors(status.HTTP_413_CONTENT_TOO_LARGE),
+    # Nothing it does can fail; the size guard and the limiter in front can.
+    responses=errors(status.HTTP_413_CONTENT_TOO_LARGE, status.HTTP_429_TOO_MANY_REQUESTS),
 )
-def digest_unsubscribe_page(user_id: RowId, token: str) -> RedirectResponse:
+@limiter.limit(settings.rate_limit_public_read)
+def digest_unsubscribe_page(request: Request, user_id: RowId, token: str) -> Response:
     """A GET to the unsubscribe link goes to Settings and changes nothing.
 
     Link scanners, previewers and prefetchers issue GETs, and an unsubscribe

@@ -169,6 +169,8 @@ _NO_MODEL_ALLOWLIST = {
     # build the whole account in memory to validate it. Documented through
     # ``responses={200: {"model": AccountExportOut}}`` instead.
     "export_me",
+    # A 303 to Settings: the digest unsubscribe link's GET, which has no body.
+    "digest_unsubscribe_page",
 }
 
 

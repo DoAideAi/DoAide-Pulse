@@ -402,7 +402,8 @@ def test_no_analytics_endpoint_still_answers_an_untyped_object():
     tenant leak — token spend is install-wide, served via /metrics). Thirteen with
     the pipeline (content by status, publish success rates), fourteen with
     subscriber growth, fifteen with feature usage, sixteen with the funnel, seventeen with autopilot
-    effectiveness (C103 M15). The count is the
+    effectiveness (C103 M15), nineteen with the digest's one-click unsubscribe
+    (its POST, and a GET that only redirects and so has no body). The count is the
     guard on the walk, so it moves when the
     surface does; what must not move is ``untyped``.
     """
@@ -424,8 +425,12 @@ def test_no_analytics_endpoint_still_answers_an_untyped_object():
         if "analytics" in (route.tags or [])
     ]
 
-    assert len(analytics_routes) == 17
-    untyped = [r.path for r in analytics_routes if r.response_model is None]
+    assert len(analytics_routes) == 19
+    untyped = [
+        r.path
+        for r in analytics_routes
+        if r.response_model is None and r.status_code != 303
+    ]
     assert untyped == []
 
 
