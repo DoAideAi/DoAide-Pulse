@@ -340,7 +340,12 @@ def due_triggers(db: Session, *, limit: int = 200) -> list[Trigger]:
     publishing with its stored platform credentials, on a schedule nobody could
     log in to change.
     """
-    rows = db.scalars(
+    # Read page by page until *limit* due triggers are found. "Checked longest
+    # ago" is not "due" — a weekly feed checked six days ago sorts ahead of an
+    # hourly one checked two hours ago — so a single page filtered afterwards
+    # starved every due trigger behind two hundred that were not. Bounded by
+    # the active triggers, which the per-project cap keeps in the thousands.
+    query = (
         select(Trigger)
         .join(Project, Project.id == Trigger.project_id)
         .join(User, User.id == Project.user_id)
@@ -350,10 +355,19 @@ def due_triggers(db: Session, *, limit: int = 200) -> list[Trigger]:
             User.is_active.is_(True),
             Trigger.kind != TriggerKind.WEBHOOK,
         )
-        .order_by(Trigger.last_checked_at.is_(None).desc(), Trigger.last_checked_at)
-        .limit(limit)
+        .order_by(
+            Trigger.last_checked_at.is_(None).desc(), Trigger.last_checked_at, Trigger.id
+        )
     )
-    return [t for t in rows if is_due(t)]
+    due: list[Trigger] = []
+    offset = 0
+    while len(due) < limit:
+        page = list(db.scalars(query.offset(offset).limit(limit)))
+        if not page:
+            break
+        due.extend(t for t in page if is_due(t))
+        offset += len(page)
+    return due[:limit]
 
 
 # --------------------------------------------------------------------------- #
