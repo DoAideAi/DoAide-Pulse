@@ -358,16 +358,15 @@ ssh … 'journalctl -u pulse-backup --since "2 days ago"'
 ssh … 'systemctl start pulse-backup'
 ```
 
-Installing it on a fresh box — the units are rsynced to `/opt/Pulse/deploy`
-by `deploy.sh`, but systemd needs them in `/etc` and the directory has to
-exist:
+Turning it on. `deploy.sh` already installs both units into
+`/etc/systemd/system`, and the service creates `/var/backups/pulse` itself
+(`ExecStartPre=+install -d …`), so the one step left is enabling the timer —
+then run it once by hand to see a dump land:
 
 ```bash
 ssh … '
-  install -d -o pulse -g pulse -m 0700 /var/backups/pulse
-  cp /opt/Pulse/deploy/systemd/pulse-backup.{service,timer} /etc/systemd/system/
-  systemctl daemon-reload
-  systemctl enable --now pulse-backup.timer'
+  systemctl enable --now pulse-backup.timer
+  systemctl start pulse-backup && ls -la /var/backups/pulse'
 ```
 
 **Restoring.** `--format=custom` is what makes a single table recoverable

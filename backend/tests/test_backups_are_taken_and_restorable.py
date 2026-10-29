@@ -137,6 +137,26 @@ def test_the_backup_cannot_write_into_the_application_directory():
     assert _directive(unit, "ReadWritePaths") == "/var/backups/pulse"
 
 
+def test_the_unit_makes_the_directory_it_is_sandboxed_to():
+    """systemd refuses to start a unit whose ``ReadWritePaths`` does not exist
+    (226/NAMESPACE, before ``backup.sh`` runs), and the service account cannot
+    create it under root-owned ``/var/backups``. It was a manual step the box
+    never took, so turning the timer on would have meant a nightly failure.
+
+    The unit makes it, privileged (``+``) so the sandbox does not apply to that
+    one command, owned by the account that writes the dumps, before the dump.
+    """
+    unit = _SERVICE.read_text()
+    directory = _directive(unit, "ReadWritePaths")
+
+    pre = _directive(unit, "ExecStartPre")
+    assert pre is not None, "nothing creates the dump directory"
+    assert pre.startswith("+"), "unprivileged, it cannot create a directory in /var/backups"
+    assert pre.split()[-1] == directory
+    assert "-o pulse -g pulse" in pre and "-m 0700" in pre
+    assert unit.index("ExecStartPre=") < unit.index("ExecStart=/")
+
+
 def test_the_backup_reads_the_same_env_file_as_the_application():
     """One ``DATABASE_URL``, so the dump cannot drift onto a different database.
 

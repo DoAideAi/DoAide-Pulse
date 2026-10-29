@@ -13,6 +13,15 @@ Group=pulse
 # than one named a second time here and free to drift from it. The same file
 # the api/worker/beat units read.
 EnvironmentFile=/opt/Pulse/.env
+# The dump directory, made by the unit itself. ReadWritePaths= below names it,
+# and systemd will not start a unit whose read-write path does not exist — the
+# run fails at 226/NAMESPACE before backup.sh is reached, and the pulse user
+# could not create it under root-owned /var/backups anyway. It was a manual
+# step in DEPLOYMENT.md, and the box never had it: enabling the timer would
+# have produced a nightly failure, not a nightly dump. ``+`` runs this one
+# command with full privileges and without the sandbox; it changes nothing
+# when the directory is already there.
+ExecStartPre=+/usr/bin/install -d -o pulse -g pulse -m 0700 /var/backups/pulse
 ExecStart=/opt/Pulse/deploy/backup.sh
 
 # A failed dump must be visible, not retried into a loop at 03:30. The timer
