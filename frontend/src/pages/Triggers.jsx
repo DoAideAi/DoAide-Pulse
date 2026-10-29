@@ -349,34 +349,46 @@ const EVENTS_PAGE = 20;
 
 /** Recent firings, and what became of each — and the older ones, on request. */
 function TriggerEvents({ triggerId }) {
-  const { data: first, error, loading, reload } = useApi(
+  const { data: firstPage, error, loading, reload } = useApi(
     () => api.triggerEvents(triggerId, { limit: EVENTS_PAGE }),
     [triggerId],
   );
+  const first = firstPage?.items ?? null;
   // Older pages, appended on "Show older". The panel used to show the newest
   // twenty and stop: an hourly feed fills that in under a day, so yesterday's
-  // failed firing could not be reached. A full page means there may be more; a
-  // short one is the last. De-duplicated by id, because a firing that lands
-  // while somebody reads shifts every offset by one.
-  const [older, setOlder] = useState({ items: [], done: false, busy: false });
+  // failed firing could not be reached. De-duplicated by id, because a firing
+  // that lands while somebody reads shifts every offset by one.
+  //
+  // Whether there is more comes from X-Total-Count. It was guessed from a page
+  // coming back full, so a history that filled whole pages (exactly 20, or 40)
+  // offered a button whose click loaded nothing.
+  const [older, setOlder] = useState({ items: [], total: null, busy: false, error: null });
   const events = first ? [...first, ...older.items.filter((e) => !first.some((f) => f.id === e.id))] : first;
-  const more =
-    !older.done && (older.items.length ? older.items.length % EVENTS_PAGE === 0 : first?.length === EVENTS_PAGE);
+  const total = older.total ?? firstPage?.total ?? 0;
+  const fetched = (first?.length ?? 0) + older.items.length;
+  const more = Boolean(first) && fetched < total;
+
+  function retry() {
+    // A fresh first page makes the appended ones stale; start the list over.
+    setOlder({ items: [], total: null, busy: false, error: null });
+    reload();
+  }
 
   async function showOlder() {
-    setOlder((o) => ({ ...o, busy: true }));
+    setOlder((o) => ({ ...o, busy: true, error: null }));
     try {
-      const page = await api.triggerEvents(triggerId, {
-        limit: EVENTS_PAGE,
-        offset: (first?.length ?? 0) + older.items.length,
-      });
+      const page = await api.triggerEvents(triggerId, { limit: EVENTS_PAGE, offset: fetched });
       setOlder((o) => ({
-        items: [...o.items, ...page],
-        done: page.length < EVENTS_PAGE,
+        items: [...o.items, ...page.items],
+        // An empty page means the rows ran out (some were purged since the
+        // count was taken), whatever the count said.
+        total: page.items.length ? page.total : fetched,
         busy: false,
+        error: null,
       }));
-    } catch {
-      setOlder((o) => ({ ...o, busy: false }));
+    } catch (err) {
+      // Said, not swallowed: the button used to reset with no word of why.
+      setOlder((o) => ({ ...o, busy: false, error: err.message }));
     }
   }
 
@@ -386,7 +398,7 @@ function TriggerEvents({ triggerId }) {
         title="Recent activity"
         subtitle="Every firing and its result."
       />
-      <ErrorBanner message={error} onRetry={reload} />
+      <ErrorBanner message={error} onRetry={retry} />
       {loading && !events ? (
         <Skeleton rows={2} />
       ) : events?.length === 0 ? (
@@ -416,6 +428,7 @@ function TriggerEvents({ triggerId }) {
           ))}
         </ul>
       )}
+      {older.error && <ErrorBanner message={older.error} />}
       {more && (
         <button type="button" className="btn-quiet mt-2" onClick={showOlder} disabled={older.busy}>
           {older.busy ? "Loading…" : "Show older"}

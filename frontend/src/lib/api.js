@@ -590,7 +590,10 @@ export const api = {
   // is "does my feed URL work?", and an answer that turns up in a list a minute
   // later does not answer it.
   checkTrigger: (id) => request(`/triggers/${id}/check`, { method: "POST" }),
-  triggerEvents: (id, params = {}) => request(`/triggers/${id}/events${qs(params)}`),
+  // `{items, total}`: the activity panel needs X-Total-Count to know when the
+  // last page is on screen, rather than guessing from a full page.
+  triggerEvents: (id, params = {}) =>
+    request(`/triggers/${id}/events${qs(params)}`, { page: true }),
 
   // ---- templates ----
   templateBuiltins: () => request("/templates/builtins"),

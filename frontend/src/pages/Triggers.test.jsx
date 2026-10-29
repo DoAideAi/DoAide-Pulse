@@ -93,7 +93,7 @@ beforeEach(() => {
   // The page reads every trigger; most tests here only care what the list
   // holds, so they set `listTriggers` and this hands it back whole.
   api.listAllTriggers.mockImplementation((params) => api.listTriggers(params));
-  api.triggerEvents.mockResolvedValue([]);
+  api.triggerEvents.mockResolvedValue({ items: [], total: 0 });
 });
 
 describe("the list", () => {
@@ -614,9 +614,24 @@ describe("the signing secret", () => {
   });
 });
 
+/** A whole listing in one page: the rows, and X-Total-Count to match. */
+const onePage = (items) => ({ items, total: items.length });
+
+const firing = (id) => ({
+  id,
+  trigger_id: 1,
+  headline: `Firing ${id}`,
+  status: "generated",
+  detail: "",
+  content_id: null,
+  dedupe_key: null,
+  payload: {},
+  created_at: "2026-07-30T10:00:00Z",
+});
+
 describe("activity", () => {
   it("lists firings and links the draft one produced", async () => {
-    api.triggerEvents.mockResolvedValue([
+    api.triggerEvents.mockResolvedValue(onePage([
       {
         id: 5,
         trigger_id: 1,
@@ -628,7 +643,7 @@ describe("activity", () => {
         payload: {},
         created_at: "2026-07-30T10:00:00Z",
       },
-    ]);
+    ]));
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
 
@@ -643,7 +658,7 @@ describe("activity", () => {
     // A webhook POST with no title field, or a feed entry missing one. The row
     // is still the record that something fired, and a blank line in a list of
     // timestamps reads as a rendering fault rather than as thin source data.
-    api.triggerEvents.mockResolvedValue([
+    api.triggerEvents.mockResolvedValue(onePage([
       {
         id: 7,
         trigger_id: 1,
@@ -655,7 +670,7 @@ describe("activity", () => {
         payload: {},
         created_at: "2026-07-30T10:00:00Z",
       },
-    ]);
+    ]));
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
 
@@ -663,7 +678,7 @@ describe("activity", () => {
   });
 
   it("explains why a firing wrote nothing", async () => {
-    api.triggerEvents.mockResolvedValue([
+    api.triggerEvents.mockResolvedValue(onePage([
       {
         id: 6,
         trigger_id: 1,
@@ -675,7 +690,7 @@ describe("activity", () => {
         payload: {},
         created_at: "2026-07-30T10:00:00Z",
       },
-    ]);
+    ]));
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
 
@@ -698,11 +713,13 @@ describe("activity", () => {
       payload: {},
       created_at: "2026-07-30T10:00:00Z",
     });
-    api.triggerEvents.mockImplementation(async (_id, { offset = 0 } = {}) =>
-      offset === 0
-        ? Array.from({ length: 20 }, (_, i) => event(100 - i))
-        : [event(80), event(79)],
-    );
+    api.triggerEvents.mockImplementation(async (_id, { offset = 0 } = {}) => ({
+      items:
+        offset === 0
+          ? Array.from({ length: 20 }, (_, i) => event(100 - i))
+          : [event(80), event(79)],
+      total: 22,
+    }));
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
     expect(await screen.findByText("Firing 100")).toBeInTheDocument();
@@ -716,17 +733,93 @@ describe("activity", () => {
   });
 
   it("offers nothing older when the first page is not full", async () => {
-    api.triggerEvents.mockResolvedValue([
+    api.triggerEvents.mockResolvedValue(onePage([
       {
         id: 9, trigger_id: 1, headline: "Only one", status: "generated", detail: "",
         content_id: null, dedupe_key: null, payload: {}, created_at: "2026-07-30T10:00:00Z",
       },
-    ]);
+    ]));
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
     await screen.findByText("Only one");
 
     expect(screen.queryByRole("button", { name: "Show older" })).not.toBeInTheDocument();
+  });
+
+  // "Show older" judged "maybe more" by a page coming back full, so with
+  // exactly 40 firings the second full page kept the button, and the click
+  // after it loaded nothing — a dead click on the last page. With exactly 20
+  // the button was there from the start. X-Total-Count says how many there
+  // are, and the button goes when they are all on the page.
+  it("offers no dead click when the firings fill whole pages", async () => {
+    api.triggerEvents.mockImplementation(async (_id, { offset = 0 } = {}) => ({
+      items: Array.from({ length: 20 }, (_, i) => firing(100 - offset - i)),
+      total: 40,
+    }));
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    await screen.findByText("Firing 100");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show older" }));
+
+    expect(await screen.findByText("Firing 61")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show older" })).not.toBeInTheDocument();
+  });
+
+  it("offers nothing older when exactly one page of firings exists", async () => {
+    api.triggerEvents.mockResolvedValue(
+      onePage(Array.from({ length: 20 }, (_, i) => firing(20 - i))),
+    );
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    await screen.findByText("Firing 20");
+
+    expect(screen.queryByRole("button", { name: "Show older" })).not.toBeInTheDocument();
+  });
+
+  it("says so when older firings could not be loaded", async () => {
+    api.triggerEvents.mockImplementation(async (_id, { offset = 0 } = {}) => {
+      if (offset) throw new Error("Couldn't reach Pulse — check your connection and try again.");
+      return { items: Array.from({ length: 20 }, (_, i) => firing(100 - i)), total: 30 };
+    });
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    await screen.findByText("Firing 100");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show older" }));
+
+    expect(await screen.findByText(/Couldn't reach Pulse/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show older" })).toBeEnabled();
+  });
+
+  it("stops offering more when the rows run out before the count said", async () => {
+    // Firings purged by retention between the count and the next page.
+    api.triggerEvents.mockImplementation(async (_id, { offset = 0 } = {}) => ({
+      items: offset ? [] : Array.from({ length: 20 }, (_, i) => firing(100 - i)),
+      total: 30,
+    }));
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    await screen.findByText("Firing 100");
+
+    await userEvent.click(screen.getByRole("button", { name: "Show older" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Show older" })).not.toBeInTheDocument(),
+    );
+  });
+
+  it("loads the panel again after a failed first load", async () => {
+    api.triggerEvents
+      .mockRejectedValueOnce(new Error("Service Unavailable"))
+      .mockResolvedValue(onePage([firing(3)]));
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    await screen.findByText("Service Unavailable");
+
+    await userEvent.click(screen.getByRole("button", { name: /Retry/ }));
+
+    expect(await screen.findByText("Firing 3")).toBeInTheDocument();
   });
 
   it("says so when a trigger has never fired", async () => {
