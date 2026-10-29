@@ -52,6 +52,14 @@ describe("a caught render crash", () => {
     expect(body.components).toContain("Boom");
   });
 
+  it("says which build crashed, so a deploy's crash is told from a stale tab's", () => {
+    // The server logs release=- for a report without one, and every report was
+    // without one: after a deploy, nothing said whether a crash came from the
+    // new code or from a tab still running the old bundle.
+    reportRenderError(new Error("x"), { componentStack: "" }, "s");
+    expect(sentBodies()[0].release).toBe("test-release");
+  });
+
   it("names the account when there is one", () => {
     localStorage.setItem("pulse_token", "tok");
     reportRenderError(new Error("x"), { componentStack: "" }, "s");

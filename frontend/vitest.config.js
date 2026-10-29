@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  // What vite.config.js fills with the commit being built (see there).
+  define: { __PULSE_RELEASE__: JSON.stringify("test-release") },
   test: {
     environment: "jsdom",
     globals: true,

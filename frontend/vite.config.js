@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { PUBLIC_ROUTE_META } from "./src/data/publicRouteMeta.js";
@@ -30,9 +31,25 @@ function prerenderHeads() {
   };
 }
 
+/**
+ * The commit being built, short form — what a crash report names as its
+ * `release` (src/lib/clientErrors.js), so the journal says which deploy's
+ * bundle crashed. Empty outside a git checkout rather than failing the build.
+ */
+function release() {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
 // Proxy /api to the FastAPI backend during development.
 export default defineConfig({
   plugins: [react(), prerenderHeads()],
+  define: { __PULSE_RELEASE__: JSON.stringify(release()) },
   build: {
     rollupOptions: {
       output: {

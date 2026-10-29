@@ -10,6 +10,10 @@ const TOKEN_KEY = "pulse_token";
 // A boundary inside a list can trip once per row; one page load says what it
 // has to say in a handful of reports, and the server limits the rest anyway.
 const MAX_PER_PAGE = 5;
+// The commit this bundle was built from (vite.config.js `define`). Without it
+// every report was logged release=-, and after a deploy nothing told a crash in
+// the new code from one in a tab still running the old bundle.
+const RELEASE = typeof __PULSE_RELEASE__ === "string" ? __PULSE_RELEASE__ : "";
 
 let enabled = import.meta.env?.MODE !== "test";
 let sent = new Set();
@@ -68,6 +72,7 @@ export function reportRenderError(error, info, section) {
         name,
         message,
         components: componentNames(info?.componentStack),
+        release: RELEASE,
       }),
     }).catch(() => {});
   } catch {
