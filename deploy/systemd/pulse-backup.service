@@ -19,8 +19,12 @@ EnvironmentFile=/opt/Pulse/.env
 # could not create it under root-owned /var/backups anyway. It was a manual
 # step in DEPLOYMENT.md, and the box never had it: enabling the timer would
 # have produced a nightly failure, not a nightly dump. ``+`` runs this one
-# command with full privileges and without the sandbox; it changes nothing
-# when the directory is already there.
+# command with full privileges; it changes nothing when the directory is there.
+# The ``+`` alone was not enough: systemd 255 still sets up the namespace for
+# this command, and a missing ReadWritePaths= path failed it at 226/NAMESPACE
+# — the step meant to make the directory died because it was not there. So the
+# path below is ``-`` (skipped while missing), and backup.sh's own namespace,
+# set up after this runs, has it read-write.
 ExecStartPre=+/usr/bin/install -d -o pulse -g pulse -m 0700 /var/backups/pulse
 ExecStart=/opt/Pulse/deploy/backup.sh
 
@@ -44,7 +48,7 @@ IOSchedulingClass=idle
 # /opt/Pulse is *not* in ReadWritePaths, unlike the application units: this
 # job only reads the code and the env file, and a backup that can write over
 # the application it is backing up has the failure modes of both.
-ReadWritePaths=/var/backups/pulse
+ReadWritePaths=-/var/backups/pulse
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes

@@ -134,7 +134,7 @@ def test_the_backup_cannot_write_into_the_application_directory():
     unit = _SERVICE.read_text()
 
     assert _directive(unit, "ProtectSystem") == "strict"
-    assert _directive(unit, "ReadWritePaths") == "/var/backups/pulse"
+    assert _directive(unit, "ReadWritePaths") == "-/var/backups/pulse"
 
 
 def test_the_unit_makes_the_directory_it_is_sandboxed_to():
@@ -148,6 +148,14 @@ def test_the_unit_makes_the_directory_it_is_sandboxed_to():
     """
     unit = _SERVICE.read_text()
     directory = _directive(unit, "ReadWritePaths")
+    # ``-``: the "+" step does not escape the namespace set-up on systemd 255.
+    # The box's first run failed 226/NAMESPACE with "/var/backups/pulse: No
+    # such file or directory" in the (install) process itself — the command
+    # meant to create the path died because the path was not there. A ``-``
+    # path is skipped while missing, so the install runs, and backup.sh's own
+    # namespace (set up per command) then has it read-write.
+    assert directory.startswith("-"), "a missing ReadWritePaths path blocks the step that makes it"
+    directory = directory[1:]
 
     pre = _directive(unit, "ExecStartPre")
     assert pre is not None, "nothing creates the dump directory"
