@@ -10,7 +10,7 @@ shared Caddy container.
 |---|---|
 | Host | `89.167.8.178` |
 | SSH | `ssh -i /Users/dev/projects/keys/hetzner_deploy_ed25519 root@89.167.8.178` |
-| Code | `/opt/Pulse` — a plain rsync copy, **no `.git`** |
+| Code | `/opt/Pulse` — synced by `deploy.sh` with rsync; also a git checkout of `main` (`.git` is excluded from the sync and never shipped) |
 | Runs as | system user `pulse` (not root) |
 | Public URL | `https://pulse.doaide.com` |
 | Deploy | `./deploy/deploy.sh` |
@@ -309,6 +309,25 @@ sudo -u pulse env $(grep -E '^DATABASE_URL=' /opt/Pulse/.env | xargs) \
 
 `deploy.sh` stops the worker and beat before migrating and starts them after.
 
+## What `deploy.sh` does, in order
+
+1. **Free space.** Refuses to start below 1 GiB free on `/opt/Pulse`
+   (`PULSE_DEPLOY_MIN_FREE_MB`): a sync that runs out of disk half way leaves a
+   tree no commit ever had. Nothing is changed when it refuses.
+2. **Dependencies, before the code.** Only `backend/requirements.txt` goes up
+   first and is installed. A pip failure (PyPI down, a yanked pin) stops the
+   deploy with the box exactly as it was. Skipped when the file hashes to
+   `/opt/Pulse/.venv/.requirements.sha256`, the stamp of the last install, so a
+   deploy that changes no pin needs no PyPI at all.
+3. **Code.** `rsync --delete --exclude-from deploy/rsync-excludes`, then
+   `frontend/dist`. The exclude list is shared with `rollback.sh` and is the
+   list of what survives `--delete`: `.env`, the venv, `backend/uploads/`,
+   `.deploy-history`, the beat schedule. Add to it, never to an inline copy.
+4. **Units.** Every file in `deploy/systemd` is installed into
+   `/etc/systemd/system` if it differs; `daemon-reload` runs only then.
+5. **Migrate** under advisory lock 737868, with worker and beat stopped.
+6. **Restart** api and web, start worker and beat, and poll `/health`.
+
 ## Seeding
 
 ```bash
@@ -323,12 +342,22 @@ default seeded fine and then 500'd `/api/v1/auth/me` on response validation.
 
 ## Rollback
 
-The server holds no `.git`, so roll back from the developer machine:
+Use `rollback.sh`, from the developer machine — not `git checkout` and
+`deploy.sh`:
 
 ```bash
-git checkout <good-sha>
-./deploy/deploy.sh
+./deploy/rollback.sh              # to HEAD~1
+./deploy/rollback.sh <good-sha>   # to a specific commit
+./deploy/rollback.sh --db-only <alembic-rev>   # schema only
 ```
+
+The difference matters when the commit being undone added a migration. Only
+the newer code knows how to undo it, so `rollback.sh` downgrades the database
+to the old commit's head *before* syncing the old tree; `deploy.sh` at the old
+commit would sync first and its `alembic upgrade head` could not find the
+revision the database is at. It also installs the old commit's requirements
+and rewrites the pip stamp to match, so the next forward deploy reinstalls
+rather than skipping pip on a stale match.
 
 Take a code and database snapshot before anything risky:
 

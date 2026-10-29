@@ -100,3 +100,25 @@ def test_the_deploy_refuses_to_start_short_of_disk():
     assert floor < DEPLOY.index("pip install -q -r")
     assert floor < DEPLOY.index('./ "root@$HOST:$REMOTE/"')
     assert re.search(r'if \[ "\$\{free_mb:-0\}" -lt "\$MIN_FREE_MB" \]; then', DEPLOY)
+
+
+#: Each mechanism, with where it lives and the doc's name for it. DEPLOYMENT.md
+#: told operators the box had no .git and to roll back with ``git checkout``
+#: and ``deploy.sh`` — which, across a migration, runs old code on the newer
+#: schema — and described none of the deploy's own guards.
+_DOCUMENTED = {
+    "rollback.sh": ROLLBACK,
+    "rsync-excludes": DEPLOY,
+    ".requirements.sha256": DEPLOY,
+    "PULSE_DEPLOY_MIN_FREE_MB": DEPLOY,
+}
+
+
+def test_deployment_md_describes_the_scripts_as_they_are():
+    doc = (_DEPLOY_DIR / "DEPLOYMENT.md").read_text()
+    for name, script in _DOCUMENTED.items():
+        assert name in doc, f"DEPLOYMENT.md does not mention {name}"
+        if name != "rollback.sh":
+            assert name in script, f"DEPLOYMENT.md names {name}, which the script no longer has"
+    assert "no `.git`" not in doc, "the box is a git checkout of main"
+    assert "git checkout <good-sha>\n./deploy/deploy.sh" not in doc
