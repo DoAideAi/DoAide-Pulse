@@ -41,7 +41,7 @@ export default function Triggers() {
     error,
     loading,
     reload,
-  } = useApi(() => api.listTriggers(projectId ? { project_id: projectId } : {}), [projectId]);
+  } = useApi(() => api.listAllTriggers(projectId ? { project_id: projectId } : {}), [projectId]);
 
   const [editing, setEditing] = useState(null); // trigger | "new" | null
   // The signing secret, held only for as long as the dialog showing it is open.

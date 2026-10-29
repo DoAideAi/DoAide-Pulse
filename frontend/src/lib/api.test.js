@@ -823,7 +823,7 @@ describe("every endpoint's path and verb", () => {
     // one sends a form, one is unauthenticated, and one touches no network at
     // all, so none of them fits the shape this table asserts. `queueCounts`
     // makes two requests and has its own case below.
-    const exempt = new Set(["login", "register", "logout", "uploadImage", "queueCounts"]);
+    const exempt = new Set(["login", "register", "logout", "uploadImage", "queueCounts", "listAllTriggers"]);
     const covered = new Set(ENDPOINTS.map(([name]) => name));
 
     const uncovered = Object.keys(api).filter(
@@ -889,5 +889,34 @@ describe("listContentPage", () => {
     vi.stubGlobal("fetch", serving('[{"id":1}]', null));
 
     expect(await api.listContentPage()).toEqual({ items: [{ id: 1 }], total: 1 });
+  });
+});
+
+describe("listAllTriggers", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // The Triggers page took the default page of 100 and showed it as the whole
+  // list; an account may hold a thousand. It reads until it has the total.
+  it("reads every page until it has the total", async () => {
+    const all = Array.from({ length: 1100 }, (_, i) => ({ id: i + 1 }));
+    const fetchMock = vi.fn(async (url) => {
+      const query = new URL(url, "http://x").searchParams;
+      const limit = Number(query.get("limit"));
+      const offset = Number(query.get("offset"));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "",
+        headers: { get: (n) => (n === "X-Total-Count" ? String(all.length) : null) },
+        text: async () => JSON.stringify(all.slice(offset, offset + limit)),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const triggers = await api.listAllTriggers({ project_id: 4 });
+
+    expect(triggers).toHaveLength(1100);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock.mock.calls[0][0]).toContain("project_id=4");
   });
 });

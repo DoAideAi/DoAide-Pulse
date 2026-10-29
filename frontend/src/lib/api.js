@@ -520,6 +520,19 @@ export const api = {
   // ---- triggers ----
   triggerKinds: () => request("/triggers/kinds"),
   listTriggers: (params = {}) => request(`/triggers${qs(params)}`),
+  // Every trigger, page by page. The Triggers page took the default page of
+  // 100 as the whole list, and an account may hold a thousand (20 a project).
+  listAllTriggers: async (params = {}) => {
+    const out = [];
+    for (;;) {
+      const page = await request(
+        `/triggers${qs({ ...params, limit: 500, offset: out.length })}`,
+        { page: true },
+      );
+      out.push(...page.items);
+      if (page.items.length === 0 || out.length >= page.total) return out;
+    }
+  },
   // The response carries the signing secret, and no later read of the trigger
   // ever will — same contract as an outbound webhook's.
   createTrigger: (payload) => request("/triggers", { method: "POST", body: payload }),

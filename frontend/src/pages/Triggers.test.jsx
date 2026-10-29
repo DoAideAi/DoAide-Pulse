@@ -11,6 +11,7 @@ vi.mock("../lib/api", () => ({
     listProjects: vi.fn(),
     triggerKinds: vi.fn(),
     listTriggers: vi.fn(),
+    listAllTriggers: vi.fn(),
     createTrigger: vi.fn(),
     updateTrigger: vi.fn(),
     deleteTrigger: vi.fn(),
@@ -89,6 +90,9 @@ beforeEach(() => {
   api.listProjects.mockResolvedValue([{ id: 7, name: "Pulse" }]);
   api.triggerKinds.mockResolvedValue(KINDS);
   api.listTriggers.mockResolvedValue([trigger()]);
+  // The page reads every trigger; most tests here only care what the list
+  // holds, so they set `listTriggers` and this hands it back whole.
+  api.listAllTriggers.mockImplementation((params) => api.listTriggers(params));
   api.triggerEvents.mockResolvedValue([]);
 });
 
