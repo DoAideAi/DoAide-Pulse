@@ -188,15 +188,35 @@ def rename_tag(
         # for every piece being retagged — a common tag is most of the account
         # — and ``Content.publications`` is ``selectin``, so every publication
         # of each piece too. ``version`` comes along because the UPDATE checks it.
+        #
+        # The new list is worked out again here, from the row as it is now,
+        # not taken from the scan. The scan is a separate read, and an editor
+        # save landing between it and this one used to be overwritten with the
+        # list computed from before it — silently, because this load picks up
+        # the saved ``version`` and the version check then passes. Locked, so
+        # nothing changes them between this read and the commit; and
+        # ``populate_existing`` so a row already in the session is re-read
+        # rather than trusted.
+        changed, merged = [], []
         for content in db.scalars(
             select(Content)
             .where(Content.id.in_(rewritten))
+            .order_by(Content.id)
             .options(
                 load_only(Content.id, Content.tags, Content.version),
                 raiseload(Content.publications),
             )
+            .with_for_update(of=Content)
+            .execution_options(populate_existing=True)
         ):
-            content.tags = rewritten[content.id]
+            before = tag_service.normalize_all(list(content.tags or []))
+            if not any(tag_service.is_within(tag, payload.old) for tag in before):
+                continue
+            after = tag_service.rename_in(before, payload.old, payload.new)
+            content.tags = after
+            changed.append(content.id)
+            if len(after) < len(before):
+                merged.append(content.id)
         db.commit()
         logger.info(
             "tag rename for user %s: %r -> %r across %d piece(s)",
