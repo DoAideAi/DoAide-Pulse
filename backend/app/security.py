@@ -158,7 +158,17 @@ def decode_access_token_claims(token: str) -> dict[str, Any] | None:
     when it happened.
     """
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        # ``require``: PyJWT checks ``exp`` only when a token carries one, so a
+        # token signed with this secret that left it out — by any other code
+        # path, or another product sharing the secret — never expired; one
+        # without ``iat`` escaped ``tokens_valid_from``. Pulse always writes
+        # all three, so this refuses nothing it issued.
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "iat", "sub"]},
+        )
     except jwt.InvalidTokenError:
         return None
     if payload.get("type") != "access":
