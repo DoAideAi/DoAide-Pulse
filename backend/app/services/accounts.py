@@ -144,16 +144,26 @@ def erase(db: Session, user: User) -> None:
     pages would outlive it, unattributed — another person's audience kept after
     they asked for their data to go.
 
+    Nor does feedback, which has no account column at all: the widget is
+    anonymous, with an address only if the sender typed one. One signed with
+    this account's own address is this person's, and was kept for
+    ``feedback_retention_days`` (a year by default) after they asked to be
+    forgotten. It is matched case-insensitively, as sign-in matches.
+
     Not reached from here: what was published to other platforms (that lives
     on those platforms, under the account's own credentials there), and images
     uploaded through the editor, which are stored by content hash and not
     attributed to an account.
     """
+    from app.models.feedback import Feedback
     from app.models.project import Project
     from app.models.subscriber import Subscriber
 
     owned = select(Project.id).where(Project.user_id == user.id)
     db.execute(delete(Subscriber).where(Subscriber.project_id.in_(owned)))
+    db.execute(
+        delete(Feedback).where(func.lower(Feedback.email) == normalize_email(user.email))
+    )
     db.execute(delete(User).where(User.id == user.id))
     db.commit()
     logger.info("account %s erased at its owner's request", user.id)

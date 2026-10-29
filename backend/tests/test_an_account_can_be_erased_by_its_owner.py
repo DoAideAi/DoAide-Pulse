@@ -122,6 +122,29 @@ def test_the_right_password_erases_the_account_and_its_sign_in(client, auth, use
     assert login.status_code == 401
 
 
+def test_feedback_signed_with_the_account_address_goes_with_it(client, auth, user, db):
+    """Feedback has no account column; an address typed into it is the only
+    link. One signed with this account's address — in any case — went on
+    being kept for a year after the account asked to be forgotten."""
+    from app.models.feedback import Feedback
+
+    db.add_all(
+        [
+            Feedback(category="bug", message="Theirs, signed.", email="DEV@Example.com"),
+            Feedback(category="bug", message="Somebody else's.", email="other@example.com"),
+            Feedback(category="general", message="Anonymous.", email=None),
+        ]
+    )
+    db.commit()
+
+    resp = client.request("DELETE", ME, headers=auth, json={"password": "hunter2hunter2"})
+
+    assert resp.status_code == 204
+    db.expire_all()
+    left = {f.message for f in db.scalars(select(Feedback))}
+    assert left == {"Somebody else's.", "Anonymous."}
+
+
 def test_it_needs_the_password_and_a_session(client, auth):
     assert client.request("DELETE", ME, headers=auth, json={}).status_code == 422
     assert client.request("DELETE", ME, json={"password": "hunter2hunter2"}).status_code == 401
