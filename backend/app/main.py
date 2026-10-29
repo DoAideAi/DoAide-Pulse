@@ -33,6 +33,7 @@ from app.routers import (
     api_keys,
     auth,
     calendar,
+    client_errors,
     content,
     feedback,
     machine,
@@ -929,6 +930,7 @@ def create_app() -> FastAPI:
     app.include_router(calendar.router, prefix=prefix)
     app.include_router(analytics.router, prefix=prefix)
     app.include_router(activity.router, prefix=prefix)
+    app.include_router(client_errors.router, prefix=prefix)
     app.include_router(product_activity.router, prefix=prefix)
     app.include_router(seo.router, prefix=prefix)
     app.include_router(metrics.router, prefix=prefix)

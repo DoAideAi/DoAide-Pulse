@@ -1,5 +1,6 @@
 import { Component } from "react";
 import { useLocation } from "react-router-dom";
+import { reportRenderError } from "../lib/clientErrors";
 
 /**
  * Catch a render-time throw and put something recoverable in its place.
@@ -50,8 +51,10 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     // React has already written the error and the component stack to
-    // `console.error` by the time this runs, so this is for a caller who wants
-    // to do something more than that — not for logging it a second time.
+    // `console.error` by the time this runs — in *this* browser. Reported to
+    // the server as well, always, so a crash shows up in the place somebody
+    // running Pulse will see it, not only in a console nobody opens.
+    reportRenderError(error, info, this.props.section);
     if (this.props.onError) this.props.onError(error, info, this.props.section);
   }
 
