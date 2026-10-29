@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DRAFT_FIELDS, clear, differs, load, prune, save } from "./draftStore";
+import { DRAFT_FIELDS, clear, clearAll, differs, load, prune, save } from "./draftStore";
 
 const ID = 42;
 const DAY = 24 * 60 * 60 * 1000;
@@ -209,6 +209,17 @@ describe("prune", () => {
   });
 });
 
+describe("clearAll", () => {
+  it("removes every draft, fresh or not, and nothing else", () => {
+    window.localStorage.setItem("pulse:token", "abc");
+    for (const id of [1, 2, 3]) save(id, draft({ title: `Draft ${id}` }), draft());
+
+    expect(clearAll()).toBe(3);
+    expect(window.localStorage.length).toBe(1);
+    expect(window.localStorage.getItem("pulse:token")).toBe("abc");
+  });
+});
+
 describe("when storage is unavailable", () => {
   it("save reports failure instead of throwing", () => {
     // Safari's private mode throws on setItem rather than refusing quietly.
@@ -235,6 +246,15 @@ describe("when storage is unavailable", () => {
     save(1, draft({ title: "Old" }), draft(), 0);
 
     expect(() => prune(8 * DAY)).not.toThrow();
+  });
+
+  it("clearAll reports nothing removed instead of throwing", () => {
+    vi.spyOn(window.localStorage, "removeItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    save(1, draft({ title: "Edited" }), draft());
+
+    expect(clearAll()).toBe(0);
   });
 
   it("clear reports failure instead of throwing", () => {
@@ -274,6 +294,10 @@ describe("when reaching localStorage at all throws", () => {
 
   it("prune counts nothing removed", () => {
     expect(prune()).toBe(0);
+  });
+
+  it("clearAll counts nothing removed", () => {
+    expect(clearAll()).toBe(0);
   });
 });
 

@@ -170,6 +170,25 @@ describe("signing out", () => {
     expect(api.logout).toHaveBeenCalled();
     expect(result.current.user).toBeNull();
   });
+
+  it("takes the account's unsaved drafts with it", async () => {
+    // The editor mirrors unsaved work to localStorage for a week. Signing out
+    // ended the session on the server and left every unpublished title and
+    // body readable by the next person at this browser.
+    getToken.mockReturnValue("stored-token");
+    api.me.mockResolvedValue(ME);
+    localStorage.setItem("pulse:draft:7", JSON.stringify({ at: Date.now(), draft: {} }));
+    localStorage.setItem("pulse:draft:9", JSON.stringify({ at: Date.now(), draft: {} }));
+    localStorage.setItem("unrelated", "kept");
+    const { result } = draw();
+    await waitFor(() => expect(result.current.user).toEqual(ME));
+
+    act(() => result.current.logout());
+
+    expect(localStorage.getItem("pulse:draft:7")).toBeNull();
+    expect(localStorage.getItem("pulse:draft:9")).toBeNull();
+    expect(localStorage.getItem("unrelated")).toBe("kept");
+  });
 });
 
 describe("refreshing", () => {

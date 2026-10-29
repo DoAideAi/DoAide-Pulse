@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { api, getToken, SESSION_ENDED, setToken, TOKEN_KEY } from "../lib/api";
+import { clearAll as clearDrafts } from "../lib/draftStore";
 import trackEvent from "../lib/trackEvent";
 
 const AuthContext = createContext(null);
@@ -82,6 +83,8 @@ export function AuthProvider({ children }) {
 
   function logout() {
     api.logout();
+    // Unsaved drafts are the account's unpublished work; they leave with it.
+    clearDrafts();
     setUser(null);
     trackEvent("logout");
   }

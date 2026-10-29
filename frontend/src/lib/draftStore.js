@@ -164,3 +164,27 @@ export function prune(now = Date.now()) {
   }
   return removed;
 }
+
+/**
+ * Delete every stored draft, whatever its age. Called on sign-out.
+ *
+ * A draft is the account's unpublished work, and the session ending on the
+ * server did nothing to the copy here: the next person at a shared browser
+ * could read every title and body the last one had not saved, for a week.
+ */
+export function clearAll() {
+  const store = storage();
+  if (!store) return 0;
+  try {
+    // Collected first, for the reason `prune` gives.
+    const keys = [];
+    for (let i = 0; i < store.length; i += 1) {
+      const key = store.key(i);
+      if (key?.startsWith(PREFIX)) keys.push(key);
+    }
+    for (const key of keys) store.removeItem(key);
+    return keys.length;
+  } catch {
+    return 0;
+  }
+}
