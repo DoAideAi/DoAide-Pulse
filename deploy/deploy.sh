@@ -91,6 +91,22 @@ if [ "${free_mb:-0}" -lt "$MIN_FREE_MB" ]; then
   exit 1
 fi
 
+# Memory as well as disk. On 2026-10-29 this box (8 GB, shared by every
+# product) sat at full RAM and full swap when a deploy added its own load, and
+# everything on it stopped answering — load near 180, SSH timing out at the
+# banner. A deploy needs headroom: pip, then four services restarting at once,
+# two uvicorn workers and a Celery pool each importing the whole app. Below the
+# floor it changes nothing. An answer that is not a number counts as none.
+MIN_MEM_MB=${PULSE_DEPLOY_MIN_MEM_MB:-600}
+echo "==> checking available memory on $HOST"
+mem_mb=$("${SSH[@]}" "awk '/^MemAvailable:/ {print int(\$2/1024)}' /proc/meminfo")
+case "$mem_mb" in ''|*[!0-9]*) mem_mb=0 ;; esac
+if [ "$mem_mb" -lt "$MIN_MEM_MB" ]; then
+  echo "only ${mem_mb}MiB of memory available on $HOST, below the ${MIN_MEM_MB}MiB floor —" \
+    "nothing was changed. Wait for the box to settle (free -m) and deploy again." >&2
+  exit 1
+fi
+
 echo "==> installing backend dependencies (before the code changes)"
 rsync -az -e "ssh -i $SSH_KEY" \
   backend/requirements.txt "root@$HOST:$REMOTE/.deploy-requirements.txt"
