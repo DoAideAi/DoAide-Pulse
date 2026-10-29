@@ -1409,7 +1409,13 @@ function LinksPanel({ contentId }) {
         </button>
       </div>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {/* Announced, like the other failures in this editor: the check is
+          started by a button and its failure lands away from focus. */}
+      {error && (
+        <p className="text-xs text-bad" role="alert">
+          {error}
+        </p>
+      )}
 
       {!result && !error && (
         <p className="text-xs text-ink-400">

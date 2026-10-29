@@ -344,6 +344,17 @@ describe("the link check", () => {
     expect(await screen.findByRole("button", { name: "Re-check" })).toBeInTheDocument();
   });
 
+  it("announces a failed check to a screen reader, not only on screen", async () => {
+    const user = userEvent.setup();
+    api.checkLinks.mockRejectedValue(new Error("Link check timed out"));
+    await open();
+
+    await user.click(checkButton());
+
+    const alerts = await screen.findAllByRole("alert");
+    expect(alerts.some((el) => el.textContent.includes("Link check timed out"))).toBe(true);
+  });
+
   it("says a body with no links has none, rather than showing nothing", async () => {
     const user = userEvent.setup();
     api.checkLinks.mockResolvedValue({ checked: 0, broken_count: 0, links: [] });

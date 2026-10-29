@@ -46,6 +46,9 @@ describe("PublicArticle", () => {
     wrap();
     expect(await screen.findByText("Test Article")).toBeInTheDocument();
     expect(screen.getByText(/My Project ·/)).toBeTruthy();
+    // The date with its month in words, not 10/1/2026 or 1/10/2026.
+    expect(screen.getByText(/My Project ·/).textContent).toMatch(/Oct.*2026/);
+    expect(screen.getByText(/My Project ·/).textContent).not.toMatch(/\d+\/\d+\/\d+/);
     expect(screen.getByText("Share this article")).toBeInTheDocument();
     expect(screen.getByText("Try DoAide Pulse for free")).toBeInTheDocument();
     // Readers can subscribe from the article itself — the analytics panel has

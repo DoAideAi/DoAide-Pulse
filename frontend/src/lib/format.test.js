@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   automaticOrigin,
   formatCount,
+  formatDate,
   formatDateTime,
   formatDuration,
   formatRate,
@@ -71,6 +72,20 @@ describe("formatDateTime", () => {
 
   it("renders a real instant", () => {
     expect(formatDateTime("2026-07-22T13:00:00Z")).toMatch(/\d/);
+  });
+});
+
+describe("formatDate", () => {
+  it("returns the dash for an empty value rather than 'Invalid Date'", () => {
+    expect(formatDate(null)).toBe("—");
+    expect(formatDate("")).toBe("—");
+  });
+
+  it("writes the month as a word, so day and month cannot be swapped", () => {
+    const text = formatDate("2026-10-01T12:00:00Z");
+    expect(text).toMatch(/Oct/);
+    expect(text).toMatch(/2026/);
+    expect(text).not.toMatch(/\d+\/\d+\/\d+/);
   });
 });
 

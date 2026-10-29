@@ -148,7 +148,13 @@ function MetaTags({ contentId }) {
         </button>
       </div>
 
-      {error && <p className="text-xs text-bad">{error}</p>}
+      {/* Announced: it appears in answer to a button press, away from where
+          focus is, and silence reads as "still loading". */}
+      {error && (
+        <p className="text-xs text-bad" role="alert">
+          {error}
+        </p>
+      )}
 
       {!tags && !error && (
         <p className="text-xs text-ink-400">

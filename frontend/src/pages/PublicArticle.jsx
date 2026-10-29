@@ -8,7 +8,7 @@ import ShareButtons from "../components/ShareButtons";
 import SubscribeForm from "../components/SubscribeForm";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
-import { formatCount, formatReadLength } from "../lib/format";
+import { formatCount, formatDate, formatReadLength } from "../lib/format";
 import { renderMarkdown } from "../lib/markdown";
 import trackEvent from "../lib/trackEvent";
 import { applyPageMeta } from "../lib/pageMeta";
@@ -116,7 +116,7 @@ export default function PublicArticle() {
               <p className="text-xs text-ink-400 mb-4">
                 {data.project_name && <>{data.project_name} · </>}
                 {formatCount(data.word_count)} words · {formatReadLength(data.read_minutes)}
-                {data.published_at && <> · {new Date(data.published_at).toLocaleDateString()}</>}
+                {data.published_at && <> · {formatDate(data.published_at)}</>}
               </p>
 
               <div

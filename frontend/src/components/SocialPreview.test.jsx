@@ -210,6 +210,8 @@ it("surfaces a failure to load the tags", async () => {
   await userEvent.click(screen.getByRole("button", { name: "Show" }));
 
   expect(await screen.findByText("Could not load social tags: Network unreachable")).toBeInTheDocument();
+  // Announced, not only shown: it lands away from the button that was pressed.
+  expect(screen.getByRole("alert")).toHaveTextContent("Could not load social tags");
 });
 
 it("omits the meta tags section for an unsaved piece", () => {

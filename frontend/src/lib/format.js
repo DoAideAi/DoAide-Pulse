@@ -43,6 +43,23 @@ export function formatDateTime(value) {
   });
 }
 
+/**
+ * "29 Oct 2026" — a calendar day, with the month in words.
+ *
+ * The public article printed its date with a bare `toLocaleDateString()`,
+ * which is all digits in the reader's own order: 10/1/2026 in one browser,
+ * 1/10/2026 in the next, and for any day up to the 12th no way to tell which
+ * is the month. Everywhere else Pulse writes the month as a word.
+ */
+export function formatDate(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 /** A number with thousands separators, or "—" for nothing. */
 export function formatCount(value) {
   if (value === null || value === undefined) return "—";
