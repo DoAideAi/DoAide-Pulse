@@ -1073,6 +1073,13 @@ class Settings(BaseSettings):
         "headline_min_snapshots",
         "webhook_claim_lease_seconds",
         "smtp_port",
+        # The /health/detail thresholds. Zero was let through as "no warning"
+        # and was the opposite: nothing is under a line of 0, so the queue read
+        # "behind", the backup "stale" and beat "stopped" on every call, each
+        # with a WARNING — an alarm that could not stop.
+        "health_queue_backlog_warn",
+        "backup_max_age_hours",
+        "health_beat_stale_seconds",
     )
     @classmethod
     def _positive_operational(cls, v: float) -> float:
@@ -1083,7 +1090,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         # Zero means something for each — no wait, no delay, no cap on the
-        # check, no backlog warning — but a negative value does not.
+        # check — but a negative value does not.
         "llm_breaker_cooldown_seconds",
         "llm_breaker_max_cooldown_seconds",
         "llm_retry_max_backoff_seconds",
@@ -1094,9 +1101,6 @@ class Settings(BaseSettings):
         "syndication_delay_seconds",
         "headline_min_window_hours",
         "link_check_max_urls",
-        "health_queue_backlog_warn",
-        "backup_max_age_hours",
-        "health_beat_stale_seconds",
     )
     @classmethod
     def _non_negative_operational(cls, v: float) -> float:

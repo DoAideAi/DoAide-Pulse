@@ -23,7 +23,6 @@ ZERO_ALLOWED = (
     "syndication_delay_seconds",
     "headline_min_window_hours",
     "link_check_max_urls",
-    "health_queue_backlog_warn",
 )
 MUST_BE_POSITIVE = (
     "github_timeout_seconds",
@@ -38,6 +37,15 @@ MUST_BE_POSITIVE = (
     "max_upload_bytes",
     "llm_max_attempts",
     "autopilot_commit_threshold",
+    # The three /health/detail thresholds. Zero was allowed on the stated
+    # grounds that it meant "no warning", and it meant the opposite: a queue
+    # of 0 is not under a line of 0, a dump 0 h old is not within 0 h, and a
+    # schedule written a second ago is not within 0 s — so the queue read
+    # "behind", the backup "stale" and beat "stopped" forever, each with a
+    # WARNING per call. An alarm that cannot stop is not "off".
+    "health_queue_backlog_warn",
+    "backup_max_age_hours",
+    "health_beat_stale_seconds",
 )
 
 
