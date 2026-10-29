@@ -858,7 +858,9 @@ def execute(db: Session, publication: Publication) -> Publication:
     # the outage stays the canary and keeps its own escalation, and the ones
     # behind it are spared: one report per outage instead of thirty, which is
     # both the cheaper answer and the more readable one.
-    if publication.attempts == 0 and breaker.is_open(publication.platform, user_id):
+    # ``allow`` rather than ``is_open``: after the cool-down it lets this queue
+    # send one row to find out whether the platform is back, not all of them.
+    if publication.attempts == 0 and not breaker.allow(publication.platform, user_id):
         _defer_for_breaker(db, publication, user_id)
         return publication
 

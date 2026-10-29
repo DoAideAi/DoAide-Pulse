@@ -269,7 +269,7 @@ def generate_content_ideas(
             detail="Content idea generation is temporarily unavailable. The AI service is not configured.",
         )
 
-    if idea_breaker.is_open(_IDEA_BREAKER_KEY):
+    if not idea_breaker.allow(_IDEA_BREAKER_KEY):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Content idea generation is temporarily unavailable. Try again in a moment.",

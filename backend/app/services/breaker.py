@@ -31,6 +31,8 @@ from dataclasses import dataclass
 class _BreakerState:
     failures: int = 0
     open_until: float = 0.0
+    #: While a half-open probe is in flight, when its claim lapses. See ``allow``.
+    probe_until: float = 0.0
 
 
 class CircuitBreaker:
@@ -54,6 +56,28 @@ class CircuitBreaker:
             state = self._state.get(name)
             return state is not None and state.open_until > now
 
+    def allow(self, name: str, *, now: float | None = None) -> bool:
+        """Whether a call to *name* may go out now — the gate, where ``is_open`` is the question.
+
+        The difference is the half-open state. Once a tripped breaker's
+        cool-down has run out, ``is_open`` says False to everybody, and
+        everybody who asked in the timeout it takes the first probe to fail
+        went to an upstream that was down a moment ago: the whole publish queue
+        for an account, each row spending an attempt. ``allow`` hands that
+        moment to the first caller only and keeps the rest out until its probe
+        reports — or until a full cool-down passes without a report, because a
+        probe that died must not leave the route shut for good.
+        """
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            state = self._state.get(name)
+            if state is None or state.open_until == 0:
+                return True
+            if state.open_until > now or state.probe_until > now:
+                return False
+            state.probe_until = now + self.cooldown
+            return True
+
     def seconds_remaining(self, name: str, *, now: float | None = None) -> float:
         """How long *name* stays shut, in seconds. ``0.0`` when it is not open.
 
@@ -67,7 +91,8 @@ class CircuitBreaker:
             state = self._state.get(name)
             if state is None:
                 return 0.0
-            return max(0.0, state.open_until - now)
+            # A probe in flight holds the route as surely as the cool-down did.
+            return max(0.0, state.open_until - now, state.probe_until - now)
 
     def record_failure(self, name: str, *, now: float | None = None) -> bool:
         """Count a failure; return True if this one tripped the breaker."""

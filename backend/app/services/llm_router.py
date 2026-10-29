@@ -853,7 +853,9 @@ def _sweep(
     outcome = _Pass()
 
     for provider in providers:
-        if breaker.is_open(provider.name):
+        # ``allow``, not ``is_open``: once a cool-down ends, one request probes
+        # the provider and the others keep skipping it until that one reports.
+        if not breaker.allow(provider.name):
             logger.debug("llm provider %s skipped (breaker open)", provider.name)
             outcome.errors.append(f"{provider.name}: skipped, circuit open")
             continue

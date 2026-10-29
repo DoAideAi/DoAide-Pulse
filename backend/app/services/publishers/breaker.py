@@ -79,6 +79,11 @@ def is_open(platform: Platform, user_id: int) -> bool:
     return settings.publish_breaker_enabled and breaker.is_open(key(platform, user_id))
 
 
+def allow(platform: Platform, user_id: int) -> bool:
+    """Whether a publish on this route may go out — claims the probe when half-open."""
+    return not settings.publish_breaker_enabled or breaker.allow(key(platform, user_id))
+
+
 def seconds_remaining(platform: Platform, user_id: int) -> float:
     """How long that route stays shut. ``0.0`` when it is open for business."""
     return breaker.seconds_remaining(key(platform, user_id))
@@ -135,6 +140,7 @@ def reset() -> None:
 
 __all__ = [
     "breaker",
+    "allow",
     "is_open",
     "key",
     "record_failure",
