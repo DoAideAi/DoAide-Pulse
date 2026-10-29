@@ -9,6 +9,7 @@
 .env.*
 keys/
 .deploy-history
+.deploy-lock/
 backend/uploads/
 .venv/
 celerybeat-schedule*

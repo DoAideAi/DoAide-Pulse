@@ -337,7 +337,10 @@ Every step before 6 refuses with the box exactly as it was.
    serves dot-files, so the stamp does not publish the production commit.
 3. **Room on the box.** At least 1 GiB free on `/opt/Pulse`
    (`PULSE_DEPLOY_MIN_FREE_MB`) and 600 MiB available memory
-   (`PULSE_DEPLOY_MIN_MEM_MB`).
+   (`PULSE_DEPLOY_MIN_MEM_MB`). Then the deploy takes `/opt/Pulse/.deploy-lock`
+   (an atomic `mkdir`, released on any exit), so two deploys never sync over
+   each other. A held lock is refused with its owner (commit, user@host, start
+   time); if that deploy is dead, `rm -rf /opt/Pulse/.deploy-lock` on the box.
 4. **A backup.** `systemctl start pulse-backup.service`: a verified database
    dump and uploads archive from minutes before anything changes. A failed
    backup stops the deploy.

@@ -129,6 +129,27 @@ if [ "$mem_mb" -lt "$MIN_MEM_MB" ]; then
   exit 1
 fi
 
+# One deploy at a time. The advisory lock further down covers the migration
+# only; two deploys started from two checkouts both ran pip into the one venv
+# and both rsynced with --delete into /opt/Pulse, and the tree left behind was
+# a mix of the two commits under whichever wrote .deploy-history last — the
+# record rollback.sh trusts. mkdir is atomic, so exactly one deploy gets the
+# lock; the owner file says who, and the trap gives it back on any exit.
+# Kept out of the sync by deploy/rsync-excludes, or --delete would remove it.
+LOCK=$REMOTE/.deploy-lock
+echo "==> taking the deploy lock on $HOST"
+if ! "${SSH[@]}" "mkdir $LOCK && echo '$DEPLOY_COMMIT by $(whoami)@$(hostname -s) since $DEPLOY_TIMESTAMP' > $LOCK/owner"; then
+  owner=$("${SSH[@]}" "cat $LOCK/owner" 2>/dev/null || true)
+  {
+    echo "refusing to deploy: another deploy holds $HOST:$LOCK — nothing was changed."
+    echo "    held by: ${owner:-unknown}"
+    echo "If that deploy is no longer running, clear it with:"
+    echo "    ssh -i $SSH_KEY root@$HOST 'rm -rf $LOCK'"
+  } >&2
+  exit 1
+fi
+trap '"${SSH[@]}" "rm -rf $LOCK" || echo "could not release $HOST:$LOCK — remove it by hand" >&2' EXIT
+
 # A fresh, verified dump before anything changes. rollback.sh has always said
 # "the database backup taken before migration (by deploy.sh) is kept as a
 # safety net" and there was none: a migration that went wrong had only the

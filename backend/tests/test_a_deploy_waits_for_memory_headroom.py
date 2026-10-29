@@ -43,6 +43,7 @@ def checkout(tmp_path):
         'case "$*" in\n'
         '  *"df -Pm"*) echo 50000 ;;\n'
         '  *MemAvailable*) echo "$FAKE_MEM_MB" ;;\n'
+        f'  *.deploy-lock*) echo "ssh lock $*" >> "{calls}" ;;\n'
         f'  *) echo "ssh $*" >> "{calls}"; exit 1 ;;\n'
         "esac\n"
     )
