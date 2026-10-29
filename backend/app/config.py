@@ -59,6 +59,14 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        # A setting refused at boot is reported in the traceback systemd sends
+        # to the journal, and pydantic's report ends with the rejected value
+        # verbatim — so a JWT_SECRET one byte short, a mistyped
+        # TOKEN_ENCRYPTION_KEY or a DATABASE_URL with its password went into
+        # the log of the one failure most likely to be pasted into a ticket.
+        # The validators' own messages say what is wrong; where the value is
+        # not secret (a URL, ENVIRONMENT) they quote it themselves.
+        hide_input_in_errors=True,
     )
 
     # ---- App ----

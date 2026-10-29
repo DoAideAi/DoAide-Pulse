@@ -75,3 +75,29 @@ def test_every_numeric_setting_has_a_rule():
 
 def test_the_defaults_still_load():
     _settings()
+
+
+_PRODUCTION = {
+    "environment": "production",
+    "frontend_url": "https://pulse.example.com",
+    "public_api_url": "https://pulse.example.com",
+}
+
+
+@pytest.mark.parametrize(
+    ("name", "secret"),
+    [
+        ("jwt_secret", "hunter2-too-short-SECRET"),
+        ("token_encryption_key", "not-a-fernet-key-SECRET"),
+    ],
+)
+def test_a_refused_secret_is_not_quoted_in_the_boot_error(name, secret):
+    """The boot error goes to the journal; pydantic used to end it with the
+    rejected value — the secret itself — as ``input_value``."""
+    over = {"jwt_secret": "x" * 64, **_PRODUCTION, name: secret}
+    with pytest.raises(ValidationError) as caught:
+        _settings(**over)
+    report = str(caught.value)
+    assert name in report
+    assert secret not in report
+    assert "input_value" not in report
