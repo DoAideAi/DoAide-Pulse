@@ -497,6 +497,36 @@ def export_me(
     )
 
 
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Sign out, ending every session this account has open",
+    responses=errors(*AUTHENTICATED, status.HTTP_429_TOO_MANY_REQUESTS),
+)
+@limiter.limit(settings.rate_limit_auth_read)
+def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """End the account's sessions on the server, not only in this browser.
+
+    Signing out used to be the browser forgetting its token, and nothing else:
+    the token itself stayed valid for the rest of its lifetime, so any copy of
+    it — another tab, a shared machine, a proxy log — was a session the person
+    believed they had closed. This moves ``tokens_valid_from`` to now, the same
+    switch a password reset throws (:attr:`app.models.user.User.tokens_valid_from`),
+    so every token minted before this moment is refused. Every session, because
+    a JWT carries no per-device identity to end one by — which for a
+    single-user install is what "sign out" ought to mean anyway.
+    """
+    current_user.tokens_valid_from = utcnow()
+    db.commit()
+    logger.info("user %s signed out; earlier tokens revoked", current_user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.delete(
     "/me",
     status_code=status.HTTP_204_NO_CONTENT,

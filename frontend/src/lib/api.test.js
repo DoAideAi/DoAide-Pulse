@@ -392,11 +392,49 @@ describe("the outgoing request", () => {
   });
 
   it("forgets the token on logout", () => {
+    vi.stubGlobal("fetch", respondWith({ status: 204 }));
     setToken("abc123");
 
     api.logout();
 
     expect(getToken()).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  // Forgetting the token was all "Sign out" did, so the token itself stayed
+  // valid for its whole lifetime. The server has to be told.
+  it("tells the server, with the token it is signing out", async () => {
+    const fetchMock = respondWith({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    setToken("abc123");
+
+    await api.logout();
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/v1/auth/logout");
+    expect(init.method).toBe("POST");
+    expect(init.headers.Authorization).toBe("Bearer abc123");
+    vi.unstubAllGlobals();
+  });
+
+  it("signs out locally even when the server cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    setToken("abc123");
+
+    await expect(api.logout()).resolves.toBeUndefined();
+    expect(getToken()).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not call the server when there was no session", async () => {
+    const fetchMock = respondWith({ status: 204 });
+    vi.stubGlobal("fetch", fetchMock);
+    setToken(null);
+
+    await api.logout();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 

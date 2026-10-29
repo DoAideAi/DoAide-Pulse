@@ -220,7 +220,25 @@ export const api = {
     return data;
   },
   me: () => request("/auth/me"),
-  logout: () => setToken(null),
+  // Forgets the token here first, so signing out works offline, then asks the
+  // server to end it. Forgetting was once all this did, and the token went on
+  // working for its whole lifetime for anyone holding a copy. Straight
+  // `fetch` rather than `request`: a 401 here (a session already ended) must
+  // not raise the "your session has ended" notice over a sign-out.
+  logout: async () => {
+    const token = getToken();
+    setToken(null);
+    if (!token) return;
+    try {
+      await fetch(`${BASE}/auth/logout`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+      });
+    } catch {
+      // Signed out here regardless; the token expires on its own.
+    }
+  },
   // Erases the account and everything in it. The password is asked for again.
   deleteAccount: (password) => request("/auth/me", { method: "DELETE", body: { password } }),
   // Everything the account has written, as one JSON document — no credentials.

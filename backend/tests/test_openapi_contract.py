@@ -92,8 +92,9 @@ def test_the_surface_is_the_size_this_file_thinks_it_is():
     ``GET /auth/me/export``, taking the work out first (C104 M9). 164 with
     ``POST /content/{id}/translations/{language}/accept`` (7830b93), which
     passes every check below and landed without raising this. 165 with
-    ``POST /client-errors``, where an error boundary reports a render crash."""
-    assert len(ROUTES) == 165
+    ``POST /client-errors``, where an error boundary reports a render crash.
+    166 with ``POST /auth/logout``, which ends the session on the server."""
+    assert len(ROUTES) == 166
 
 
 @pytest.mark.parametrize("route", ROUTES)
