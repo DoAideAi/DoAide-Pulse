@@ -84,6 +84,9 @@ export const KIND_FIELDS = {
       unit: "commits",
       step: "1",
       min: "1",
+      // One scan sees at most 100 commits, so a higher number could never be
+      // reached; the API refuses it (MAX_COMMITS_PER_SCAN).
+      max: "100",
       placeholder: "3",
       hint: "A release always fires, however few commits came with it.",
     },
