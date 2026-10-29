@@ -225,6 +225,7 @@ export default function Settings() {
         />
       )}
 
+      <DigestSection />
       <ExportAccountSection />
       <DeleteAccountSection />
     </div>
@@ -1598,6 +1599,56 @@ export function OneTimeSecret({ title, value, onClose }) {
  * out first was not. The file is the API's JSON as-is, saved under a dated
  * name; credentials are never in it (``app.services.account_export``).
  */
+/**
+ * The weekly digest's switch. The digest is on by default for every account,
+ * and until this there was nowhere to turn it off — the email links here
+ * (`#digest`, and its List-Unsubscribe header).
+ */
+function DigestSection() {
+  const { user, refresh } = useAuth();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const enabled = user?.weekly_digest_enabled !== false;
+
+  async function toggle(event) {
+    const next = event.target.checked;
+    setBusy(true);
+    try {
+      await api.updateMe({ weekly_digest_enabled: next });
+      await refresh?.();
+      toast.success(next ? "Weekly digest on" : "Weekly digest off");
+    } catch (err) {
+      toast.error(`Could not change the digest: ${err.message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section id="digest" aria-labelledby="digest-heading" className="border-t border-line pt-8">
+      <h2 id="digest-heading" className="text-base font-semibold text-ink-900">
+        Email
+      </h2>
+      <label className="mt-3 flex items-start gap-3 text-sm text-ink-700">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={enabled}
+          disabled={busy}
+          onChange={toggle}
+        />
+        <span>
+          <span className="block font-medium text-ink-900">Weekly digest</span>
+          <span className="block text-xs text-ink-500">
+            A summary every week of what was published, what is waiting for review and what
+            failed. Sent only in weeks when something happened.
+          </span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
 export function ExportAccountSection() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);

@@ -33,6 +33,7 @@ vi.mock("../lib/api", () => ({
     pingWebhook: vi.fn(),
     exportAccount: vi.fn(),
     webhookDeliveries: vi.fn(),
+    updateMe: vi.fn(),
     webhookDeliveriesPage: vi.fn(),
     redeliverWebhook: vi.fn(),
     listApiKeys: vi.fn(),
@@ -1399,3 +1400,23 @@ describe("downloading your work", () => {
   });
 });
 
+
+describe("the weekly digest", () => {
+  // On by default for every account, and there was no switch anywhere: the
+  // only way to stop it was a PATCH /auth/me nobody would think to send.
+  it("can be turned off from Settings", async () => {
+    auth.user = { email: "you@example.com", weekly_digest_enabled: true };
+    api.updateMe.mockResolvedValue({ weekly_digest_enabled: false });
+    const user = userEvent.setup();
+    draw();
+
+    const toggle = await screen.findByRole("checkbox", { name: /weekly digest/i });
+    expect(toggle).toBeChecked();
+    expect(toggle.closest("section")).toHaveAttribute("id", "digest");
+
+    await user.click(toggle);
+
+    expect(api.updateMe).toHaveBeenCalledWith({ weekly_digest_enabled: false });
+    await vi.waitFor(() => expect(auth.refresh).toHaveBeenCalled());
+  });
+});

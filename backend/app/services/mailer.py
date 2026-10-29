@@ -45,7 +45,14 @@ def _message_id_domain(from_address: str) -> str:
     return domain or settings.smtp_host.strip()
 
 
-def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
+def send(
+    *,
+    to: str,
+    subject: str,
+    body: str,
+    html: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> bool:
     """Deliver a message. Never raises; returns whether it went out.
 
     *body* is the plain-text version and is always required — an HTML-only
@@ -73,6 +80,8 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
         # and a reset link that bounces is a lockout.
         message["Date"] = formatdate(usegmt=True)
         message["Message-ID"] = make_msgid(domain=_message_id_domain(sender))
+        for name, value in (headers or {}).items():
+            message[name] = value
         message.set_content(body)
         if html:
             # Added second, so it becomes the preferred alternative while the

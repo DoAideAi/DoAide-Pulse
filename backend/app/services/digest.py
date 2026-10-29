@@ -526,8 +526,27 @@ def render_text(digest: Digest) -> str:
                 + (f" on {when:%d %b %H:%M} UTC" if when else "")
             )
 
-    lines += ["", "— Pulse", settings.frontend_url]
+    lines += [
+        "",
+        "— Pulse",
+        settings.frontend_url,
+        "",
+        "You get this every week because the digest is on for your account.",
+        f"To turn it off: {digest_settings_url()}",
+    ]
     return "\n".join(lines)
+
+
+def digest_settings_url() -> str:
+    """Where the digest is switched off — the footer's link and List-Unsubscribe.
+
+    The digest is on by default for every account, and the email used to say
+    nothing about stopping it: no footer line, no header, and no switch in
+    Settings. Recurring mail with no way out is mail people mark as spam, and
+    that costs every message from the same sender its inbox — the password
+    reset link included.
+    """
+    return f"{settings.frontend_url.rstrip('/')}/settings#digest"
 
 
 def render_html(digest: Digest) -> str:
@@ -607,6 +626,9 @@ def render_html(digest: Digest) -> str:
     parts.append(
         f'<p style="color:#6b7280;font-size:13px">— Pulse &middot; '
         f'<a href="{esc(settings.frontend_url)}">{esc(settings.frontend_url)}</a></p>'
+        '<p style="color:#9ca3af;font-size:12px">You get this every week because the '
+        "digest is on for your account. "
+        f'<a href="{esc(digest_settings_url())}">Turn it off</a>.</p>'
         "</div>"
     )
     return "".join(parts)
@@ -653,6 +675,8 @@ def send(
         subject=digest.subject,
         body=render_text(digest),
         html=render_html(digest),
+        # What mail clients turn into their own "Unsubscribe" button.
+        headers={"List-Unsubscribe": f"<{digest_settings_url()}>"},
     )
     if strict and not delivered:
         raise MailerRefused(f"the mailer refused user {user.id}'s digest")

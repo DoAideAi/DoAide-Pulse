@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.config import settings
 from app.models.content import Content, ContentStatus, ContentType
 from app.models.metrics import ContentMetric
 from app.models.mixins import as_aware
@@ -89,8 +90,10 @@ def sent_mail(monkeypatch):
     """Capture outbound mail and pretend SMTP is configured."""
     outbox: list[dict] = []
 
-    def fake_send(*, to, subject, body, html=None):
-        outbox.append({"to": to, "subject": subject, "body": body, "html": html})
+    def fake_send(*, to, subject, body, html=None, headers=None):
+        outbox.append(
+            {"to": to, "subject": subject, "body": body, "html": html, "headers": headers or {}}
+        )
         return True
 
     monkeypatch.setattr(mailer, "send", fake_send)
@@ -734,3 +737,21 @@ def test_only_one_of_two_claims_on_the_same_week_wins(db, user):
     second = digest.claim_week(db, user.id)
     assert first is not None
     assert second is None
+
+
+# The digest is on by default for every account, and nothing in the email said
+# how to stop it: the Settings page had no switch, the footer was the site's
+# address. Recurring mail with no way out is mail people mark as spam — which
+# costs the reset link from the same sender its inbox too.
+def test_the_digest_says_how_to_turn_it_off(db, user, piece, publication, sent_mail):
+    _snapshot(db, publication, days_ago=6, views=10)
+    _snapshot(db, publication, days_ago=1, views=910)
+
+    digest.send(db, user)
+
+    mail = sent_mail[0]
+    settings_url = f"{settings.frontend_url.rstrip('/')}/settings#digest"
+    assert settings_url in mail["body"]
+    assert "turn it off" in mail["body"].lower()
+    assert settings_url in mail["html"]
+    assert mail["headers"].get("List-Unsubscribe") == f"<{settings_url}>"

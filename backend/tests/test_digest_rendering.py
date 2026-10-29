@@ -188,7 +188,9 @@ def test_a_week_with_nothing_still_renders_a_body_rather_than_crashing():
     body = digest_service.render_text(_digest())
 
     assert "Hello Dev," in body
-    assert body.rstrip().endswith(digest_service.settings.frontend_url)
+    # Rendered to the end: the sign-off, then the way to turn the digest off.
+    assert f"— Pulse\n{digest_service.settings.frontend_url}" in body
+    assert body.rstrip().endswith(digest_service.digest_settings_url())
 
 
 # --------------------------------------------------------------------------- #
