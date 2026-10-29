@@ -85,7 +85,8 @@ def test_every_write_route_the_browser_can_call_belongs_to_a_feature(client):
         "/settings/connections/:id/verify": "/settings/connections/devto/verify",
     }
     not_ui = ("/auth", "/machine", "/triggers/inbound", "/products/events", "/activity",
-              "/subscribers", "/tools", "/feedback", "/uploads", "/analytics/digest")
+              "/subscribers", "/tools", "/feedback", "/uploads", "/analytics/digest",
+              "/client-errors")
     missing = []
     for path, operations in spec["paths"].items():
         route = re.sub(r"\{[^}]+\}", ":id", path.removeprefix("/api/v1"))

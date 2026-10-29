@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Annotated
 
 from fastapi import APIRouter, Request, Response, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.logging_config import mask_email
 from app.ratelimit import limiter
@@ -37,7 +38,7 @@ _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 class ClientErrorIn(BaseModel):
     """One caught render error, as ``frontend/src/lib/clientErrors.js`` sends it."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     section: str = Field(default="", max_length=120)
     #: The route pattern (``/content/:id``), never the full URL — a URL can
@@ -47,7 +48,9 @@ class ClientErrorIn(BaseModel):
     message: str = Field(default="", max_length=2000)
     #: Component names from React's component stack, innermost first. Names
     #: only — the stack's file paths say nothing a release id does not.
-    components: list[str] = Field(default_factory=list, max_length=40)
+    components: list[Annotated[str, StringConstraints(max_length=120)]] = Field(
+        default_factory=list, max_length=40
+    )
     release: str = Field(default="", max_length=64)
 
 

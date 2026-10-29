@@ -61,6 +61,7 @@ _ANONYMOUS_WRITES = {
     ("POST", "/feedback"): "free text from the public widget, 5 an hour",
     ("POST", "/subscribers/unsubscribe"): "an email in the body, rate-limited",
     ("POST", "/products/events"): "the shared X-Pulse-Ingest-Token header",
+    ("POST", "/client-errors"): "a crash report; writes one log line, 20 a minute",
 }
 
 
