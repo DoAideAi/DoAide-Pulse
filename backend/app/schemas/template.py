@@ -32,7 +32,7 @@ from pydantic import (
 
 from app.models.content import ContentType
 from app.models.template import TemplateMode
-from app.schemas.limits import BoundedId
+from app.schemas.limits import BoundedId, Timezone
 from app.services.templates import (
     BUILTINS,
     malformed_placeholders,
@@ -228,6 +228,15 @@ class RenderRequest(BaseModel):
     #: Which project's facts fill ``{{project.*}}``. Falls back to the
     #: template's default project, then to blanks.
     project_id: BoundedId | None = None
+    #: Whose day ``{{date.*}}`` means. Pulse stores no timezone per account, so
+    #: without one the built-ins are UTC — and a piece rendered at 01:00 in
+    #: India was dated yesterday. The app sends the browser's zone.
+    timezone: Timezone | None = Field(
+        default=None,
+        description="IANA name — 'Asia/Kolkata' — whose calendar day fills "
+        "{{date.today}}, {{date.long}}, {{date.month}} and {{date.year}}. UTC "
+        "when absent.",
+    )
 
 
 class RenderOut(BaseModel):

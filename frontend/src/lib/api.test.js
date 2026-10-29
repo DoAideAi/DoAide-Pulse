@@ -710,6 +710,22 @@ describe("every endpoint's path and verb", () => {
     expect(init.method).toBe(verb);
   });
 
+  it("sends the browser's zone with a template, so {{date.*}} is the writer's day", async () => {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    for (const name of ["previewTemplate", "useTemplate"]) {
+      const fetchMock = stubOk();
+      await api[name](4, { values: { a: "b" } });
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+        timezone: zone,
+        values: { a: "b" },
+      });
+    }
+    // A caller that names a zone keeps it.
+    const fetchMock = stubOk();
+    await api.previewTemplate(4, { values: {}, timezone: "Asia/Kolkata" });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).timezone).toBe("Asia/Kolkata");
+  });
+
   it("covers every method on the client", () => {
     // `login`, `register` and `logout` are covered by their own cases above —
     // one sends a form, one is unauthenticated, and one touches no network at

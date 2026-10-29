@@ -2,6 +2,7 @@
 // Stores the JWT in localStorage and attaches it as a Bearer token.
 
 import { routePattern, trackAction } from "./activity";
+import { browserZone } from "./seo";
 
 const BASE = "/api/v1";
 const TOKEN_KEY = "pulse_token";
@@ -479,11 +480,20 @@ export const api = {
   deleteTemplate: (id) => request(`/templates/${id}`, { method: "DELETE" }),
   // Renders without saving, and renders a half-filled template rather than
   // refusing — the missing names come back in the response instead.
+  // With the browser's zone, so {{date.today}} is the writer's day: Pulse keeps
+  // no timezone per account, and without one the server dated a piece made
+  // at 01:30 in India with yesterday.
   previewTemplate: (id, payload) =>
-    request(`/templates/${id}/preview`, { method: "POST", body: payload }),
+    request(`/templates/${id}/preview`, {
+      method: "POST",
+      body: { timezone: browserZone(), ...payload },
+    }),
   // Writes a draft. Refuses on the missing values `preview` merely reports.
   useTemplate: (id, payload) =>
-    request(`/templates/${id}/use`, { method: "POST", body: payload }),
+    request(`/templates/${id}/use`, {
+      method: "POST",
+      body: { timezone: browserZone(), ...payload },
+    }),
 
   // ---- uploads ----
   uploadImage: (file) => {

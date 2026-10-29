@@ -19,6 +19,7 @@ instructions.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import ValidationError
@@ -53,7 +54,7 @@ from app.schemas.template import (
     TemplateUseRequest,
     TemplateVariable,
 )
-from app.services import content_generator, content_store, seo
+from app.services import content_generator, content_store, scheduling, seo
 from app.services import templates as template_service
 from app.services.templates import BUILTINS
 
@@ -113,6 +114,21 @@ def _validation_detail(exc: ValidationError) -> str:
 
 
 router = APIRouter(prefix="/templates", tags=["templates"])
+
+
+def _now_in(timezone: str | None) -> datetime:
+    """This moment on the requester's calendar, for ``{{date.*}}``.
+
+    UTC when no zone was sent, which is what every render was before. A zone
+    name nobody recognises is a 422 in the same words a schedule's is.
+    """
+    try:
+        zone = scheduling.resolve_zone(timezone)
+    except scheduling.ScheduleError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
+    return datetime.now(zone or UTC)
 
 
 def _owned(template_id: RowId, db: Session, user: User) -> ContentTemplate:
@@ -445,7 +461,9 @@ def preview_template(
     """
     template = _owned(template_id, db, user)
     project = _resolve_project(template, payload.project_id, db, user)
-    rendered = template_service.render(template, payload.values, project=project)
+    rendered = template_service.render(
+        template, payload.values, project=project, now=_now_in(payload.timezone)
+    )
     return RenderOut(
         title=rendered.title,
         body=rendered.body,
@@ -499,7 +517,9 @@ def use_template(
             "default, or its default project is gone.",
         )
 
-    rendered = template_service.render(template, payload.values, project=project)
+    rendered = template_service.render(
+        template, payload.values, project=project, now=_now_in(payload.timezone)
+    )
     if rendered.missing:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
