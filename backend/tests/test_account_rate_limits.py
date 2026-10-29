@@ -158,6 +158,12 @@ _COSTLY_CALLS = (
     # `rate_limit_repo_scan` budget again — the second way around it, after
     # `trigger_service.check`.
     "adapter.verify(",
+    # Pass 39 M3: handing publications to the worker, which posts each one to
+    # its platform with the account's own credentials. Bulk retry was limited;
+    # the single-publication retry and retry-a-piece were not, so a row that
+    # failed fast (a revoked token) could be retried in a loop, each one a
+    # request to the platform that throttles or flags the account for it.
+    "_dispatch(",
 )
 
 #: Endpoints that touch a costly call but must not carry an account limit, with
@@ -262,6 +268,11 @@ def test_the_costly_endpoints_are_the_ones_expected():
         "/content/bulk/publish",
         "/content/{content_id}/publish",
         "/content/{content_id}/schedule",
+        # Pass 39 M3: every door into ``_dispatch`` that is not already one of
+        # the publish doors above.
+        "/content/bulk/retry",
+        "/content/{content_id}/retry",
+        "/content/{content_id}/retry/{publication_id}",
     }
 
 

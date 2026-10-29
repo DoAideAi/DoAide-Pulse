@@ -2877,11 +2877,17 @@ def _dispatch(publication_ids: list[int]) -> None:
     summary="Retry a failed publication",
     # 404 covers both halves of the path; 409 is a publication that is not in a
     # state a retry means anything for.
-    responses=errors(*OWNED, status.HTTP_409_CONFLICT),
+    responses=errors(*OWNED, status.HTTP_409_CONFLICT, status.HTTP_429_TOO_MANY_REQUESTS),
 )
+# Limited like ``/bulk/retry``, which it is one row of: each retry posts to the
+# platform with the account's own credentials, and a row that fails fast (a
+# revoked token) was retryable in a loop the platform throttles or flags for.
+@limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
 def retry_publication(
     content_id: RowId,
     publication_id: RowId,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> PublicationOut:
@@ -2954,10 +2960,14 @@ def retry_publication(
     "/{content_id}/retry",
     response_model=RetryResultOut,
     summary="Retry every stopped publication on a piece",
-    responses=errors(*OWNED, status.HTTP_409_CONFLICT),
+    responses=errors(*OWNED, status.HTTP_409_CONFLICT, status.HTTP_429_TOO_MANY_REQUESTS),
 )
+# The same budget as the per-row retry above and ``/bulk/retry``.
+@limiter.limit(settings.rate_limit_outbound_probe, key_func=account_key)
 def retry_content(
     content_id: RowId,
+    request: Request,
+    response: Response,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> RetryResultOut:
