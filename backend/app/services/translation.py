@@ -657,6 +657,9 @@ def listing(db: Session, content: Content) -> list[ContentTranslation]:
                     ContentTranslation.language,
                     ContentTranslation.status,
                     ContentTranslation.source_version,
+                    # Read by ``is_stale`` for every row; left out, each row
+                    # lazy-loaded it with a query of its own.
+                    ContentTranslation.source_fingerprint,
                     ContentTranslation.quality_issues,
                     ContentTranslation.error,
                     ContentTranslation.translated_at,
