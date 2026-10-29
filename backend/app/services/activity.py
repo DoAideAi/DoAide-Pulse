@@ -49,17 +49,21 @@ def summary(db: Session, user_id: int, *, days: int, limit: int = 10) -> dict:
         ).all()
         return [{"name": name, "count": int(n)} for name, n in rows]
 
-    # Grouped in Python rather than with a dialect-specific date function: the
-    # window is at most a few hundred rows a day for one account, and SQLite
-    # and PostgreSQL disagree about how to truncate a timestamp.
+    # Counted by the database, one row per day and kind. This read every event
+    # in the window back to Python — up to 180 days of an account's page views
+    # — to make a few dozen numbers, on the theory that SQLite and PostgreSQL
+    # cannot agree on truncating a timestamp. ``func.date`` works on both
+    # (``feature_usage`` groups by it); SQLite hands back a string and
+    # PostgreSQL a date, and ``str`` makes both the ISO day.
+    day = func.date(ActivityEvent.created_at)
     per_day: dict[str, dict[str, int]] = {}
-    for kind, created_at in db.execute(
-        select(ActivityEvent.kind, ActivityEvent.created_at).where(window)
+    for kind, when, n in db.execute(
+        select(ActivityEvent.kind, day, func.count(ActivityEvent.id))
+        .where(window)
+        .group_by(ActivityEvent.kind, day)
     ):
-        bucket = per_day.setdefault(
-            created_at.date().isoformat(), {PAGE_VIEW: 0, ACTION: 0}
-        )
-        bucket[kind] = bucket.get(kind, 0) + 1
+        bucket = per_day.setdefault(str(when), {PAGE_VIEW: 0, ACTION: 0})
+        bucket[kind] = bucket.get(kind, 0) + int(n)
 
     return {
         "days": days,
