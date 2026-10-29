@@ -17,6 +17,7 @@ been seen to return rather than the one the docs show today:
 """
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from typing import Any
@@ -26,6 +27,11 @@ import httpx
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+#: The most of one Umami answer Pulse will hold. The largest real one — a page
+#: of 500 websites — is tens of kilobytes; this is for an instance that has gone
+#: wrong, not for a big account.
+MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
 
 class UmamiError(Exception):
@@ -116,19 +122,32 @@ class UmamiClient:
         attempts = 1 if self._api_token else 2
         for attempt in range(attempts):
             token = self._bearer(fresh=attempt > 0)
+            # Streamed with a ceiling, like every other outbound read here
+            # (``feeds``, ``webhooks``, ``github_client``). ``http.get`` held
+            # whatever Umami sent, in full, in the request that asked — and the
+            # instance is a self-hosted service on the other end of a network.
             try:
-                with self._http() as http:
-                    resp = http.get(
-                        path, params=params, headers={"Authorization": f"Bearer {token}"}
-                    )
+                with self._http() as http, http.stream(
+                    "GET", path, params=params, headers={"Authorization": f"Bearer {token}"}
+                ) as resp:
+                    code = resp.status_code
+                    body = bytearray()
+                    if code == 200:
+                        for chunk in resp.iter_bytes():
+                            body.extend(chunk)
+                            if len(body) > MAX_RESPONSE_BYTES:
+                                raise UmamiError(
+                                    f"Umami {path} answered with more than "
+                                    f"{MAX_RESPONSE_BYTES // (1024 * 1024)} MB"
+                                )
             except httpx.HTTPError as exc:
                 raise UmamiError(f"Umami unreachable: {type(exc).__name__}") from exc
-            if resp.status_code == 401 and attempt + 1 < attempts:
+            if code == 401 and attempt + 1 < attempts:
                 continue
-            if resp.status_code != 200:
-                raise UmamiError(f"Umami {path} answered {resp.status_code}")
+            if code != 200:
+                raise UmamiError(f"Umami {path} answered {code}")
             try:
-                return resp.json()
+                return json.loads(bytes(body))
             except ValueError as exc:
                 raise UmamiError(f"Umami {path} returned non-JSON") from exc
         raise UmamiError("Umami refused the token")  # pragma: no cover

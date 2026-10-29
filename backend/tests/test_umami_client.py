@@ -119,3 +119,28 @@ def test_a_refused_login_and_a_dead_host_are_umami_errors():
 
     with pytest.raises(UmamiError, match="unreachable"):
         _client(boom).active("w")
+
+
+def test_an_oversized_answer_is_refused_without_reading_it_all():
+    """Streamed with a ceiling: a runaway instance cannot fill the worker."""
+    from app.services import umami
+
+    served: list[int] = []
+    chunk = b" " * 65_536
+
+    class _Body(httpx.SyncByteStream):
+        def __iter__(self):
+            yield b'{"pageviews": 1, "pad": "'
+            for _ in range(200):  # ~13 MB on offer
+                served.append(len(chunk))
+                yield chunk
+            yield b'"}'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/auth/login":
+            return httpx.Response(200, json={"token": "tok"})
+        return httpx.Response(200, stream=_Body())
+
+    with pytest.raises(UmamiError, match="more than"):
+        _client(handler).stats("w", 0, 1)
+    assert sum(served) < 2 * umami.MAX_RESPONSE_BYTES
