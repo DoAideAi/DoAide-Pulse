@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 
 from app.models.project import Project
-from app.models.template import ContentTemplate, TemplateMode
 from app.routers import templates as template_router
 from app.schemas.template import MAX_VARIABLES, TemplateCreate
 
@@ -139,35 +138,3 @@ def test_more_variables_than_a_template_may_declare_is_refused():
             body_template=" ".join(f"{{{{{v['name']}}}}}" for v in many),
             variables=many,
         )
-
-
-# --------------------------------------------------------------------------- #
-# Model accessors                                                             #
-# --------------------------------------------------------------------------- #
-
-
-def test_declared_variable_names_skip_malformed_entries(db, user):
-    template = ContentTemplate(
-        user_id=user.id,
-        name="T",
-        mode=TemplateMode.LITERAL,
-        variables=[
-            "not a dict",
-            {"name": "headline", "label": "Headline", "required": True},
-            {"label": "nameless"},
-        ],
-    )
-    db.add(template)
-    db.commit()
-
-    assert template.variable_names == ["headline"]
-
-
-def test_a_template_with_no_variables_declares_none(db, user):
-    template = ContentTemplate(
-        user_id=user.id, name="T", mode=TemplateMode.LITERAL, variables=None
-    )
-    db.add(template)
-    db.commit()
-
-    assert template.variable_names == []

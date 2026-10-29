@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.project import Project
-from app.models.trigger import Trigger, TriggerEvent, TriggerEventStatus, TriggerKind
+from app.models.trigger import Trigger, TriggerEvent, TriggerEventStatus
 from app.models.user import User
 from app.routers import triggers as trigger_router
 from app.security import hash_password
@@ -260,9 +260,16 @@ def test_a_webhook_trigger_cannot_be_created_when_the_secret_cannot_be_encrypted
     assert "encrypt" in resp.json()["detail"].lower()
 
 
-def test_only_the_kinds_pulse_goes_and_looks_at_are_polled():
-    """``check`` is offered for these three and refused for the fourth."""
-    assert TriggerKind.GITHUB.is_polled
-    assert TriggerKind.RSS.is_polled
-    assert TriggerKind.SCHEDULE.is_polled
-    assert not TriggerKind.WEBHOOK.is_polled
+def test_check_is_refused_for_an_inbound_webhook(client, auth, project):
+    """``check`` polls a source now; an inbound webhook has none to poll.
+
+    This used to assert ``TriggerKind.is_polled``, a property nothing in the
+    app read — the endpoint decides with ``kind == WEBHOOK`` — so the test
+    named the behaviour and checked something else.
+    """
+    trigger_id = _make(client, auth, project).json()["id"]
+
+    resp = client.post(f"{API}/{trigger_id}/check", headers=auth)
+
+    assert resp.status_code == 409
+    assert "POSTs to it" in resp.json()["detail"]

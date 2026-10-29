@@ -84,11 +84,6 @@ class TriggerKind(StrEnum):
             self.value
         ]
 
-    @property
-    def is_polled(self) -> bool:
-        """True when Pulse has to go and look, rather than being told."""
-        return self in (TriggerKind.GITHUB, TriggerKind.RSS, TriggerKind.SCHEDULE)
-
 
 class TriggerEventStatus(StrEnum):
     """What became of one firing."""

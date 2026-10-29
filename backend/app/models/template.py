@@ -141,21 +141,6 @@ class ContentTemplate(Base, TimestampMixin):
 
     user: Mapped[User] = relationship(back_populates="templates")
 
-    @property
-    def variable_names(self) -> list[str]:
-        """Declared variable names, in declaration order.
-
-        Skips malformed entries rather than raising: ``variables`` is a JSON
-        column, so a row written by an older version — or by hand — can hold
-        anything, and the rendering path already reports an unresolved
-        placeholder as a missing variable.
-        """
-        return [
-            str(entry["name"])
-            for entry in (self.variables or [])
-            if isinstance(entry, dict) and entry.get("name")
-        ]
-
     def __repr__(self) -> str:  # pragma: no cover - debug aid
         return f"<ContentTemplate id={self.id} name={self.name!r} mode={self.mode}>"
 
