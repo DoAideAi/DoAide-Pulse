@@ -24,6 +24,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.logging_config import carrying_context
 from app.models.content import Content
 from app.models.mixins import utcnow
 from app.models.project import Project
@@ -178,7 +179,9 @@ def traffic(
         ids, umami_error = {}, str(exc)
     with ThreadPoolExecutor(max_workers=6) as pool:
         futures = {
-            site.key: pool.submit(_site_traffic, client, site, ids.get(site.domain, ""), days)
+            site.key: pool.submit(
+                carrying_context(_site_traffic), client, site, ids.get(site.domain, ""), days
+            )
             for site in SITES
         }
         raw = {key: f.result() for key, f in futures.items()}

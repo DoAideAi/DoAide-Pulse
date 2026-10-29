@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.logging_config import carrying_context
 from app.models.mixins import utcnow
 from app.models.seo import SitemapStatus
 from app.services import search_console, seo_sites
@@ -172,7 +173,12 @@ def check(
     sites = list(sites)
     with ThreadPoolExecutor(max_workers=min(6, len(sites) or 1)) as pool:
         results = list(
-            pool.map(lambda s: _check_one(s, gsc, submit=submit, transport=transport), sites)
+            pool.map(
+                carrying_context(
+                    lambda s: _check_one(s, gsc, submit=submit, transport=transport)
+                ),
+                sites,
+            )
         )
 
     now = utcnow()

@@ -39,6 +39,7 @@ import httpcore
 import httpx
 
 from app.config import settings
+from app.logging_config import carrying_context
 from app.services.errors import friendly_network_error
 
 logger = logging.getLogger(__name__)
@@ -401,7 +402,7 @@ def check(urls: list[str], *, timeout: float | None = None) -> list[LinkStatus]:
         ) as client,
         ThreadPoolExecutor(max_workers=min(8, len(urls))) as pool,
     ):
-        results = list(pool.map(lambda url: check_url(url, client=client), urls))
+        results = list(pool.map(carrying_context(lambda url: check_url(url, client=client)), urls))
 
     n_broken = sum(1 for r in results if r.status == BROKEN)
     n_unknown = sum(1 for r in results if r.status == UNKNOWN)

@@ -30,6 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.logging_config import carrying_context
 from app.models.mixins import utcnow
 from app.models.seo import MetaAudit
 from app.services import sitemaps
@@ -172,7 +173,7 @@ def audit_site(site: Site, *, transport: httpx.BaseTransport | None = None) -> d
             }
 
         with ThreadPoolExecutor(max_workers=4) as pool:
-            pages = list(pool.map(one, urls))
+            pages = list(pool.map(carrying_context(one), urls))
 
     duplicates = {
         "title": _duplicates(pages, "title"),

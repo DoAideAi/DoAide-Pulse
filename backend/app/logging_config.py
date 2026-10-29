@@ -32,7 +32,9 @@ from __future__ import annotations
 import logging
 import re
 import sys
-from contextvars import ContextVar
+from collections.abc import Callable
+from contextvars import ContextVar, copy_context
+from typing import Any
 from urllib.parse import urlsplit
 
 from app.config import settings
@@ -100,6 +102,24 @@ class RequestIDFilter(logging.Filter):
 _SECRET_PATH = re.compile(
     r"(/triggers/inbound/|/content/preview/|/digest/unsubscribe/\d+/)[^/?#\s]+"
 )
+
+
+def carrying_context(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """*fn*, to run in a copy of the calling thread's context — for executor threads.
+
+    ``ThreadPoolExecutor`` does not copy context variables into its threads the
+    way Starlette's threadpool does, so every line logged from inside a pool
+    said ``request_id=-`` and could not be tied to the request or task that
+    started it. Wrap the pooled function with this at the ``submit``/``map``
+    site. Each call gets its own copy: one ``Context`` cannot be entered by two
+    threads at once.
+    """
+    context = copy_context()
+
+    def run(*args: Any, **kwargs: Any) -> Any:
+        return context.copy().run(fn, *args, **kwargs)
+
+    return run
 
 
 def redact_path(path: str) -> str:

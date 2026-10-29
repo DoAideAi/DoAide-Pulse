@@ -26,6 +26,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.logging_config import carrying_context
 from app.models.mixins import as_aware, utcnow
 from app.models.product_event import ACTION, LOGIN, SIGNUP, ProductEvent
 from app.services import product_catalog
@@ -273,7 +274,12 @@ def dashboard(
         with ThreadPoolExecutor(max_workers=min(8, len(PRODUCTS))) as pool:
             futures = {
                 p.key: pool.submit(
-                    _umami_for, client, p, resolve_website_id(p, sites), days, force=force
+                    carrying_context(_umami_for),
+                    client,
+                    p,
+                    resolve_website_id(p, sites),
+                    days,
+                    force=force,
                 )
                 for p in PRODUCTS
             }
