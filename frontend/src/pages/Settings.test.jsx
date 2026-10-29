@@ -187,6 +187,62 @@ describe("service health", () => {
     expect(screen.getByText(/250 tasks waiting/)).toBeInTheDocument();
   });
 
+  // /health/detail has reported these two since Pass 37 and no page showed
+  // them: a beat that stopped firing sweeps and a backup that stopped being
+  // written were in the API, and invisible where somebody checks.
+  it("shows a stopped beat and a stale backup, with what to check", async () => {
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+      beat: {
+        status: "stale", required: false,
+        detail: "schedule written 42 min ago — pulse-beat looks stopped: nothing is firing the sweeps",
+      },
+      backups: {
+        status: "stale", required: false,
+        detail: "newest dump is 50 h old (9 kept), past the 36 h limit — check pulse-backup.timer",
+      },
+    });
+    draw();
+
+    expect(await screen.findByText("Beat scheduler")).toBeInTheDocument();
+    expect(screen.getByText(/pulse-beat looks stopped/)).toBeInTheDocument();
+    expect(screen.getByText("Database backups")).toBeInTheDocument();
+    expect(screen.getByText(/newest dump is 50 h old/)).toBeInTheDocument();
+    expect(screen.getAllByText("stale")).toHaveLength(2);
+  });
+
+  it("says when beat and backups are fine", async () => {
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+      beat: { status: "ok", required: false, detail: "" },
+      backups: { status: "ok", required: false, detail: "" },
+    });
+    draw();
+
+    expect(await screen.findByText("Beat scheduler")).toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText("current")).toBeInTheDocument();
+    // With no detail from the server, each row still says what it is for.
+    expect(screen.getByText(/Fires the publishing, scan and digest sweeps/)).toBeInTheDocument();
+    expect(screen.getByText(/A dump is written every night/)).toBeInTheDocument();
+  });
+
+  it("leaves beat and backups off when there is no broker or no backup directory here", async () => {
+    api.healthDetail.mockResolvedValue({
+      status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},
+      github_configured: true, credential_encryption: true,
+      beat: { status: "disabled", required: false, detail: "" },
+      backups: { status: "unknown", required: false, detail: "/var/backups/pulse is not readable here" },
+    });
+    draw();
+
+    expect(await screen.findByText("openrouter")).toBeInTheDocument();
+    expect(screen.queryByText("Beat scheduler")).not.toBeInTheDocument();
+    expect(screen.queryByText("Database backups")).not.toBeInTheDocument();
+  });
+
   it("leaves the task queue off the page when there is no broker", async () => {
     api.healthDetail.mockResolvedValue({
       status: "ok", llm_providers: ["openrouter"], llm_breakers_open: {},

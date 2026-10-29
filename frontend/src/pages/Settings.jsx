@@ -200,6 +200,28 @@ export default function Settings() {
                 hint={health.data.queue.detail || "Work is taken as fast as it arrives."}
               />
             )}
+            {/* Reported by /health/detail since Pass 37 and shown nowhere: a
+                beat that stopped firing the sweeps, and a backup that stopped
+                being written, were in the API and invisible here. Beat is left
+                off with no broker; backups when this box has no backup
+                directory the API can read ("unknown"). A beat with no schedule
+                file at all is "unknown" and is shown — it has never run. */}
+            {health.data?.beat && health.data.beat.status !== "disabled" && (
+              <HealthRow
+                label="Beat scheduler"
+                value={health.data.beat.status === "ok" ? "running" : health.data.beat.status}
+                ok={health.data.beat.status === "ok"}
+                hint={health.data.beat.detail || "Fires the publishing, scan and digest sweeps."}
+              />
+            )}
+            {health.data?.backups && health.data.backups.status !== "unknown" && (
+              <HealthRow
+                label="Database backups"
+                value={health.data.backups.status === "ok" ? "current" : health.data.backups.status}
+                ok={health.data.backups.status === "ok"}
+                hint={health.data.backups.detail || "A dump is written every night."}
+              />
+            )}
             {Object.keys(health.data?.llm_breakers_open ?? {}).length > 0 && (
               <HealthRow
                 label="Tripped providers"
