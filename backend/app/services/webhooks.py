@@ -265,11 +265,17 @@ def replay_nonce(*, delivery_id: str = "", signature: str = "") -> str | None:
     delivery id, and a fresh signature (different ``t``, or different content).
     Only a literal replay repeats either.
 
-    The delivery id wins when both are present. It is the sender's own name for
-    the delivery, so it identifies a redelivery *across* a signature the sender
-    recomputed — which is what GitHub's "Redeliver" button does.
+    **The signature wins when both are present.** It used to be the other way
+    round, and the delivery id is a plain header no signature covers: one
+    captured signed request, resent with a fresh ``X-GitHub-Delivery`` each
+    time, verified on every copy and was a new nonce on every copy — inside the
+    five-minute window for Pulse's scheme, and forever for GitHub's. A verified
+    signature is the one value here only the sender can produce. GitHub's
+    "Redeliver" resends the same body, so the same signature, and is still
+    recognised; the delivery id is what an unsigned request has, and there it
+    is no weaker than the URL that already authenticates it.
     """
-    for candidate in (delivery_id, signature):
+    for candidate in (signature, delivery_id):
         value = (candidate or "").strip()
         if value:
             # Hashed rather than stored raw. `TriggerEvent.dedupe_key` is 200
