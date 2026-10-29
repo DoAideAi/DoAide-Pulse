@@ -13,7 +13,7 @@ shared Caddy container.
 | Code | `/opt/Pulse` — synced by `deploy.sh` with rsync; also a git checkout of `main` (`.git` is excluded from the sync and never shipped) |
 | Runs as | system user `pulse` (not root) |
 | Public URL | `https://pulse.doaide.com` |
-| Deploy | `./deploy/deploy.sh` |
+| Deploy | `./deploy/deploy.sh` — from a clean checkout; it refuses uncommitted changes (`--allow-dirty` ships them, recorded as `<commit>-dirty`) |
 
 ## Ports
 

@@ -4,6 +4,7 @@
 #   ./deploy/deploy.sh            # build, sync, migrate, restart
 #   ./deploy/deploy.sh --no-build # skip the frontend build (backend-only change)
 #   ./deploy/deploy.sh --skip-preflight  # skip local preflight checks
+#   ./deploy/deploy.sh --allow-dirty     # ship uncommitted changes (recorded as such)
 #
 # The server is a plain rsync copy with no .git, matching the other apps on the
 # box. Nothing builds on the server: it has 4 GB of RAM shared between six
@@ -20,12 +21,33 @@ cd "$REPO_ROOT"
 
 SKIP_BUILD=0
 SKIP_PREFLIGHT=0
+ALLOW_DIRTY=0
 for arg in "$@"; do
   case "$arg" in
     --no-build) SKIP_BUILD=1 ;;
     --skip-preflight) SKIP_PREFLIGHT=1 ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
   esac
 done
+
+# ---- Ship a commit, not a working tree ------------------------------------
+# rsync copies what is on disk, and the history below records HEAD. Nothing
+# held those to being the same: an uncommitted edit — half a change, a debug
+# print, another session's work in this shared checkout — went to production
+# without passing CI, under a commit id that does not contain it, which is the
+# record rollback.sh trusts. Untracked files count: rsync ships them too.
+# Ignored ones (frontend/dist, .env) do not, so --porcelain's view is the one.
+DIRTY=$(git status --porcelain 2>/dev/null || true)
+if [ -n "$DIRTY" ] && [ "$ALLOW_DIRTY" -eq 0 ]; then
+  {
+    echo "refusing to deploy: the checkout has uncommitted changes, which rsync"
+    echo "would ship under a commit that does not contain them:"
+    echo "$DIRTY" | sed 's/^/    /'
+    echo "Commit them (and let CI pass), or deploy from a clean worktree."
+    echo "--allow-dirty ships them anyway and records the deploy as <commit>-dirty."
+  } >&2
+  exit 1
+fi
 
 # ---- Preflight checks (local) --------------------------------------------
 if [ "$SKIP_PREFLIGHT" -eq 0 ] && [ -x deploy/preflight.sh ]; then
@@ -35,6 +57,9 @@ if [ "$SKIP_PREFLIGHT" -eq 0 ] && [ -x deploy/preflight.sh ]; then
 fi
 
 DEPLOY_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+if [ -n "$DIRTY" ]; then
+  DEPLOY_COMMIT="${DEPLOY_COMMIT}-dirty"
+fi
 DEPLOY_TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 echo "==> deploying commit $DEPLOY_COMMIT at $DEPLOY_TIMESTAMP"
 
