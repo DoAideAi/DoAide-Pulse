@@ -139,8 +139,11 @@ def list_feedback(
         query = query.where(Feedback.detected_feature == feature.strip())
     if since:
         query = query.where(Feedback.created_at >= datetime.combine(since, time.min, UTC))
-    if until:
+    if until and until < date.max:
         # Inclusive of the whole last day: before midnight of the day after.
+        # Skipped for the last day there is: there is no day after it to stop
+        # before (the addition raised OverflowError, a 500 for a date picker's
+        # furthest value), and it bounds nothing anyway.
         end = datetime.combine(until + timedelta(days=1), time.min, UTC)
         query = query.where(Feedback.created_at < end)
 

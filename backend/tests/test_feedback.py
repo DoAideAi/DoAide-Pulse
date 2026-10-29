@@ -131,6 +131,25 @@ class TestReading:
         assert messages(until="2026-10-10") == ["a", "b"]
         assert messages(category="bug", feature="Calendar") == ["a"]
 
+    def test_the_last_representable_day_is_a_bound_not_a_crash(self, client, auth, db, operator):
+        """``until=9999-12-31`` is "everything", not a 500.
+
+        The inclusive end is midnight of the day *after* ``until``, and there
+        is no day after 9999-12-31: the addition raised ``OverflowError``, and
+        a date picker's furthest value was a server error.
+        """
+        db.add(Feedback(category="bug", message="kept", created_at=datetime.now(UTC)))
+        db.commit()
+
+        resp = client.get(URL, headers=auth, params={"until": "9999-12-31"})
+        assert resp.status_code == 200, resp.text
+        assert [r["message"] for r in resp.json()] == ["kept"]
+
+        resp = client.get(
+            URL, headers=auth, params={"since": "0001-01-01", "until": "9999-12-31"}
+        )
+        assert resp.status_code == 200, resp.text
+
     def test_an_inverted_date_range_is_refused(self, client, auth, operator):
         resp = client.get(URL, headers=auth, params={"since": "2026-10-11", "until": "2026-10-10"})
         assert resp.status_code == 400
