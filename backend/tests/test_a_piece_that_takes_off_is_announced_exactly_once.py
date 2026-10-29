@@ -87,6 +87,8 @@ def _publish(db, content, platform=Platform.DEVTO) -> Publication:
         platform=platform,
         status=PublicationStatus.PUBLISHED,
         external_id=f"ext-{content.id}-{platform.value}",
+        # Published rows always carry it; the sweep pages on it.
+        published_at=utcnow(),
         external_url=f"https://{platform.value}.example.com/{content.slug}",
     )
     db.add(row)

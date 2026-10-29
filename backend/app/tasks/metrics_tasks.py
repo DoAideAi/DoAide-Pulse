@@ -5,7 +5,7 @@ import logging
 from datetime import timedelta
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import func, select, true, tuple_
+from sqlalchemy import select, true, tuple_
 from sqlalchemy.exc import OperationalError
 
 from app.config import settings
@@ -89,14 +89,17 @@ def collect_all_metrics() -> dict:
         # on (went-live time, id), descending, so a page boundary cannot repeat
         # or skip a row that shares its publish time with another.
         cutoff = utcnow() - timedelta(days=settings.metrics_poll_max_age_days)
-        # A row published before ``published_at`` was always written has its
-        # creation time to go by, rather than dropping out of the sweep.
-        went_live = func.coalesce(Publication.published_at, Publication.created_at)
+        # ``published_at`` itself, not ``coalesce(published_at, created_at)``:
+        # no index covers the expression, so every page sorted every published
+        # row from scratch. The one path that marks a publication published
+        # writes ``published_at`` with it, and the column (indexed) is in the
+        # first migration, so there is no row the fallback was catching.
+        went_live = Publication.published_at
         after: tuple | None = None
 
         while not timed_out:
             page = db.execute(
-                select(Publication, Project.user_id, went_live)
+                select(Publication, Project.user_id)
                 .join(Content, Content.id == Publication.content_id)
                 .join(Project, Project.id == Content.project_id)
                 .join(User, User.id == Project.user_id)
@@ -115,8 +118,8 @@ def collect_all_metrics() -> dict:
             if not page:
                 break
 
-            for publication, user_id, live_at in page:
-                after = (live_at, publication.id)
+            for publication, user_id in page:
+                after = (publication.published_at, publication.id)
                 polled += 1
                 publication_id = publication.id
                 content_id = publication.content_id

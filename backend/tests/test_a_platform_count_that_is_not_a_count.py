@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from app.models.content import Content, ContentStatus, ContentType
 from app.models.metrics import ContentMetric
+from app.models.mixins import utcnow
 from app.models.platform_connection import ConnectionStatus, PlatformConnection
 from app.models.publication import Platform, Publication, PublicationStatus
 from app.services import publishers, publishing_service
@@ -47,6 +48,8 @@ def _published(db, project, external_id: str) -> Publication:
         platform=Platform.DEVTO,
         status=PublicationStatus.PUBLISHED,
         external_id=external_id,
+        # Published rows always carry it; the sweep pages on it.
+        published_at=utcnow(),
     )
     db.add(publication)
     db.commit()

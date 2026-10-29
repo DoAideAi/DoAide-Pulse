@@ -17,6 +17,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.content import Content, ContentStatus, ContentType
+from app.models.mixins import utcnow
 from app.models.platform_connection import ConnectionStatus, PlatformConnection
 from app.models.project import Project
 from app.models.publication import Platform, Publication, PublicationStatus
@@ -57,6 +58,8 @@ def _published(db, project: Project, external_id: str) -> Publication:
         status=PublicationStatus.PUBLISHED,
         external_id=external_id,
         external_url=f"https://dev.to/a/{external_id}",
+        # Published rows always carry it; the sweep pages on it.
+        published_at=utcnow(),
     )
     db.add(publication)
     db.commit()
