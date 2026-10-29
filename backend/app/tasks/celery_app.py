@@ -63,6 +63,18 @@ def _configure_logging(**_kwargs: object) -> None:
     """
     configure_logging()
 
+def cron_weekday(weekday: int) -> int:
+    """``digest_send_weekday`` as ``crontab`` reads it.
+
+    The setting is documented, validated and defaulted the way Python numbers
+    days — ``date.weekday()``, 0 = Monday through 6 = Sunday. ``crontab`` uses
+    cron's numbering, where 0 is Sunday. Passed straight through, the default
+    "Monday morning" digest went out on Sunday, and every configured day landed
+    a day early.
+    """
+    return (weekday + 1) % 7
+
+
 celery_app = Celery(
     "pulse",
     broker=settings.celery_broker_url,
@@ -168,7 +180,7 @@ celery_app.conf.beat_schedule = {
         # against the week, and a summary that lands at 03:12 on a Thursday is
         # one nobody opens.
         "schedule": crontab(
-            day_of_week=str(settings.digest_send_weekday),
+            day_of_week=str(cron_weekday(settings.digest_send_weekday)),
             hour=str(settings.digest_send_hour),
             minute="0",
         ),
