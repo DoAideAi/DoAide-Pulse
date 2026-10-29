@@ -26,6 +26,47 @@ const TYPES = [
   "product_spotlight",
 ];
 
+// The list arrives a page at a time. It used to ask for one unsized page and
+// take whatever came back as everything: the backend's default page is 100,
+// so the 101st piece and every one after it was simply not on the page — no
+// count, no "more", and no filter that would bring back a piece you could not
+// remember the title of.
+const PAGE_SIZE = 100;
+// The most rows /content returns per request (its ``limit`` is ``le=500``).
+const MAX_PER_REQUEST = 500;
+// The most ids one bulk request takes (BulkContentIn ``max_length=100``).
+// With more than a page on screen, "Approve all" can name more than that.
+const BULK_LIMIT = 100;
+
+/** The first `shown` rows that match `filters`, and how many match in all. */
+async function loadContent(filters, shown) {
+  const items = [];
+  let total = 0;
+  do {
+    const limit = Math.min(shown - items.length, MAX_PER_REQUEST);
+    const page = await api.listContentPage({ ...filters, limit, offset: items.length });
+    items.push(...page.items);
+    total = page.total;
+    if (page.items.length === 0) break;
+  } while (items.length < Math.min(shown, total));
+  return { items, total };
+}
+
+/**
+ * Run a bulk action over any number of ids, at most BULK_LIMIT per request,
+ * and add the answers together. `key` is the list of ids that worked, which
+ * approve and reject name differently.
+ */
+async function inBatches(ids, action, key) {
+  const merged = { [key]: [], failed: [] };
+  for (let i = 0; i < ids.length; i += BULK_LIMIT) {
+    const result = await action(ids.slice(i, i + BULK_LIMIT));
+    merged[key].push(...(result?.[key] ?? []));
+    merged.failed.push(...(result?.failed ?? []));
+  }
+  return merged;
+}
+
 /** Everything written, filterable, plus the button that writes something new. */
 export default function ContentList() {
   const [params, setParams] = useSearchParams();
@@ -42,16 +83,32 @@ export default function ContentList() {
   const filtered = Boolean(status || type || projectId || query);
 
   const { data: projects } = useApi(() => api.listProjects(), []);
-  const { data, error, loading, reload } = useApi(
+  // How many rows to show, for these filters. Keyed by the filters so that
+  // changing one starts again from the first page without a second fetch.
+  const filterKey = [projectId, status, type, query].join("\u0000");
+  const [more, setMore] = useState({ key: filterKey, shown: PAGE_SIZE });
+  const shown = more.key === filterKey ? more.shown : PAGE_SIZE;
+  const {
+    data: listing,
+    error,
+    loading,
+    reload,
+  } = useApi(
     () =>
-      api.listContent({
-        project_id: projectId || undefined,
-        status: status || undefined,
-        content_type: type || undefined,
-        q: query || undefined,
-      }),
-    [projectId, status, type, query],
+      loadContent(
+        {
+          project_id: projectId || undefined,
+          status: status || undefined,
+          content_type: type || undefined,
+          q: query || undefined,
+        },
+        shown,
+      ),
+    [projectId, status, type, query, shown],
   );
+  const data = listing?.items ?? null;
+  const total = listing?.total ?? 0;
+  const showMore = () => setMore({ key: filterKey, shown: shown + PAGE_SIZE });
 
   const setFilter = useCallback(
     (key, value) => {
@@ -112,10 +169,10 @@ export default function ContentList() {
     if (ids.length === 0) return;
     setApprovingBulk(true);
     try {
-      const result = await api.bulkApprove(ids);
-      const ok = result.succeeded?.length ?? 0;
+      const result = await inBatches(ids, api.bulkApprove, "succeeded");
+      const ok = result.succeeded.length;
       if (ok > 0) toast.success(`Approved ${ok} item${ok === 1 ? "" : "s"}`);
-      const fail = result.failed?.length ?? 0;
+      const fail = result.failed.length;
       if (fail > 0)
         toast.error(
           `${fail} item${fail === 1 ? "" : "s"} could not be approved — ` +
@@ -136,9 +193,15 @@ export default function ContentList() {
     if (ids.length === 0) return;
     setApprovingBulk(true);
     try {
-      const result = await api.bulkApprove(ids);
-      const ok = result.succeeded?.length ?? 0;
+      const result = await inBatches(ids, api.bulkApprove, "succeeded");
+      const ok = result.succeeded.length;
       if (ok > 0) toast.success(`Approved ${ok} item${ok === 1 ? "" : "s"}`);
+      const fail = result.failed.length;
+      if (fail > 0)
+        toast.error(
+          `${fail} item${fail === 1 ? "" : "s"} could not be approved — ` +
+            "they may have been modified or are no longer in review",
+        );
       setSelected(new Set());
       reload();
     } catch (err) {
@@ -153,10 +216,10 @@ export default function ContentList() {
     if (ids.length === 0) return;
     setRejectingBulk(true);
     try {
-      const result = await api.bulkReject(ids);
-      const ok = result.archived?.length ?? 0;
+      const result = await inBatches(ids, api.bulkReject, "archived");
+      const ok = result.archived.length;
       if (ok > 0) toast.success(`Rejected ${ok} item${ok === 1 ? "" : "s"}`);
-      const fail = result.failed?.length ?? 0;
+      const fail = result.failed.length;
       if (fail > 0)
         toast.error(
           `${fail} item${fail === 1 ? "" : "s"} could not be rejected — ` +
@@ -344,6 +407,17 @@ export default function ContentList() {
             <ContentRow key={item.id} item={item} onChanged={reload} />
           ))}
         </ul>
+      )}
+
+      {data?.length > 0 && data.length < total && (
+        <div className="flex items-center justify-center gap-3 text-sm text-ink-500">
+          <span role="status">
+            Showing {data.length} of {total}
+          </span>
+          <button className="btn-quiet" onClick={showMore} disabled={loading}>
+            {loading ? "Loading…" : `Show ${Math.min(PAGE_SIZE, total - data.length)} more`}
+          </button>
+        </div>
       )}
 
       {composing && (

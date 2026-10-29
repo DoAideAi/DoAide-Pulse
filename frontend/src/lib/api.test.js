@@ -579,6 +579,7 @@ describe("every endpoint's path and verb", () => {
     ["draftProjectFromDocuments", [[]], "/projects/draft-from-documents", "POST"],
 
     ["listContent", [], "/content", "GET"],
+    ["listContentPage", [{ limit: 100, offset: 0 }], "/content?limit=100&offset=0", "GET"],
     ["getContent", [3], "/content/3", "GET"],
     ["checkLinks", [3], "/content/3/links", "GET"],
     ["socialCards", [3], "/content/3/social", "GET"],
@@ -819,5 +820,34 @@ describe("queueCounts", () => {
     vi.stubGlobal("fetch", withTotals(() => null));
 
     expect(await api.queueCounts()).toEqual({ review: 0, failed: 0 });
+  });
+});
+
+describe("listContentPage", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function serving(body, total) {
+    return vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "",
+      headers: { get: (name) => (name === "X-Total-Count" ? total : null) },
+      text: async () => body,
+    }));
+  }
+
+  it("answers with the page and the total behind it", async () => {
+    vi.stubGlobal("fetch", serving('[{"id":1},{"id":2}]', "240"));
+
+    expect(await api.listContentPage({ limit: 2 })).toEqual({
+      items: [{ id: 1 }, { id: 2 }],
+      total: 240,
+    });
+  });
+
+  it("counts the page when a proxy drops the header", async () => {
+    vi.stubGlobal("fetch", serving('[{"id":1}]', null));
+
+    expect(await api.listContentPage()).toEqual({ items: [{ id: 1 }], total: 1 });
   });
 });

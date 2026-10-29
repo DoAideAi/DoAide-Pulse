@@ -19,7 +19,7 @@ export function setToken(token) {
 
 async function request(
   path,
-  { method = "GET", body, form, auth = true, headers: extra, total = false } = {},
+  { method = "GET", body, form, auth = true, headers: extra, total = false, page = false } = {},
 ) {
   const headers = { ...extra };
   const token = getToken();
@@ -127,6 +127,12 @@ async function request(
   if (total) {
     const header = Number.parseInt(res.headers.get("X-Total-Count") ?? "", 10);
     return Number.isNaN(header) ? (Array.isArray(data) ? data.length : 0) : header;
+  }
+  // `page: true` answers with both: the rows, and how many there are in all.
+  if (page) {
+    const items = Array.isArray(data) ? data : [];
+    const header = Number.parseInt(res.headers?.get("X-Total-Count") ?? "", 10);
+    return { items, total: Number.isNaN(header) ? items.length : header };
   }
   return data;
 }
@@ -243,6 +249,9 @@ export const api = {
 
   // ---- content ----
   listContent: (params = {}) => request(`/content${qs(params)}`),
+  // One page and the total behind it, for a list that has to know whether
+  // there is more than it was given.
+  listContentPage: (params = {}) => request(`/content${qs(params)}`, { page: true }),
   getContent: (id) => request(`/content/${id}`),
   // Makes outbound HTTP requests, so it is called on demand rather than with
   // every editor load.

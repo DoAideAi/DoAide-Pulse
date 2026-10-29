@@ -16,6 +16,7 @@ vi.mock("../lib/api", () => ({
   api: {
     listProjects: vi.fn(),
     listContent: vi.fn(),
+    listContentPage: vi.fn(),
     generateContent: vi.fn(),
     approveContent: vi.fn(),
     updateContent: vi.fn(),
@@ -38,9 +39,9 @@ function Search() {
   return <span data-testid="search">{useLocation().search}</span>;
 }
 
-function draw() {
+function draw(url = "/") {
   return render(
-    <MemoryRouter future={ROUTER_FUTURE}>
+    <MemoryRouter initialEntries={[url]} future={ROUTER_FUTURE}>
       <ContentList />
       <Search />
     </MemoryRouter>,
@@ -69,6 +70,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   api.listProjects.mockResolvedValue([PROJECT]);
   api.listContent.mockResolvedValue([]);
+  // The page asks for a page and its total. Most tests here only care about
+  // the rows, so they set `listContent` and this answers as if that were all.
+  api.listContentPage.mockImplementation(async (params) => {
+    const items = await api.listContent(params);
+    return { items, total: items.length };
+  });
 });
 
 describe("loading and empty states", () => {
@@ -580,5 +587,79 @@ describe("searching by title", () => {
     draw();
     await screen.findByText(item().title);
     expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+  });
+});
+
+describe("more than one page", () => {
+  // 150 drafts, served by offset/limit the way /content serves them.
+  const many = Array.from({ length: 150 }, (_, i) =>
+    item({ id: i + 1, title: `Piece ${i + 1}`, status: "review" }),
+  );
+  const serve = async ({ limit, offset }) => ({
+    items: many.slice(offset, offset + limit),
+    total: many.length,
+  });
+
+  it("says there is more than it shows, and fetches the rest when asked", async () => {
+    api.listContentPage.mockImplementation(serve);
+    const user = userEvent.setup();
+    draw();
+
+    expect(await screen.findByText("Piece 100")).toBeInTheDocument();
+    expect(screen.queryByText("Piece 101")).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 100 of 150")).toBeInTheDocument();
+    expect(api.listContentPage).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 100, offset: 0 }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show 50 more" }));
+
+    expect(await screen.findByText("Piece 150")).toBeInTheDocument();
+    expect(screen.queryByText(/Showing \d+ of/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /more$/ })).not.toBeInTheDocument();
+  });
+
+  it("starts from the first page again when a filter changes", async () => {
+    api.listContentPage.mockImplementation(serve);
+    const user = userEvent.setup();
+    draw();
+    await user.click(await screen.findByRole("button", { name: "Show 50 more" }));
+    await screen.findByText("Piece 150");
+    api.listContentPage.mockClear();
+
+    await user.selectOptions(screen.getByLabelText("Filter by content type"), "tutorial");
+
+    await waitFor(() =>
+      expect(api.listContentPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ content_type: "tutorial", limit: 100, offset: 0 }),
+      ),
+    );
+  });
+
+  it("asks for no page at all when the total is exactly one page", async () => {
+    const hundred = many.slice(0, 100);
+    api.listContentPage.mockResolvedValue({ items: hundred, total: 100 });
+    draw();
+    await screen.findByText("Piece 100");
+    expect(screen.queryByText(/Showing \d+ of/)).not.toBeInTheDocument();
+    expect(api.listContentPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("approves more than 100 drafts in batches the API accepts", async () => {
+    // BulkContentIn takes at most 100 ids; one request naming 150 is a 422
+    // and approves none of them.
+    api.listContentPage.mockImplementation(serve);
+    api.bulkApprove.mockImplementation(async (ids) => ({ succeeded: ids, failed: [] }));
+    const user = userEvent.setup();
+    draw("/?status=review");
+    await user.click(await screen.findByRole("button", { name: "Show 50 more" }));
+    await screen.findByText("Piece 150");
+
+    await user.click(screen.getByRole("button", { name: "Approve all" }));
+
+    await waitFor(() => expect(api.bulkApprove).toHaveBeenCalledTimes(2));
+    expect(api.bulkApprove.mock.calls[0][0]).toHaveLength(100);
+    expect(api.bulkApprove.mock.calls[1][0]).toHaveLength(50);
+    expect(toast.success).toHaveBeenCalledWith("Approved 150 items");
   });
 });
