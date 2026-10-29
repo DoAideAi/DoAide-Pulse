@@ -204,6 +204,14 @@ def upsert_connection(
         connection.status = ConnectionStatus.CONNECTED
         connection.last_verified_at = utcnow()
         connection.last_error = None
+        # The destination's language. ``ConnectionCreate`` declared and
+        # validated it and nothing ever wrote it, so every destination stayed
+        # English: the publish path's translation lookup read a column no
+        # request could set, and "publish this one in French" was not a thing
+        # a user could do. Written only when sent, so re-saving credentials
+        # without it leaves the language the destination already had.
+        if "language" in payload.model_fields_set:
+            connection.language = payload.language
         db.commit()
 
     connection = _existing()
