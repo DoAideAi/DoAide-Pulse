@@ -29,6 +29,7 @@ from app.models.content import Content, ContentIdea, ContentStatus
 from app.models.mixins import elapsed_ms
 from app.models.project import AutopilotMode, Project, slugify
 from app.models.publication import Publication
+from app.models.subscriber import Subscriber
 from app.models.user import User
 from app.ratelimit import account_key, limiter
 from app.routers._patch import reject_nulls
@@ -497,9 +498,20 @@ def delete_project(
     # and deleted them row by row — about four statements a piece, so a project
     # with a few years of autopilot output became tens of thousands of round
     # trips in one request. Every table under a project is ``ON DELETE
-    # CASCADE`` (or ``SET NULL`` for what outlives it: templates, subscribers,
-    # an idea's link to a piece), pinned with foreign keys enforced by
+    # CASCADE`` (or ``SET NULL`` for what outlives it: templates, an idea's
+    # link to a piece), pinned with foreign keys enforced by
     # tests/test_journey_repo_to_publish_to_project_delete.py.
+    #
+    # The project's readers go first, for the reason ``accounts.erase`` gives:
+    # ``subscribers.project_id`` is ``SET NULL``, so the cascade alone turned a
+    # deleted project's list into unattributed rows — the install's pool,
+    # owned by no account. Worse, a later erase of the account could no longer
+    # find them (it deletes the subscribers of projects it still owns), so the
+    # addresses collected on this account's pages outlived the account that
+    # asked to be forgotten. The list belonged to the project; it goes with it.
+    readers = db.execute(delete(Subscriber).where(Subscriber.project_id == project.id))
+    if readers.rowcount:
+        logger.info("project %s deleted with %d subscriber(s)", project.id, readers.rowcount)
     db.execute(delete(Project).where(Project.id == project.id))
     db.commit()
 

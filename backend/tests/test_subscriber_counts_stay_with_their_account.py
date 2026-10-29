@@ -181,3 +181,18 @@ def test_deleting_a_project_keeps_working_when_its_reader_is_also_unattributed(
     resp = client.delete(f"/api/v1/projects/{project.id}", headers=auth)
 
     assert resp.status_code == 204, resp.text
+
+
+def test_deleting_a_project_takes_its_readers_and_only_its_readers(
+    client, auth, db, project, article
+):
+    """A deleted project's list goes with it, rather than becoming addresses
+    owned by no account — which a later account erasure could not find."""
+    _subscribe(client, "install@example.com")  # the install's own widget
+    _subscribe(client, "reader@example.com", article=article.slug)
+
+    assert client.delete(f"/api/v1/projects/{project.id}", headers=auth).status_code == 204
+
+    db.expire_all()
+    emails = {s.email for s in db.query(Subscriber).all()}
+    assert emails == {"install@example.com"}
