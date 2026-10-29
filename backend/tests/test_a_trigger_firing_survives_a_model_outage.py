@@ -194,3 +194,32 @@ def test_the_sweep_hands_due_retries_to_the_worker(db, trigger, outage, monkeypa
 
     assert sent == [event.id]
     assert result["retried"] == 1
+
+
+def test_firings_out_of_attempts_do_not_crowd_out_one_that_is_due(db, trigger, outage):
+    """The sweep reads a page of failed firings and filters it in Python. A
+    long outage leaves many that have spent all three attempts; they are the
+    oldest, so they filled the page first, and a firing still due another try
+    was never reached while they sat in the 24-hour window."""
+    spent = [
+        TriggerEvent(
+            trigger_id=trigger.id, dedupe_key=f"spent-{i}", headline="h",
+            payload={"kind": "webhook", "headline": "h"},
+            status=TriggerEventStatus.FAILED,
+            detail="Generation failed (attempt 3 of 3): provider unavailable",
+        )
+        for i in range(120)
+    ]
+    db.add_all(spent)
+    db.commit()
+    db.execute(
+        update(TriggerEvent)
+        .where(TriggerEvent.id.in_([e.id for e in spent]))
+        .values(updated_at=utcnow() - timedelta(hours=10))
+    )
+    db.commit()
+
+    due = _fail_once(db, trigger, outage)
+    _age(db, due, 31)
+
+    assert triggers.retryable_event_ids(db) == [due.id]

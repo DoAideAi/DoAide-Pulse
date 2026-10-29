@@ -651,6 +651,13 @@ def retryable_event_ids(db: Session, *, now: Any = None, limit: int = 20) -> lis
         .where(
             TriggerEvent.status == TriggerEventStatus.FAILED,
             TriggerEvent.detail.startswith(_GENERATION_FAILED),
+            # In SQL, not only in the Python filter below: a firing that has
+            # spent every attempt is among the oldest rows here and stays in
+            # the window for a day, so a long outage left enough of them to
+            # fill the page, and a firing still due a try was never reached.
+            ~TriggerEvent.detail.startswith(
+                f"{_GENERATION_FAILED} (attempt {GENERATION_ATTEMPTS} of"
+            ),
             TriggerEvent.created_at >= moment - GENERATION_RETRY_WINDOW,
             Trigger.is_active.is_(True),
             Project.is_active.is_(True),
