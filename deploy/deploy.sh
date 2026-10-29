@@ -166,22 +166,26 @@ fi
 
 systemctl stop pulse-beat pulse-worker || true
 cd /opt/Pulse/backend
-DB_URL=\$(grep -E '^DATABASE_URL=' /opt/Pulse/.env | head -1 | cut -d= -f2-)
+# Everything below runs from here so that Settings finds ../.env itself. The
+# database URL used to be read out of that file and passed to sudo as an env
+# assignment, which put the password in argv — readable through ps by every
+# user on this shared box, and written by sudo into the auth log each deploy.
 
 # Snapshot the current alembic revision before migrating, so a failed deploy
 # can downgrade back to exactly where it was.
-PREV_REV=\$(sudo -u pulse env DATABASE_URL="\$DB_URL" \
+PREV_REV=\$(sudo -u pulse \
   /opt/Pulse/.venv/bin/alembic current 2>/dev/null | grep -oP '^[a-f0-9]+' || echo "unknown")
 echo "pre-migration alembic revision: \$PREV_REV"
 
 # Advisory lock prevents two overlapping deploys from running migrations
 # concurrently. The lock id (737868) is arbitrary but fixed; pg_try_advisory_lock
 # returns false (exit 1 from psql) when another session holds it.
-if ! sudo -u pulse env DATABASE_URL="\$DB_URL" \
+if ! sudo -u pulse \
   /opt/Pulse/.venv/bin/python -c "
 import os, sys
 from sqlalchemy import create_engine, text
-e = create_engine(os.environ['DATABASE_URL'])
+from app.config import settings
+e = create_engine(settings.database_url)
 with e.connect() as c:
     if not c.execute(text('SELECT pg_try_advisory_lock(737868)')).scalar():
         print('ERROR: another migration is running', file=sys.stderr)
@@ -202,7 +206,7 @@ with e.connect() as c:
   exit 1
 fi
 
-POST_REV=\$(sudo -u pulse env DATABASE_URL="\$DB_URL" \
+POST_REV=\$(sudo -u pulse \
   /opt/Pulse/.venv/bin/alembic current 2>/dev/null | grep -oP '^[a-f0-9]+' || echo "unknown")
 echo "post-migration alembic revision: \$POST_REV"
 

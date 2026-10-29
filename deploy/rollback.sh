@@ -38,8 +38,7 @@ if [[ ${1:-} == "--db-only" ]]; then
     "${SSH[@]}" bash -euo pipefail <<REMOTE_SCRIPT
 systemctl stop pulse-beat pulse-worker || true
 cd /opt/Pulse/backend
-DB_URL=\$(grep -E '^DATABASE_URL=' /opt/Pulse/.env | head -1 | cut -d= -f2-)
-sudo -u pulse env DATABASE_URL="\$DB_URL" /opt/Pulse/.venv/bin/alembic downgrade $TARGET_REV
+sudo -u pulse /opt/Pulse/.venv/bin/alembic downgrade $TARGET_REV
 systemctl restart pulse-api
 systemctl start pulse-worker pulse-beat
 REMOTE_SCRIPT
@@ -92,12 +91,11 @@ echo "==> building frontend at rollback commit"
 echo "==> downgrading the database to $TARGET_REV (with the code still deployed)"
 "${SSH[@]}" bash -euo pipefail <<REMOTE_SCRIPT
 cd /opt/Pulse/backend
-DB_URL=\$(grep -E '^DATABASE_URL=' /opt/Pulse/.env | head -1 | cut -d= -f2-)
-CURRENT=\$(sudo -u pulse env DATABASE_URL="\$DB_URL" /opt/Pulse/.venv/bin/alembic current 2>/dev/null \
+CURRENT=\$(sudo -u pulse /opt/Pulse/.venv/bin/alembic current 2>/dev/null \
   | grep -oE '^[a-z0-9]+' || true)
 if [ "\$CURRENT" != "$TARGET_REV" ]; then
   systemctl stop pulse-beat pulse-worker || true
-  sudo -u pulse env DATABASE_URL="\$DB_URL" /opt/Pulse/.venv/bin/alembic downgrade $TARGET_REV
+  sudo -u pulse /opt/Pulse/.venv/bin/alembic downgrade $TARGET_REV
 fi
 REMOTE_SCRIPT
 
@@ -132,8 +130,7 @@ chown pulse:pulse "$stamp"
 systemctl stop pulse-beat pulse-worker || true
 
 cd /opt/Pulse/backend
-DB_URL=$(grep -E '^DATABASE_URL=' /opt/Pulse/.env | head -1 | cut -d= -f2-)
-sudo -u pulse env DATABASE_URL="$DB_URL" /opt/Pulse/.venv/bin/alembic upgrade head
+sudo -u pulse /opt/Pulse/.venv/bin/alembic upgrade head
 
 systemctl restart pulse-api pulse-web
 systemctl start pulse-worker pulse-beat
