@@ -185,6 +185,31 @@ def _unsupported_claims(
     return factcheck.unsupported_names(text, known | factcheck.vocabulary(readme))
 
 
+def _release_connection_for_the_model(db: Session) -> None:
+    """End a read-only transaction before the model call, keeping what was loaded.
+
+    Every caller reads before it gets here — the project, the day's firing count
+    — and those reads opened a transaction that then sat idle for the whole
+    model call: twenty seconds, minutes under retries. On the inbound webhook
+    that is one of the API's fifteen pooled connections per firing, on an
+    endpoint anyone holding the URL can call; on the workers, theirs. Ending it
+    returns the connection, and ``expire_on_commit`` is suspended so the loaded
+    project stays readable rather than reloading — and taking a connection back
+    — on the first attribute the generator reads.
+
+    Only when nothing is pending: a caller's unwritten change is not this
+    function's to commit early, so with one staged the transaction is left as
+    it was.
+    """
+    if db.new or db.dirty or db.deleted or not db.in_transaction():
+        return
+    expire, db.expire_on_commit = db.expire_on_commit, False
+    try:
+        db.commit()
+    finally:
+        db.expire_on_commit = expire
+
+
 def generate_and_route(
     db: Session,
     project: Project,
@@ -222,6 +247,7 @@ def generate_and_route(
 
     Raises :class:`GenerationUnavailable` on that path, having written nothing.
     """
+    _release_connection_for_the_model(db)
     generated = content_generator.generate(
         project,
         content_type,
