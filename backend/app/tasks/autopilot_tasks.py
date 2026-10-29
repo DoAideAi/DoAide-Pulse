@@ -188,7 +188,17 @@ def scan_project(project_id: int) -> dict:
             logger.warning("autopilot paused on project %s: %s", project_id, exc)
             return {"project_id": project_id, "status": "llm_unavailable"}
 
-        if result.get("status") not in _HOLDS_WATERMARK:
+        # Only onto the repository it was read from. A PATCH moving the project
+        # to another repo while this scan ran has reset the watermark for the
+        # new one; writing this head over that would hand the new repo the old
+        # one's position, and its next scan would write up a page of history.
+        current_repo = db.execute(
+            select(Project.repo_url).where(Project.id == project_id).with_for_update()
+        ).scalar()
+        if (
+            result.get("status") not in _HOLDS_WATERMARK
+            and repo_full_name(current_repo) == full_name
+        ):
             project.last_seen_commit_sha = activity.head_sha
             project.last_seen_release_tag = activity.latest_tag
         # Always: we did look, whatever we decided to do about it.

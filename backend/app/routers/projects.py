@@ -17,7 +17,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, lazyload, load_only, selectinload
 from starlette.concurrency import run_in_threadpool
@@ -27,9 +27,10 @@ from app.database import get_db
 from app.deps import ListOffset, RowId, get_current_user, lock_for_count, owned_project
 from app.models.content import Content, ContentIdea, ContentStatus
 from app.models.mixins import elapsed_ms
-from app.models.project import AutopilotMode, Project, slugify
+from app.models.project import AutopilotMode, Project, repo_full_name, slugify
 from app.models.publication import Publication
 from app.models.subscriber import Subscriber
+from app.models.trigger import Trigger, TriggerKind
 from app.models.user import User
 from app.ratelimit import account_key, limiter
 from app.routers._patch import reject_nulls
@@ -427,8 +428,11 @@ def update_project(
             project.slug = f"{slug}-{collision_suffix}" if collision_suffix else slug
 
         was_unreviewed = project.autopilot_mode in _PUBLISHES_UNREVIEWED
+        repo_before = repo_full_name(project.repo_url)
         for key, value in data.items():
             setattr(project, key, value)
+        if repo_full_name(project.repo_url) != repo_before:
+            _forget_the_old_repo(db, project)
         if was_unreviewed and project.autopilot_mode not in _PUBLISHES_UNREVIEWED:
             content_pipeline.hold_unreviewed(db, project)
 
@@ -450,6 +454,36 @@ def update_project(
                 raise
     db.refresh(project)
     return _to_out(project, db=db)
+
+
+def _forget_the_old_repo(db: Session, project: Project) -> None:
+    """Drop the watermarks that belonged to the repository this project left.
+
+    ``last_seen_commit_sha`` and ``last_seen_release_tag`` are positions in one
+    repository. Kept across a change of ``repo_url``, the next scan asked the
+    new one for commits since a sha it never had, got a full page back and —
+    not being a first scan — wrote, and on ``auto`` published, a post about the
+    last hundred commits of somebody's history. A GitHub trigger that names no
+    repo of its own watches this one, so its watermark goes too.
+    """
+    project.last_seen_commit_sha = None
+    project.last_seen_release_tag = None
+    followers = [
+        trigger.id
+        for trigger in db.scalars(
+            select(Trigger).where(
+                Trigger.project_id == project.id, Trigger.kind == TriggerKind.GITHUB
+            )
+        )
+        if not str(trigger.setting("repo") or "").strip()
+    ]
+    if followers:
+        db.execute(
+            update(Trigger)
+            .where(Trigger.id.in_(followers))
+            .values(state={})
+            .execution_options(synchronize_session="fetch")
+        )
 
 
 @router.delete(
