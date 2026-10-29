@@ -12,20 +12,12 @@ import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
 import { inBatches } from "../lib/bulk";
+import { CONTENT_STATUSES, CONTENT_TYPES } from "../lib/contentTypes";
 import { automaticOrigin, formatWhen, titleize } from "../lib/format";
 import trackEvent from "../lib/trackEvent";
 
-const STATUSES = ["draft", "review", "approved", "published", "failed", "archived"];
-const TYPES = [
-  "tutorial",
-  "announcement",
-  "feature_spotlight",
-  "comparison",
-  "how_to",
-  "social_thread",
-  "changelog",
-  "product_spotlight",
-];
+const STATUSES = CONTENT_STATUSES;
+const TYPES = CONTENT_TYPES;
 
 // The list arrives a page at a time. It used to ask for one unsized page and
 // take whatever came back as everything: the backend's default page is 100,

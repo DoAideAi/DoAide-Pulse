@@ -11,23 +11,11 @@
 // field must be *absent* rather than `""`, because the API refuses an unknown
 // or malformed value rather than ignoring it, and `""` for `every_hours` is
 // malformed where "not set" is fine.
+import { CONTENT_TYPES } from "./contentTypes";
 
-/**
- * Content types the generator understands. Mirrors `ContentType`.
- *
- * The last two are not articles — they produce a thread and a changelog. The
- * shape a type takes is the server's to decide (`content_format` on the piece),
- * so nothing here needs to know which is which.
- */
-export const CONTENT_TYPES = [
-  "announcement",
-  "tutorial",
-  "feature_spotlight",
-  "comparison",
-  "how_to",
-  "social_thread",
-  "changelog",
-];
+// Re-exported so the trigger builder's existing imports keep working; the list
+// itself lives in lib/contentTypes.js.
+export { CONTENT_TYPES };
 
 /**
  * Field specs per kind, in the order the builder shows them.
