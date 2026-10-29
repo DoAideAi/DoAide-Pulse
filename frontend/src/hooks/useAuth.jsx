@@ -26,8 +26,8 @@ export function AuthProvider({ children }) {
     trackEvent("login");
   }
 
-  async function register(email, password, fullName) {
-    await api.register(email, password, fullName);
+  async function register(email, password, fullName, inviteToken) {
+    await api.register(email, password, fullName, inviteToken);
     await login(email, password);
     trackEvent("signup");
   }

@@ -20,7 +20,7 @@
   var SECRET_SEGMENTS = { preview: ":token" };
   // Query parameters that are credentials. Everything else — utm_* above all —
   // is kept, which is why this does not use data-exclude-search.
-  var SECRET_PARAMS = /^(token|key|code|secret|password|signature|sig)$/i;
+  var SECRET_PARAMS = /^(token|invite|key|code|secret|password|signature|sig)$/i;
 
   function redactPath(path) {
     var parts = path.split("/");

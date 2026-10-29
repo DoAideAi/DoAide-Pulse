@@ -162,11 +162,13 @@ function qs(params) {
 
 export const api = {
   // ---- auth ----
-  register: (email, password, full_name) =>
+  // ``invite_token`` only when there is one: an install with an invite code
+  // set refused every sign-up from the UI, because nothing ever sent it.
+  register: (email, password, full_name, invite_token) =>
     request("/auth/register", {
       method: "POST",
       auth: false,
-      body: { email, password, full_name },
+      body: { email, password, full_name, ...(invite_token ? { invite_token } : {}) },
     }),
   login: async (email, password) => {
     const form = new URLSearchParams({ username: email, password });

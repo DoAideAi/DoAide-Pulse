@@ -327,6 +327,19 @@ describe("the outgoing request", () => {
     });
   });
 
+  it("sends an invite code when there is one, and only then", async () => {
+    const fetchMock = stubOk();
+
+    await api.register("you@example.com", "pw", null, "welcome-42");
+
+    expect(JSON.parse(sentBy(fetchMock).init.body)).toEqual({
+      email: "you@example.com",
+      password: "pw",
+      full_name: null,
+      invite_token: "welcome-42",
+    });
+  });
+
   it("forgets the token on logout", () => {
     setToken("abc123");
 
@@ -545,6 +558,7 @@ describe("every endpoint's path and verb", () => {
     ["listTranslations", [3], "/content/3/translations", "GET"],
     ["translateContent", [3, "hi"], "/content/3/translations", "POST"],
     ["deleteTranslation", [3, "hi"], "/content/3/translations/hi", "DELETE"],
+    ["acceptTranslation", [3, "hi"], "/content/3/translations/hi/accept", "POST"],
 
     ["listRevisions", [3], "/content/3/revisions", "GET"],
     ["getRevision", [3, 2], "/content/3/revisions/2", "GET"],

@@ -1,14 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import LandingPage from "./LandingPage";
+
+const auth = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn() }));
 
 vi.mock("../hooks/useAuth", () => ({
   useAuth: () => ({
     user: null,
     loading: false,
-    login: vi.fn(),
-    register: vi.fn(),
+    login: auth.login,
+    register: auth.register,
   }),
 }));
 
@@ -110,6 +112,69 @@ describe("LandingPage", () => {
       wrap();
       fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
       expect(screen.queryByRole("link", { name: "Forgot your password?" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("an invite-only install", () => {
+    afterEach(() => {
+      auth.register.mockReset();
+      window.history.replaceState(null, "", "/");
+    });
+
+    const fill = () => {
+      fireEvent.change(screen.getByLabelText("Email"), { target: { value: "new@example.com" } });
+      fireEvent.change(screen.getByLabelText("Password"), { target: { value: "long-enough-pw" } });
+    };
+
+    it("takes the code from an invite link, opens on sign-up and sends it", async () => {
+      window.history.replaceState(null, "", "/?invite=welcome-42");
+      auth.register.mockResolvedValue(undefined);
+      wrap();
+
+      expect(window.location.search).toBe("");
+      expect(screen.getByLabelText("Invite code")).toHaveValue("welcome-42");
+      fill();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+      });
+
+      await vi.waitFor(() =>
+        expect(auth.register).toHaveBeenCalledWith(
+          "new@example.com",
+          "long-enough-pw",
+          null,
+          "welcome-42",
+        ),
+      );
+    });
+
+    it("asks for the code once the server says it wants one, instead of a dead end", async () => {
+      auth.register.mockRejectedValueOnce(
+        new Error("Invalid invite token. Check the token and try again."),
+      );
+      wrap();
+      fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
+      expect(screen.queryByLabelText("Invite code")).not.toBeInTheDocument();
+
+      fill();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+      });
+      const field = await screen.findByLabelText("Invite code");
+
+      auth.register.mockResolvedValueOnce(undefined);
+      fireEvent.change(field, { target: { value: "from-the-operator" } });
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+      });
+      await vi.waitFor(() =>
+        expect(auth.register).toHaveBeenLastCalledWith(
+          "new@example.com",
+          "long-enough-pw",
+          null,
+          "from-the-operator",
+        ),
+      );
     });
   });
 });

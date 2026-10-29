@@ -22,6 +22,11 @@ describe("the Umami before-send hook", () => {
     expect(payload.url).toBe("/reset-password?token=redacted&utm_source=mail");
   });
 
+  it("takes an invite code out of the landing URL", () => {
+    const payload = window.pulseRedactAnalytics("event", { url: "/?invite=welcome-42" });
+    expect(payload.url).toBe("/?invite=redacted");
+  });
+
   it("takes a preview token out of the path", () => {
     const payload = window.pulseRedactAnalytics("event", { url: `/preview/${TOKEN}` });
     expect(payload.url).toBe("/preview/:token");

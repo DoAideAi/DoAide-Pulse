@@ -506,7 +506,15 @@ function QuickLinks() {
 
 export default function LandingPage() {
   const { user, login, register } = useAuth();
-  const [mode, setMode] = useState("signin");
+  // An operator running Pulse invite-only shares /?invite=<code>. Read once and
+  // taken out of the address bar, like a reset token: it is a credential.
+  const [invite, setInvite] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const code = new URLSearchParams(window.location.search).get("invite") || "";
+    if (code) window.history.replaceState(window.history.state, "", window.location.pathname);
+    return code;
+  });
+  const [mode, setMode] = useState(() => (invite ? "signup" : "signin"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -515,6 +523,11 @@ export default function LandingPage() {
   const [visible, setVisible] = useState(false);
 
   const isSignUp = mode === "signup";
+  // Only where it can matter: an install with no invite code set never asks.
+  // Shown when a link brought one, or once the server has said it wants one —
+  // until then "Invalid invite token" was the answer to every sign-up, with
+  // nowhere on the page to put one.
+  const askForInvite = isSignUp && (Boolean(invite) || /invite/i.test(error || ""));
 
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
@@ -558,7 +571,7 @@ export default function LandingPage() {
     setError(null);
     setBusy(true);
     try {
-      if (isSignUp) await register(email, password, fullName || null);
+      if (isSignUp) await register(email, password, fullName || null, invite.trim() || null);
       else await login(email, password);
     } catch (err) {
       setError(err.message);
@@ -685,6 +698,21 @@ export default function LandingPage() {
                   autoComplete={isSignUp ? "new-password" : "current-password"}
                 />
               </div>
+
+              {askForInvite && (
+                <div className="landing-field">
+                  <label className="landing-label" htmlFor="invite">Invite code</label>
+                  <input
+                    id="invite"
+                    required
+                    className="landing-input"
+                    value={invite}
+                    onChange={(e) => setInvite(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+              )}
 
               {!isSignUp && (
                 <Link to="/reset-password" className="landing-label-hint landing-forgot">
