@@ -63,6 +63,7 @@ from app.security import (
     create_access_token,
     dummy_hash,
     hash_password,
+    needs_rehash,
     verify_password,
 )
 from app.services import account_export, accounts, mailer, password_reset
@@ -276,6 +277,13 @@ def login(
             detail="This account has been deactivated. Contact the administrator "
             "to reactivate it.",
         )
+    # The one moment the plaintext is here: move a legacy or under-cost hash
+    # onto the current scheme. Only after a correct password on a live
+    # account, so the extra bcrypt cannot tell a stopwatch anything new.
+    if needs_rehash(form.password, user.hashed_password):
+        user.hashed_password = hash_password(form.password)
+        db.commit()
+        logger.info("password hash for user %s upgraded on sign-in", user.id)
     logger.info("login ok for user %s from %s", user.id, client_key(request))
     return Token(access_token=create_access_token(user.id))
 

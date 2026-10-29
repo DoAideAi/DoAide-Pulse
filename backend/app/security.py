@@ -102,6 +102,26 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 
+def needs_rehash(plain: str, hashed: str) -> bool:
+    """Whether a hash that *plain* just verified against should be replaced.
+
+    True for a hash made by the legacy scheme (raw UTF-8 cut at bcrypt's 72
+    bytes, so two passwords agreeing in their first 72 bytes are the same
+    password) and for one below the configured ``bcrypt_rounds``.
+    ``hash_password`` used to run only at registration and reset, so neither
+    kind ever went away: every account kept the scheme and the cost it was
+    created with, and raising the cost strengthened only new passwords. Call it
+    only after :func:`verify_password` has returned True.
+    """
+    hashed_bytes = hashed.encode("utf-8")
+    try:
+        if not bcrypt.checkpw(_prepare(plain), hashed_bytes):
+            return True
+        return int(hashed.split("$")[2]) < settings.bcrypt_rounds
+    except (ValueError, TypeError, IndexError):
+        return True
+
+
 def create_access_token(subject: str | int, expires_minutes: int | None = None) -> str:
     """Create a signed JWT whose ``sub`` claim is the user id.
 
