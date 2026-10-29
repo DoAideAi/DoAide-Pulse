@@ -644,6 +644,29 @@ def hold_unreviewed(db: Session, project: Project) -> list[Content]:
     return held
 
 
+def release_destinations(content: Content) -> list[Platform]:
+    """Where approving *content* would send it, or ``[]`` if nowhere.
+
+    The project-level half of :func:`release_approved`'s conditions — active
+    project and owner, ``auto`` or ``full``, at least one usable destination —
+    without the piece-level ones, so the approve route can ask before it
+    approves.
+    """
+    project = content.project
+    if project is None or not project.is_active:
+        return []
+    if project.user is None or not project.user.is_active:
+        return []
+    mode = (
+        project.autopilot_mode
+        if isinstance(project.autopilot_mode, AutopilotMode)
+        else AutopilotMode(project.autopilot_mode)
+    )
+    if mode not in (AutopilotMode.AUTO, AutopilotMode.FULL):
+        return []
+    return list(publishable_destinations(project).usable)
+
+
 def release_approved(db: Session, content: Content) -> list[Publication]:
     """Queue an approved piece for its project's autopilot destinations.
 
@@ -679,20 +702,21 @@ def release_approved(db: Session, content: Content) -> list[Publication]:
     if content.publications:
         return []
 
-    project = content.project
-    if project is None or not project.is_active:
-        return []
-    if project.user is None or not project.user.is_active:
-        return []
-    mode = (
-        project.autopilot_mode
-        if isinstance(project.autopilot_mode, AutopilotMode)
-        else AutopilotMode(project.autopilot_mode)
-    )
-    if mode not in (AutopilotMode.AUTO, AutopilotMode.FULL):
-        return []
-
-    platforms = publishable_destinations(project).usable
+    platforms = release_destinations(content)
+    # The publish endpoint refuses an empty body for these; this path did not,
+    # so an approved blank piece went out as an empty article (or an empty
+    # Buttondown email to the whole list). The approve routes refuse it up
+    # front (``routers.content._assert_release_has_body``); this is the guard
+    # for every other way here — bulk approve and the beat sweep among them.
+    if not (content.body_markdown or "").strip():
+        dropped = [p for p in platforms if p in publishing_service.BODY_PLATFORMS]
+        if dropped:
+            logger.warning(
+                "content %s has no body; not released to %s",
+                content.id,
+                ", ".join(p.value for p in dropped),
+            )
+        platforms = [p for p in platforms if p not in publishing_service.BODY_PLATFORMS]
     if not platforms:
         return []
 

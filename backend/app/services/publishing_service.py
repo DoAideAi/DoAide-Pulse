@@ -1721,6 +1721,21 @@ def reclaim_stuck(db: Session, *, now: datetime | None = None) -> int:
 
 _DUE_PUBLICATIONS_LIMIT = 500
 
+#: Destinations whose post *is* the body: an empty body is an empty article (or,
+#: for Buttondown, an empty email to the whole list). The rest post the title or
+#: the excerpt, so a body-less piece is still something there. Shared by the
+#: publish endpoint's check and the autopilot release, which skipped it.
+BODY_PLATFORMS = frozenset(
+    {
+        Platform.MEDIUM,
+        Platform.DEVTO,
+        Platform.HASHNODE,
+        Platform.WORDPRESS,
+        Platform.GIT,
+        Platform.BUTTONDOWN,
+    }
+)
+
 
 #: How far past due a waiting publication has to be before it counts as the
 #: queue falling behind: three publish sweeps. One late sweep is noise; three

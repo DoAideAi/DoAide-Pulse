@@ -52,7 +52,7 @@ def _content(db, project, *, status=ContentStatus.REVIEW, slug="pulse-1-0", **kw
         content_type=ContentType.FEATURE_SPOTLIGHT,
         title="Pulse 1.0",
         slug=slug,
-        body_markdown="## It's out\n\n" + ("word " * 200),
+        body_markdown=kwargs.pop("body_markdown", "## It's out\n\n" + ("word " * 200)),
         excerpt="Pulse 1.0 is out.",
         meta_description="Pulse 1.0 is out.",
         status=status,
@@ -426,3 +426,62 @@ def test_a_database_failure_leaves_the_sweep_to_celery(db, monkeypatch):
     assert OperationalError in publish_tasks.release_approved_content.autoretry_for
     # And the session still went back, which is what the `finally` is for.
     assert closed == [True]
+
+
+# --------------------------------------------------------------------------- #
+# An empty piece                                                               #
+# --------------------------------------------------------------------------- #
+# The publish endpoint refuses an empty body for destinations that publish the
+# article itself; the release on approval never asked, so a blank piece went
+# out to Dev.to-like platforms as an empty article (and to Buttondown as an
+# empty email to the whole list).
+
+
+@pytest.mark.parametrize("body", ["", "   \n\n  "])
+def test_approving_an_empty_piece_that_would_post_an_article_is_refused(
+    client, auth, db, auto_project, _no_dispatch, body
+):
+    piece = _content(db, auto_project, body_markdown=body)
+
+    resp = client.post(f"/api/v1/content/{piece.id}/approve", headers=auth)
+
+    assert resp.status_code == 422, resp.text
+    assert "no body" in resp.json()["detail"]
+    assert "devto" in resp.json()["detail"]
+    db.expire_all()
+    assert db.get(Content, piece.id).status == ContentStatus.REVIEW
+    assert db.query(Publication).filter_by(content_id=piece.id).count() == 0
+    assert _no_dispatch == []
+
+
+def test_the_same_empty_piece_on_a_manual_project_is_still_approvable(
+    client, auth, db, project
+):
+    piece = _content(db, project, body_markdown="")
+
+    resp = client.post(f"/api/v1/content/{piece.id}/approve", headers=auth)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "approved"
+
+
+def test_approving_by_patch_is_refused_the_same_way(client, auth, db, auto_project):
+    piece = _content(db, auto_project, body_markdown="")
+
+    resp = client.patch(
+        f"/api/v1/content/{piece.id}", headers=auth, json={"status": "approved"}
+    )
+
+    assert resp.status_code == 422, resp.text
+    assert "no body" in resp.json()["detail"]
+
+
+def test_a_release_by_any_other_path_never_sends_an_empty_body_as_an_article(
+    db, auto_project, _no_dispatch
+):
+    """The guard inside ``release_approved`` covers bulk approve and the sweep."""
+    piece = _content(db, auto_project, status=ContentStatus.APPROVED, body_markdown="  ")
+
+    released = content_pipeline.release_approved(db, piece)
+
+    assert [p.platform for p in released] == [Platform.BLUESKY]

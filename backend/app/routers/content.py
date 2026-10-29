@@ -2093,6 +2093,8 @@ def update_content(
     # the body it is sending, not on the one it is replacing.
     _assert_review_ready(db, content, previous_status)
     _assert_seo_ready(db, content, previous_status)
+    if data.get("status") == ContentStatus.APPROVED:
+        _assert_release_has_body(content)
 
     if "scheduled_for" in data:
         # And the piece's date has to reach the rows that act on it. Every other
@@ -2242,6 +2244,7 @@ def approve_content(
             seo_autofix.apply(db, content)
     else:
         _assert_seo_ready(db, content, previous_status)
+    _assert_release_has_body(content)
     _settle_status(db, content, previous_status)
     db.commit()
     released = content_pipeline.release_approved(db, content)
@@ -2274,16 +2277,34 @@ class _PublishError(Exception):
 
 
 #: Destinations whose post *is* the body. See :func:`_assert_publishable`.
-_BODY_PLATFORMS = frozenset(
-    {
-        Platform.MEDIUM,
-        Platform.DEVTO,
-        Platform.HASHNODE,
-        Platform.WORDPRESS,
-        Platform.GIT,
-        Platform.BUTTONDOWN,
-    }
-)
+_BODY_PLATFORMS = publishing_service.BODY_PLATFORMS
+
+
+def _assert_release_has_body(content: Content) -> None:
+    """Refuse to approve an empty piece the autopilot would post as an article.
+
+    Approving on a project on ``auto`` releases the piece to its destinations
+    (:func:`app.services.content_pipeline.release_approved`), and that path
+    never had the publish endpoint's empty-body check: an empty or blank piece
+    went out to Hashnode, Medium and WordPress as an empty article, and to
+    Buttondown as an empty email. Only when such a destination is in play — an
+    empty piece on a manual project, or one that only posts to social, is still
+    approvable.
+    """
+    if (content.body_markdown or "").strip():
+        return
+    targets = sorted(
+        p.value
+        for p in content_pipeline.release_destinations(content)
+        if p in _BODY_PLATFORMS
+    )
+    if targets:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"This piece has no body, and approving it would publish it to "
+            f"{', '.join(targets)}, which publish the article itself. Write the "
+            "body first.",
+        )
 
 
 def _assert_publishable(
@@ -2968,6 +2989,8 @@ def set_content_status(
     # through one and accepted through the other is not a rule.
     _assert_review_ready(db, content, previous_status)
     _assert_seo_ready(db, content, previous_status)
+    if new_status == ContentStatus.APPROVED:
+        _assert_release_has_body(content)
     _settle_status(db, content, previous_status)
     db.commit()
     # After the commit, as in the PATCH and the bulk approve: a release that
