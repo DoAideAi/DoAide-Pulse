@@ -254,6 +254,32 @@ describe("the mobile menu", () => {
     ).toHaveAttribute("aria-expanded", "true");
   });
 
+  it("closes on Escape and gives focus back to the toggle", async () => {
+    // The open menu covers the page; without this the only way out from the
+    // keyboard was to Tab back to the toggle.
+    await draw();
+    const toggle = screen.getByRole("button", { name: "Toggle navigation menu" });
+    await userEvent.click(toggle);
+    const firstLink = document.querySelector("#mobile-nav a");
+    firstLink.focus();
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(document.getElementById("mobile-nav")).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(toggle).toHaveFocus();
+  });
+
+  it("ignores Escape while the menu is closed", async () => {
+    await draw();
+    const toggle = screen.getByRole("button", { name: "Toggle navigation menu" });
+
+    await userEvent.keyboard("{Escape}");
+
+    expect(toggle).not.toHaveFocus();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("leaves focus on the toggle, which is what a disclosure should do", async () => {
     await draw();
     const toggle = screen.getByRole("button", { name: "Toggle navigation menu" });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../lib/api";
@@ -26,9 +26,26 @@ export default function Shell({ children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const counts = useNavCounts(location.pathname);
 
+  const menuToggle = useRef(null);
+
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
+
+  // Escape closes the open menu, the way every disclosure is expected to: it
+  // covers the page under it, and the only way out from the keyboard was to
+  // Tab back to the toggle. Focus goes back to the toggle so it is not left on
+  // a link the closed menu has just removed.
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    function onKey(event) {
+      if (event.key !== "Escape") return;
+      setMenuOpen(false);
+      menuToggle.current?.focus();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -82,6 +99,7 @@ export default function Shell({ children }) {
           </span>
         </div>
         <button
+          ref={menuToggle}
           className="btn-quiet -mr-1 min-h-[48px] min-w-[48px]"
           onClick={() => setMenuOpen((v) => !v)}
           aria-expanded={menuOpen}
