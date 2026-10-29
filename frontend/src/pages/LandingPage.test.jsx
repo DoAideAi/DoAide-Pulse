@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import LandingPage from "./LandingPage";
@@ -93,6 +93,23 @@ describe("LandingPage", () => {
       wrap();
       expect(screen.queryByText(/Newsletters sent/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Avg open rate/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("sign in", () => {
+    // The reset flow had a backend and an email and no way in from here.
+    it("offers a way back in to someone who forgot their password", () => {
+      wrap();
+      expect(screen.getByRole("link", { name: "Forgot your password?" })).toHaveAttribute(
+        "href",
+        "/reset-password",
+      );
+    });
+
+    it("does not offer it while creating an account", () => {
+      wrap();
+      fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
+      expect(screen.queryByRole("link", { name: "Forgot your password?" })).not.toBeInTheDocument();
     });
   });
 });

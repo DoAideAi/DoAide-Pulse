@@ -686,6 +686,12 @@ export default function LandingPage() {
                 />
               </div>
 
+              {!isSignUp && (
+                <Link to="/reset-password" className="landing-label-hint landing-forgot">
+                  Forgot your password?
+                </Link>
+              )}
+
               {error && <p className="landing-error" role="alert">{error}</p>}
 
               <button type="submit" className="landing-submit" disabled={busy}>

@@ -33,6 +33,7 @@ const Templates = lazyPage(() => import("./pages/Templates"));
 const TemplatesGallery = lazyPage(() => import("./pages/TemplatesGallery"));
 const Triggers = lazyPage(() => import("./pages/Triggers"));
 const Unsubscribe = lazyPage(() => import("./pages/Unsubscribe"));
+const ResetPassword = lazyPage(() => import("./pages/ResetPassword"));
 const PublicArticle = lazyPage(() => import("./pages/PublicArticle"));
 const NotFound = lazyPage(() => import("./pages/NotFound"));
 const SubjectLineTester = lazyPage(() => import("./pages/tools/SubjectLineTester"));
@@ -156,6 +157,8 @@ export default function App() {
       <Route path="/gallery" element={<Unshelled section="gallery"><NewsletterGallery /></Unshelled>} />
       <Route path="/embed" element={<Unshelled section="embed"><Embed /></Unshelled>} />
       <Route path="/unsubscribe" element={<Unshelled section="unsubscribe"><Unsubscribe /></Unshelled>} />
+      {/* Where the reset email links to — see app.services.password_reset. */}
+      <Route path="/reset-password" element={<Unshelled section="reset-password"><ResetPassword /></Unshelled>} />
 
       <Route
         path="/dashboard"
