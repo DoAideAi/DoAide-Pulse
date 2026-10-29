@@ -18,6 +18,7 @@ import {
   formatWhen,
   titleize,
 } from "../lib/format";
+import { EXCERPT_MAX, META_DESCRIPTION_MAX, TITLE_MAX } from "../lib/limits";
 import { renderMarkdown } from "../lib/markdown";
 import { moveItem } from "../lib/reorder";
 import trackEvent from "../lib/trackEvent";
@@ -750,6 +751,7 @@ export default function ContentEditor() {
                 </label>
                 <input
                   id="c-title"
+                maxLength={TITLE_MAX}
                   className="input"
                   value={draft.title}
                   onChange={set("title")}
@@ -1188,6 +1190,7 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
         </label>
         <textarea
           id="c-meta"
+                maxLength={META_DESCRIPTION_MAX}
           rows={3}
           className={`input resize-y text-[13px] ${aiLoading && !draft.meta_description ? "animate-pulse bg-ink-50" : ""}`}
           placeholder={aiLoading ? "Generating…" : ""}
@@ -1248,6 +1251,7 @@ function SeoPanel({ contentId, issues, draft, onChange, setDraft, locked }) {
         </label>
         <textarea
           id="c-excerpt"
+                maxLength={EXCERPT_MAX}
           rows={2}
           className={`input resize-y text-[13px] ${aiLoading && !draft.excerpt ? "animate-pulse bg-ink-50" : ""}`}
           placeholder={aiLoading ? "Generating…" : ""}

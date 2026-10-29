@@ -6,6 +6,7 @@ import ContentEditor from "./ContentEditor";
 import { api } from "../lib/api";
 import * as draftStore from "../lib/draftStore";
 import { ROUTER_FUTURE } from "../lib/routerFuture";
+import { EXCERPT_MAX, META_DESCRIPTION_MAX, TITLE_MAX } from "../lib/limits";
 
 vi.mock("../lib/api", () => ({
   api: {
@@ -1635,5 +1636,20 @@ describe("tag suggestions", () => {
       expect(api.suggestTags).toHaveBeenCalledWith(3);
     });
     expect(toast.success).toHaveBeenCalledWith("Added 2 suggested tags");
+  });
+});
+
+describe("the fields stop where the API does", () => {
+  // Autosave sends the whole piece; one field over the schema's limit made
+  // every save a 422, body and all, with the reason only on hover.
+  it("caps title, meta description and excerpt at the API's limits", async () => {
+    draw();
+    const title = await screen.findByLabelText(/^Title/i);
+    expect(title).toHaveAttribute("maxLength", String(TITLE_MAX));
+    expect(document.getElementById("c-meta")).toHaveAttribute(
+      "maxLength",
+      String(META_DESCRIPTION_MAX),
+    );
+    expect(document.getElementById("c-excerpt")).toHaveAttribute("maxLength", String(EXCERPT_MAX));
   });
 });
