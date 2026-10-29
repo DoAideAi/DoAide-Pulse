@@ -208,15 +208,27 @@ def _health_core(
     """
     database = _check_database(db)
     redis_probe = _check_redis()
-    redis_required = settings.celery_enabled
+    # Reported, never required. Caddy takes this endpoint's status code as the
+    # health of the API's only upstream, so a 503 here answers every API request
+    # 503 — and the API does not need Redis to serve them: the limiter fails
+    # open, and a publish whose broker handoff fails runs inline. Requiring it
+    # turned a Redis outage, which costs background work, into a total one.
+    # Same reasoning as ``_check_workers``; the database still decides.
+    redis_required = False
 
-    healthy = database.ok and (redis_probe.ok or not redis_required)
+    healthy = database.ok
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         logger.warning(
             "health check failed: database=%s redis=%s",
             database.detail or "ok",
             redis_probe.detail or "ok",
+        )
+    elif not redis_probe.ok and settings.celery_enabled:
+        logger.warning(
+            "redis is unreachable (%s): the API keeps serving, but queued work "
+            "is not being delivered to the worker",
+            redis_probe.verbose or redis_probe.detail,
         )
 
     db_out = DependencyOut(

@@ -68,16 +68,20 @@ def test_real_database_probe_reports_a_broken_session(db, monkeypatch):
     assert "OperationalError" in probe.detail or probe.detail == "OperationalError"
 
 
-def test_redis_down_fails_the_check_when_celery_is_enabled(
+def test_redis_down_is_reported_but_does_not_fail_the_check_with_celery(
     client, redis_down, monkeypatch
 ):
-    """With workers running, a dead broker means publishes queue into nothing."""
+    """Reported, not required: Caddy would answer every API request 503 over it.
+
+    See tests/test_a_redis_outage_does_not_take_the_site_down.py.
+    """
     monkeypatch.setattr(settings, "celery_enabled", True)
     resp = client.get(HEALTH)
-    assert resp.status_code == 503
+    assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "degraded"
-    assert body["redis"]["required"] is True
+    assert body["status"] == "ok"
+    assert body["redis"]["status"] == "unavailable"
+    assert body["redis"]["required"] is False
     assert body["redis"]["detail"]  # non-empty, but no internal details leaked
 
 
@@ -162,9 +166,11 @@ def test_health_detail_says_why_a_dependency_is_down(client, auth, monkeypatch):
     assert detailed["redis"]["detail"] == (
         "ConnectionError: Error 111 connecting to redis:6379"
     )
-    # Same verdict, less of it, for a caller with no token.
+    # Same verdict, less of it, for a caller with no token. The verdict is
+    # "ok": Redis is reported, not required (see
+    # tests/test_a_redis_outage_does_not_take_the_site_down.py).
     assert public["redis"]["detail"] == "ConnectionError"
-    assert public["status"] == detailed["status"] == "degraded"
+    assert public["status"] == detailed["status"] == "ok"
 
 
 def test_health_detail_reports_capabilities(client, auth, redis_up):
