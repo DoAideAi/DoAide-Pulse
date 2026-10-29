@@ -179,25 +179,76 @@ def _docx_text(data: bytes) -> str:
         if info.file_size > 50 * 1024 * 1024:
             raise DocumentError("The Word document is too large to read.")
         root = ElementTree.fromstring(archive.read(info))
-    paragraphs = []
-    for paragraph in root.iter(f"{_W}p"):
-        # In document order, and not only the ``w:t`` runs: a Tab is
-        # ``<w:tab/>`` and a soft line break (Shift+Enter) is ``<w:br/>`` or
-        # ``<w:cr/>``, elements between the runs rather than characters in
-        # them. Joining the runs alone turned "Name<Tab>Pulse" into "NamePulse"
-        # and a soft-broken list into one word, which the model then read.
-        # Children of runs only: ``w:tab`` is also how paragraph properties
-        # define tab *stops* (``w:pPr/w:tabs/w:tab``), which are not text.
-        parts = []
-        for node in (child for run in paragraph.iter(f"{_W}r") for child in run):
-            if node.tag == f"{_W}t":
-                parts.append(node.text or "")
-            elif node.tag == f"{_W}tab":
-                parts.append("\t")
-            elif node.tag in (f"{_W}br", f"{_W}cr"):
-                parts.append("\n")
-        paragraphs.append("".join(parts))
+    paragraphs: list[str] = []
+    _walk(root, paragraphs)
     return "\n".join(paragraphs)
+
+
+#: Word writes a text box twice: DrawingML in ``mc:Choice`` and a VML copy in
+#: ``mc:Fallback`` for readers that cannot draw the first. Only one is text.
+_MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+
+
+def _walk(node: ElementTree.Element, out: list[str]) -> None:
+    """Append every paragraph under *node* to *out*, each once, in document order.
+
+    Not ``root.iter("w:p")`` with each paragraph's runs found by ``iter`` as
+    well: a text box is whole paragraphs nested inside a run of the paragraph
+    it is anchored to, so its text was read as part of the anchor *and* as a
+    paragraph of its own — and with Word's fallback copy, four times in all.
+    """
+    for child in node:
+        if child.tag == _MC_FALLBACK:
+            continue
+        if child.tag == f"{_W}p":
+            nested: list[ElementTree.Element] = []
+            out.append("".join(_own_text(child, nested)))
+            for paragraph in nested:
+                _walk_paragraph(paragraph, out)
+        else:
+            _walk(child, out)
+
+
+def _walk_paragraph(paragraph: ElementTree.Element, out: list[str]) -> None:
+    nested: list[ElementTree.Element] = []
+    out.append("".join(_own_text(paragraph, nested)))
+    for inner in nested:
+        _walk_paragraph(inner, out)
+
+
+def _own_text(node: ElementTree.Element, nested: list[ElementTree.Element]) -> list[str]:
+    """The text of *node*'s own runs; paragraphs found inside it go to *nested*.
+
+    In document order, and not only the ``w:t`` runs: a Tab is ``<w:tab/>``
+    and a soft line break (Shift+Enter) is ``<w:br/>`` or ``<w:cr/>``,
+    elements between the runs rather than characters in them. Joining the runs
+    alone turned "Name<Tab>Pulse" into "NamePulse" and a soft-broken list into
+    one word, which the model then read. Children of runs only: ``w:tab`` is
+    also how paragraph properties define tab *stops* (``w:pPr/w:tabs/w:tab``),
+    which are not text.
+    """
+    parts: list[str] = []
+    for child in node:
+        if child.tag == _MC_FALLBACK:
+            continue
+        if child.tag == f"{_W}p":
+            nested.append(child)
+        elif child.tag == f"{_W}r":
+            for item in child:
+                if item.tag == f"{_W}t":
+                    parts.append(item.text or "")
+                elif item.tag == f"{_W}tab":
+                    parts.append("\t")
+                elif item.tag in (f"{_W}br", f"{_W}cr"):
+                    parts.append("\n")
+                else:
+                    # A drawing or AlternateContent: no text of the run's own,
+                    # but it may hold a text box's paragraphs.
+                    _own_text(item, nested)
+        elif child.tag != f"{_W}pPr":
+            # Hyperlinks, smart tags, insertions: their runs are this paragraph's.
+            parts.extend(_own_text(child, nested))
+    return parts
 
 
 def _tidy(text: str) -> str:
