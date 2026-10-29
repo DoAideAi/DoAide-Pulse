@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it } from "vitest";
@@ -41,7 +41,7 @@ describe("NewsletterRoiCalculator", () => {
   it("shows annual projection", () => {
     wrap();
     const annual = screen.getByTestId("annual");
-    expect(annual.textContent).toMatch(/\$/);
+    expect(annual.textContent).toMatch(/^₹/);
   });
 
   it("shows correct opens for default values", () => {
@@ -57,7 +57,22 @@ describe("NewsletterRoiCalculator", () => {
     const { fireEvent } = await import("@testing-library/react");
     fireEvent.change(subsInput, { target: { value: "-100" } });
     const revenue = screen.getByTestId("revenue");
-    expect(revenue.textContent).toBe("$0");
+    expect(revenue.textContent).toBe("₹0");
+  });
+
+  it("answers in rupees, grouped the Indian way, like the pricing it sits beside", () => {
+    wrap();
+    expect(screen.getByLabelText(/revenue per conversion \(₹\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/monthly cost \(₹\)/i)).toBeInTheDocument();
+    const subs = screen.getByLabelText(/subscribers/i);
+    // 1,00,000 readers × 100% × 100% × 100% × ₹500 = ₹5,00,00,000 a month.
+    fireEvent.change(subs, { target: { value: "100000" } });
+    for (const label of [/open rate/i, /click rate/i, /conversion rate/i]) {
+      fireEvent.change(screen.getByLabelText(label), { target: { value: "100" } });
+    }
+    expect(screen.getByTestId("opens").textContent).toBe("1,00,000");
+    expect(screen.getByTestId("revenue").textContent).toBe("₹5,00,00,000");
+    expect(document.body.textContent).not.toMatch(/\$/);
   });
 
   it("clamps rates above 100 to 100", async () => {

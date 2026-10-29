@@ -7,10 +7,16 @@ import trackEvent from "../../lib/trackEvent";
 import { usePageMeta } from "../../lib/pageMeta";
 import { PUBLIC_ROUTE_META } from "../../data/publicRouteMeta";
 
+// Rupees, grouped the Indian way (₹1,00,000). Pulse is priced in rupees and
+// written for Indian creators; this calculator alone answered in dollars, so a
+// reader weighing it against the ₹ pricing on the home page was comparing two
+// currencies without being told.
+const LOCALE = "en-IN";
+
 const fmt = (n) =>
-  n.toLocaleString("en-US", {
+  n.toLocaleString(LOCALE, {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
@@ -22,8 +28,8 @@ export default function NewsletterRoiCalculator() {
   const [openRate, setOpenRate] = useState(35);
   const [clickRate, setClickRate] = useState(5);
   const [conversionRate, setConversionRate] = useState(2);
-  const [revenuePerConversion, setRevenuePerConversion] = useState(50);
-  const [monthlyCost, setMonthlyCost] = useState(200);
+  const [revenuePerConversion, setRevenuePerConversion] = useState(500);
+  const [monthlyCost, setMonthlyCost] = useState(2000);
 
   usePageMeta(PUBLIC_ROUTE_META["/tools/newsletter-roi-calculator"]);
 
@@ -71,11 +77,11 @@ export default function NewsletterRoiCalculator() {
               <input id="conv" type="number" className="input" value={conversionRate} onChange={(e) => setConversionRate(Number(e.target.value))} min={0} max={100} />
             </div>
             <div>
-              <label htmlFor="rev" className="label">Revenue per conversion ($)</label>
+              <label htmlFor="rev" className="label">Revenue per conversion (₹)</label>
               <input id="rev" type="number" className="input" value={revenuePerConversion} onChange={(e) => setRevenuePerConversion(Number(e.target.value))} min={0} />
             </div>
             <div>
-              <label htmlFor="cost" className="label">Monthly cost ($)</label>
+              <label htmlFor="cost" className="label">Monthly cost (₹)</label>
               <input id="cost" type="number" className="input" value={monthlyCost} onChange={(e) => setMonthlyCost(Number(e.target.value))} min={0} />
             </div>
           </div>
@@ -84,11 +90,11 @@ export default function NewsletterRoiCalculator() {
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <div className="panel p-4 text-center">
             <div className="eyebrow">Monthly opens</div>
-            <div className="stat-figure mt-1" data-testid="opens">{Math.round(opens).toLocaleString()}</div>
+            <div className="stat-figure mt-1" data-testid="opens">{Math.round(opens).toLocaleString(LOCALE)}</div>
           </div>
           <div className="panel p-4 text-center">
             <div className="eyebrow">Monthly clicks</div>
-            <div className="stat-figure mt-1" data-testid="clicks">{Math.round(clicks).toLocaleString()}</div>
+            <div className="stat-figure mt-1" data-testid="clicks">{Math.round(clicks).toLocaleString(LOCALE)}</div>
           </div>
           <div className="panel p-4 text-center">
             <div className="eyebrow">Conversions/mo</div>
