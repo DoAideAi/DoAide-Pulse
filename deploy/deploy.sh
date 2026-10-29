@@ -180,6 +180,15 @@ if [ "\$units_changed" -eq 1 ]; then
   systemctl daemon-reload
 fi
 
+# And on. A timer installed above and left disabled never fires: the backup
+# timer was copied into place by every deploy and enabled by none — a manual
+# step in DEPLOYMENT.md nobody had taken, so the box had no database backup at
+# all. enable --now is idempotent, so a timer already on is untouched.
+for timer in /opt/Pulse/deploy/systemd/*.timer; do
+  [ -e "\$timer" ] || continue
+  systemctl enable --now "\$(basename "\$timer")"
+done
+
 systemctl stop pulse-beat pulse-worker || true
 cd /opt/Pulse/backend
 # Everything below runs from here so that Settings finds ../.env itself. The

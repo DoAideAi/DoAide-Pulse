@@ -387,10 +387,12 @@ ssh … 'journalctl -u pulse-backup --since "2 days ago"'
 ssh … 'systemctl start pulse-backup'
 ```
 
-Turning it on. `deploy.sh` already installs both units into
-`/etc/systemd/system`, and the service creates `/var/backups/pulse` itself
-(`ExecStartPre=+install -d …`), so the one step left is enabling the timer —
-then run it once by hand to see a dump land:
+Turning it on. `deploy.sh` installs both units into `/etc/systemd/system` and
+enables every timer it installs (`systemctl enable --now`, idempotent) — it
+used to leave that as a manual step, and on the box it was never taken, so no
+dump had ever been written. The service creates `/var/backups/pulse` itself
+(`ExecStartPre=+install -d …`). On a box deployed some other way, enable it by
+hand, then run it once to see a dump land:
 
 ```bash
 ssh … '
