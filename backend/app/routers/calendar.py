@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -370,15 +370,42 @@ def reschedule(
             "now on " + ", ".join(p.platform.value for p in in_flight),
         )
 
+    # The check above read the status this request loaded; a sweep can claim a
+    # row between that read and this write. So each move is a conditional
+    # UPDATE on the row still being movable, as ``publish_one``'s claim is: an
+    # unconditional write put a just-claimed row back to ``scheduled`` (or, for
+    # a ``scheduled`` one, rewrote its time and attempt count under the worker),
+    # and the next sweep posted it a second time.
     for publication in targets:
-        publication.scheduled_for = when
-        publication.status = (
-            PublicationStatus.SCHEDULED if when else PublicationStatus.PENDING
-        )
-        # A move is a fresh start: a row that had burned two retries should not
-        # arrive at its new slot with one left.
-        publication.attempts = 0
-        publication.error = None
+        moved = db.execute(
+            update(Publication)
+            .where(
+                Publication.id == publication.id,
+                Publication.status.not_in(settled),
+            )
+            .values(
+                scheduled_for=when,
+                status=(
+                    PublicationStatus.SCHEDULED if when else PublicationStatus.PENDING
+                ),
+                # A move is a fresh start: a row that had burned two retries
+                # should not arrive at its new slot with one left.
+                attempts=0,
+                error=None,
+            )
+            .execution_options(synchronize_session=False)
+        ).rowcount
+        if not moved:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot reschedule something already going out — "
+                f"{publication.platform.value} was picked up just now. "
+                "Reload to see where it stands.",
+            )
+    # The instances still hold what was loaded; the rows hold the move.
+    for publication in targets:
+        db.refresh(publication)
 
     if payload.publication_id is None:
         content.scheduled_for = when
