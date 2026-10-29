@@ -1,7 +1,7 @@
 # 0006: The frontend is built off the server and shipped as files
 
 ## Context
-Production is one Hetzner box with 4 GB shared by six applications. A Vite build
+Production is one Hetzner box with 8 GB shared by every DoAide product. A Vite build
 needs Node and a burst of memory; neither belongs on that box. `frontend/dist/`
 is gitignored.
 

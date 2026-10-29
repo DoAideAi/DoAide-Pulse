@@ -1,7 +1,7 @@
 # Pulse — production deployment
 
-Pulse runs on the shared Hetzner box `89.167.8.178` (Ubuntu 24.04, 4 GB RAM)
-alongside GoSumo, Documedic, HomeNex, Authmatic and Knol. It is **not** Docker:
+Pulse runs on the shared Hetzner box `89.167.8.178` (Ubuntu 24.04, 8 GB RAM)
+alongside every other DoAide product and Knol. It is **not** Docker:
 `docker-compose.yml` in the repo root is local-dev only. Production is four
 systemd units in front of the host's PostgreSQL and Redis, published by the
 shared Caddy container.
@@ -66,8 +66,8 @@ location — the working directory — is read-only under `ProtectSystem=strict`
 ## Frontend: built locally, never on the server
 
 `npm run build` runs on the developer machine and `frontend/dist/` is rsynced.
-The box has 4 GB shared between six applications; a Vite build there competes
-with live traffic. `frontend/dist` is gitignored, so `deploy.sh` syncs it in a
+The box's 8 GB are shared by every DoAide product on it; a Vite build there
+competes with live traffic, and on 2026-10-29 the box ran out of memory. `frontend/dist` is gitignored, so `deploy.sh` syncs it in a
 second explicit pass.
 
 The SPA calls the API at the **relative** path `/api/v1`
@@ -453,7 +453,7 @@ actually needs.
 One thing to know before the incident rather than during it: `backup.sh` runs
 `umask 077`, so the dumps are `0600` inside a `0700` directory owned by
 `pulse`. That is deliberate — a dump holds every password hash and every
-encrypted platform credential in the database, on a box six products share. It
+encrypted platform credential in the database, on a box every DoAide product shares. It
 also means **`sudo -u postgres pg_restore` cannot read them.** Handing the path
 straight to the `postgres` user fails with
 

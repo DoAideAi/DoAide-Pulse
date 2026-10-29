@@ -7,8 +7,8 @@
 #   ./deploy/deploy.sh --allow-dirty     # ship uncommitted changes (recorded as such)
 #
 # The server is a plain rsync copy with no .git, matching the other apps on the
-# box. Nothing builds on the server: it has 4 GB of RAM shared between six
-# applications, and a Vite build there competes with live traffic.
+# box. Nothing builds on the server: its 8 GB of RAM are shared by every
+# DoAide product on it, and a Vite build there competes with live traffic.
 set -euo pipefail
 
 HOST=${PULSE_HOST:-89.167.8.178}

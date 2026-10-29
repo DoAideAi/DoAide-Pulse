@@ -251,8 +251,8 @@ production. The shape of it:
 - **TLS and routing are Caddy's**, in a shared container, one origin with
   `/api/*` split to the API. The vhost lives in `/opt/knol/Caddyfile`; the
   canonical copy of the block is `deploy/Caddyfile.pulse`.
-- **The frontend is built on your machine, never on the server** — 4 GB is
-  shared between six applications, and `frontend/dist/` is rsynced.
+- **The frontend is built on your machine, never on the server** — its 8 GB
+  are shared by every DoAide product on it, and `frontend/dist/` is rsynced.
 - `./deploy/deploy.sh` does the whole thing: build, rsync, dependencies,
   migrations, restart, and a health check it retries so it does not race
   uvicorn's bind. `--no-build` skips the frontend for a backend-only change.
