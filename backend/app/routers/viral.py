@@ -120,6 +120,13 @@ def get_public_article(
     responses=errors(status.HTTP_429_TOO_MANY_REQUESTS),
 )
 @limiter.limit("10/minute;100/hour")
+# One bucket for everybody, beside the per-address one: each accepted call is a
+# row in somebody's subscriber list, and a pool of addresses could otherwise
+# fill it without bound. See ``rate_limit_subscribe_global``.
+@limiter.limit(
+    lambda: settings.rate_limit_subscribe_global,
+    key_func=lambda request: "install:subscribe",
+)
 def subscribe(
     request: Request,
     response: Response,

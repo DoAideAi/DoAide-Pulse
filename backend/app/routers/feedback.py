@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.deps import ListOffset, get_current_user
 from app.models.feedback import (
@@ -80,6 +81,12 @@ def require_operator(user: User = Depends(get_current_user)) -> User:
     responses=errors(status.HTTP_429_TOO_MANY_REQUESTS),
 )
 @limiter.limit("5/hour")
+# Install-wide as well: a pool of addresses could fill the operator's inbox
+# five an hour each. See ``rate_limit_feedback_global``.
+@limiter.limit(
+    lambda: settings.rate_limit_feedback_global,
+    key_func=lambda request: "install:feedback",
+)
 def submit_feedback(
     request: Request,
     response: Response,

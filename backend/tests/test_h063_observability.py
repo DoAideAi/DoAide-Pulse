@@ -62,7 +62,7 @@ class TestDuplicateSubscriberLogged:
         fake_payload = SimpleNamespace(email="Dup@Example.COM", source="embed", article=None)
 
         with caplog.at_level(logging.DEBUG, logger="app.routers.viral"):
-            result = viral.subscribe.__wrapped__(
+            result = inspect.unwrap(viral.subscribe)(
                 request=None,
                 response=None,
                 payload=fake_payload,

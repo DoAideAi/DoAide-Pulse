@@ -215,6 +215,12 @@ class Settings(BaseSettings):
     # per-address limit did nothing against a pool of addresses: past this, the
     # tool says 429 to everyone and the rest of Pulse keeps its quota.
     rate_limit_content_ideas_global: str = "200/hour;1000/day"
+    # The other anonymous endpoints that write a row per call, for the whole
+    # install: newsletter sign-ups and the public feedback widget. Their
+    # per-address limits did nothing against a pool of addresses, and each table
+    # grew without bound — the subscriber list is real people's addresses.
+    rate_limit_subscribe_global: str = "300/hour;2000/day"
+    rate_limit_feedback_global: str = "60/hour;300/day"
     # The budgets below are per *account*, not per address, and exist because
     # the request spends something shared rather than because the caller is
     # anonymous — see the `app.ratelimit` module docstring. Every one of them is
