@@ -124,12 +124,12 @@ def test_every_hours_of_a_wrong_type_is_refused():
 
 def test_every_hours_of_zero_is_refused():
     """Zero is not "as often as possible", it is a busy loop."""
-    with pytest.raises(ValueError, match="between 0 and"):
+    with pytest.raises(ValueError, match="between 0.5"):
         validate_config(TriggerKind.WEBHOOK, {"every_hours": 0})
 
 
 def test_a_negative_every_hours_is_refused():
-    with pytest.raises(ValueError, match="between 0 and"):
+    with pytest.raises(ValueError, match="between 0.5"):
         validate_config(TriggerKind.WEBHOOK, {"every_hours": -1})
 
 

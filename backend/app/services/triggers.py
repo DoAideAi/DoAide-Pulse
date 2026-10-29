@@ -33,6 +33,7 @@ from app.models.mixins import as_aware, utcnow
 from app.models.project import AutopilotMode, Project
 from app.models.trigger import Trigger, TriggerEvent, TriggerEventStatus, TriggerKind
 from app.models.user import User
+from app.schemas.trigger import MIN_INTERVAL_HOURS
 from app.services import content_pipeline, feeds, signals
 from app.services.crypto import (
     CredentialEncryptionError,
@@ -268,7 +269,9 @@ def interval_hours(trigger: Trigger) -> float:
         value = 0.0
     if value <= 0:
         value = float(settings.trigger_default_interval_hours)
-    return value
+    # A row saved before the schema had a floor keeps its value; read it as
+    # the floor rather than act on it every sweep.
+    return max(value, MIN_INTERVAL_HOURS)
 
 
 def is_due(trigger: Trigger, *, moment: Any = None) -> bool:

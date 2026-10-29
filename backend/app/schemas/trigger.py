@@ -49,6 +49,11 @@ ALLOWED_CONFIG: dict[TriggerKind, tuple[str, ...]] = {
 
 #: How long a schedule may sleep. A year is a mistyped number, not a plan.
 MAX_INTERVAL_HOURS = 24 * 365
+#: How often a trigger may ask to be checked — the shortest interval the
+#: builder offers. Any positive number used to pass: ``0.01`` hours put the
+#: trigger due on every ten-minute sweep, so a schedule wrote a piece each pass
+#: up to the daily cap and a GitHub trigger spent six calls an hour of sixty.
+MIN_INTERVAL_HOURS = 0.5
 
 #: How long each free-text setting may be.
 #:
@@ -191,10 +196,10 @@ def validate_config(kind: TriggerKind, config: dict[str, Any] | None) -> dict[st
             hours = float(body["every_hours"])
         except (TypeError, ValueError) as exc:
             raise ValueError("every_hours must be a number of hours.") from exc
-        if not 0 < hours <= MAX_INTERVAL_HOURS:
+        if not MIN_INTERVAL_HOURS <= hours <= MAX_INTERVAL_HOURS:
             raise ValueError(
-                f"every_hours must be between 0 and {MAX_INTERVAL_HOURS} "
-                "(one year)."
+                f"every_hours must be between {MIN_INTERVAL_HOURS:g} (half an hour) "
+                f"and {MAX_INTERVAL_HOURS} (one year)."
             )
         body["every_hours"] = hours
 
