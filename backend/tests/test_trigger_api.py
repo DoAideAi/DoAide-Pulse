@@ -289,6 +289,7 @@ def test_a_trigger_requiring_a_signature_refuses_an_unsigned_post(
     resp = client.post(f"{API}/inbound/{token}", json={"title": "hi"})
 
     assert resp.status_code == 401
+    assert resp.headers["WWW-Authenticate"] == "Signature"
 
 
 def test_a_correctly_signed_post_is_accepted(client, auth, project, db):

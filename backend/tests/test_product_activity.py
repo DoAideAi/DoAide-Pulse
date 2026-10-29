@@ -98,6 +98,7 @@ def test_ingest_needs_the_token(client, db):
     assert client.post(INGEST, json=body).status_code == 401
     bad = client.post(INGEST, json=body, headers={"X-Pulse-Ingest-Token": "nope"})
     assert bad.status_code == 401
+    assert bad.headers["WWW-Authenticate"] == "IngestToken"
     assert db.query(ProductEvent).count() == 0
 
 

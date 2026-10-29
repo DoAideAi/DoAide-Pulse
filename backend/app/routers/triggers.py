@@ -773,6 +773,8 @@ def _ingest(db: Session, token: str, raw: bytes, headers: _InboundHeaders) -> di
             detail="This trigger requires a valid signature. Send an "
             "X-Pulse-Signature header (HMAC-SHA256 with the trigger's secret) "
             "or an X-Hub-Signature-256 header (GitHub webhook format).",
+            # Every 401 names its scheme (RFC 7235 §3.1).
+            headers={"WWW-Authenticate": "Signature"},
         )
 
     body_text = raw.decode("utf-8", errors="replace")

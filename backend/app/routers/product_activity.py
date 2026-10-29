@@ -83,6 +83,8 @@ def require_ingest_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid ingest token. Send the value of PRODUCT_INGEST_TOKEN in "
             "the X-Pulse-Ingest-Token header.",
+            # Every 401 names its scheme (RFC 7235 §3.1).
+            headers={"WWW-Authenticate": "IngestToken"},
         )
 
 
