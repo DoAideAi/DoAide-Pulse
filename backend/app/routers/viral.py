@@ -256,6 +256,14 @@ def _parse_ideas(raw: object, count: int) -> list[ContentIdeaItem]:
     ),
 )
 @limiter.limit("5/minute;30/hour")
+# One bucket for everybody, beside the per-address one above: the tool spends
+# the Gemini key ``llm_router`` writes every account's drafts with, and a pool
+# of addresses could otherwise spend its quota through here. Read per request,
+# so the setting can be tuned without a code change.
+@limiter.limit(
+    lambda: settings.rate_limit_content_ideas_global,
+    key_func=lambda request: "install:content-ideas",
+)
 def generate_content_ideas(
     request: Request,
     response: Response,

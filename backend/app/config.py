@@ -205,6 +205,11 @@ class Settings(BaseSettings):
     # The unauthenticated constant lists (webhook events, trigger kinds). Cheap
     # to serve, but there is no reason for one caller to need hundreds a minute.
     rate_limit_public_read: str = "60/minute"
+    # The free, no-login idea generator, for the whole install at once. It spends
+    # the same Gemini key every account's drafts are written with, and its
+    # per-address limit did nothing against a pool of addresses: past this, the
+    # tool says 429 to everyone and the rest of Pulse keeps its quota.
+    rate_limit_content_ideas_global: str = "200/hour;1000/day"
     # The budgets below are per *account*, not per address, and exist because
     # the request spends something shared rather than because the caller is
     # anonymous — see the `app.ratelimit` module docstring. Every one of them is
