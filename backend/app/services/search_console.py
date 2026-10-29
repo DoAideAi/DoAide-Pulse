@@ -202,18 +202,21 @@ class SearchConsoleClient:
             raise SearchConsoleError("Search Console's sitemap answer was not an object")
         contents = [c for c in (data.get("contents") or []) if isinstance(c, dict)]
         return {
-            "submitted": _count(sum(_count(c.get("submitted")) for c in contents)),
-            "indexed": _count(sum(_count(c.get("indexed")) for c in contents)),
+            "submitted": _count_or_zero(sum(_count_or_zero(c.get("submitted")) for c in contents)),
+            "indexed": _count_or_zero(sum(_count_or_zero(c.get("indexed")) for c in contents)),
             "last_submitted": data.get("lastSubmitted"),
             "last_downloaded": data.get("lastDownloaded"),
             "is_pending": bool(data.get("isPending")),
-            "errors": _count(data.get("errors")),
-            "warnings": _count(data.get("warnings")),
+            "errors": _count_or_zero(data.get("errors")),
+            "warnings": _count_or_zero(data.get("warnings")),
         }
 
 
-def _count(value: object) -> int:
+def _count_or_zero(value: object) -> int:
     """A count from Google's JSON as a column takes it: 0 when it is not one.
+
+    Zero, not ``None`` — unlike ``publishing_service._count`` — because these
+    columns are shown on a dashboard that already reads 0 as "not reported".
 
     Google sends counts as strings (``"42"``). Anything that does not read as a
     non-negative whole number is 0, which the dashboard already shows as "not
