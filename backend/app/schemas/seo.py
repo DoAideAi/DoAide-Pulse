@@ -219,7 +219,9 @@ class AuditQueuedOut(BaseModel):
 
 class TrafficPageOut(BaseModel):
     path: str
-    url: str
+    #: ``None`` when Umami reported something that is neither a path nor an
+    #: http(s) URL — shown as text, never as a link.
+    url: str | None = None
     views: int
     #: A Pulse piece lives here, or the path is under a blog-like prefix.
     is_content: bool

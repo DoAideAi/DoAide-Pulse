@@ -6,6 +6,8 @@ import { formatCount, formatRate, formatWhen } from "../../lib/format";
 import { TRAFFIC_WINDOWS, searchShare } from "../../lib/seo";
 import { ErrorBanner, SectionHeader, Skeleton, Stat } from "../ui/Bits";
 
+const isWebLink = (url) => typeof url === "string" && /^https?:\/\//i.test(url);
+
 /**
  * Which content brings people to the DoAide sites, from Umami — read by the
  * API, never by the browser. Pages a Pulse piece lives at are named and
@@ -101,10 +103,15 @@ export default function TrafficPanel() {
                             <Link to={`/content/${p.content_id}`} className="font-medium text-ink-900 hover:text-brand-600">
                               {p.title}
                             </Link>
-                          ) : (
+                          ) : isWebLink(p.url) ? (
                             <a href={p.url} target="_blank" rel="noopener noreferrer" className="font-mono text-xs text-ink-700 hover:text-brand-600">
                               {p.path}
                             </a>
+                          ) : (
+                            // Umami's collect endpoint takes any URL from
+                            // anyone, so a reported "path" is not trusted to
+                            // be one: anything but http(s) is text, never href.
+                            <span className="font-mono text-xs text-ink-700">{p.path}</span>
                           )}
                         </td>
                         <td className="cell text-xs text-ink-500">{p.domain}</td>

