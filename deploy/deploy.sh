@@ -224,10 +224,15 @@ with e.connect() as c:
     c.execute(text('SELECT pg_advisory_unlock(737868)'))
     sys.exit(r.returncode)
 "; then
-  echo "migration failed — not restarting services" >&2
+  # Left stopped. The new tree is already on disk, so a worker or beat started
+  # here imports the new code against the schema this migration just failed
+  # to bring up to it — the background half of the app writing to columns that
+  # are not there yet. pulse-api and pulse-web keep the old code in memory
+  # and stay up; rollback.sh puts the old tree back and starts the rest.
+  echo "migration failed — pulse-worker and pulse-beat are stopped, the API is" >&2
+  echo "still serving the previous code from memory" >&2
   echo "previous alembic revision was: \$PREV_REV" >&2
-  echo "to roll back: ./deploy/rollback.sh --db-only \$PREV_REV" >&2
-  systemctl start pulse-worker pulse-beat || true
+  echo "to roll back: ./deploy/rollback.sh (restores the previous tree and starts them)" >&2
   exit 1
 fi
 
