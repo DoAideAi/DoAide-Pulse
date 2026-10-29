@@ -67,3 +67,50 @@ def test_a_key_name_of_nothing_visible_is_refused(client, auth, project, name):
     )
 
     assert resp.status_code == 422
+
+
+def test_a_generated_piece_keeps_none_of_it(db, project):
+    """Autopilot's pieces reach the row without a request schema in between."""
+    from app.models.content import ContentStatus, ContentType
+    from app.services.content_generator import GeneratedContent, content_from_generated
+
+    generated = GeneratedContent(
+        title="Release" + SNEAKY,
+        body_markdown="Body. " * 40,
+        excerpt=SNEAKY,
+        meta_description=SNEAKY,
+    )
+
+    row = content_from_generated(
+        db,
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        generated=generated,
+        status=ContentStatus.REVIEW,
+        source={},
+    )
+
+    assert row.title == "Release" + CLEAN
+    assert row.excerpt == CLEAN
+    assert row.meta_description == CLEAN
+
+
+def test_a_generated_title_of_nothing_visible_still_has_a_title(db, project):
+    from app.models.content import ContentStatus, ContentType
+    from app.services.content_generator import GeneratedContent, content_from_generated
+
+    generated = GeneratedContent(
+        title="​‮", body_markdown="Body. " * 40, excerpt="", meta_description=""
+    )
+
+    row = content_from_generated(
+        db,
+        project_id=project.id,
+        content_type=ContentType.ANNOUNCEMENT,
+        generated=generated,
+        status=ContentStatus.REVIEW,
+        source={},
+    )
+
+    assert row.title == "Untitled"
+    assert row.slug

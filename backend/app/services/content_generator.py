@@ -42,6 +42,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.content import TARGET_WORDS, ContentIdea, ContentType
 from app.models.project import Project, Tone
+from app.schemas.text import visible_label
 from app.services import ai, dedup, formats, seo
 from app.services.github_client import RepoActivity
 from app.services.signals import TriggerSignal, from_repo_activity
@@ -294,8 +295,16 @@ def content_from_generated(
             len(body_markdown),
         )
 
-    title = generated.title[:TITLE_MAX_LENGTH]
-    meta_description = generated.meta_description[:META_DESCRIPTION_MAX_LENGTH]
+    # The model's one-line fields get the cleaning a person's would: control,
+    # zero-width and reordering characters out. They reach the row without
+    # passing a request schema, and they are what a platform, a feed and a
+    # search snippet show — a U+202E in a generated title or description
+    # reverses how the rest of the line displays, under the account's name.
+    title = visible_label(generated.title)[:TITLE_MAX_LENGTH] or "Untitled"
+    meta_description = visible_label(generated.meta_description)[
+        :META_DESCRIPTION_MAX_LENGTH
+    ]
+    excerpt = visible_label(generated.excerpt)
     focus_keyword = generated.focus_keyword[:100]
 
     return Content(
@@ -305,7 +314,7 @@ def content_from_generated(
         title=title,
         slug=unique_content_slug(db, project_id, title),
         body_markdown=body_markdown,
-        excerpt=generated.excerpt,
+        excerpt=excerpt,
         meta_description=meta_description,
         keywords=generated.keywords,
         tags=clamp_tags(generated.tags),
