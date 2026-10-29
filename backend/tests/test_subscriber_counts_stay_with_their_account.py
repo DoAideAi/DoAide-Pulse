@@ -196,3 +196,37 @@ def test_deleting_a_project_takes_its_readers_and_only_its_readers(
     db.expire_all()
     emails = {s.email for s in db.query(Subscriber).all()}
     assert emails == {"install@example.com"}
+
+
+def test_deleting_projects_in_turn_takes_each_list_and_leaves_the_rest(client, auth, db, user):
+    """Three projects, three lists; deleting two in sequence leaves exactly the third."""
+    from app.models.content import Content, ContentStatus, ContentType
+    from app.models.mixins import utcnow
+
+    ids = []
+    for n in range(3):
+        resp = client.post("/api/v1/projects", headers=auth, json={"name": f"List {n}"})
+        assert resp.status_code == 201, resp.text
+        project_id = resp.json()["id"]
+        ids.append(project_id)
+        db.add(
+            Content(
+                project_id=project_id,
+                content_type=ContentType.TUTORIAL,
+                status=ContentStatus.PUBLISHED,
+                title=f"Post {n}",
+                slug=f"post-{n}",
+                body_markdown="A public article. " * 20,
+                published_at=utcnow(),
+            )
+        )
+        db.commit()
+        for reader in ("shared@example.com", f"only-{n}@example.com"):
+            _subscribe(client, reader, article=f"post-{n}")
+
+    for project_id in ids[:2]:
+        assert client.delete(f"/api/v1/projects/{project_id}", headers=auth).status_code == 204
+
+    db.expire_all()
+    rows = {(s.email, s.project_id) for s in db.query(Subscriber).all()}
+    assert rows == {("shared@example.com", ids[2]), ("only-2@example.com", ids[2])}
