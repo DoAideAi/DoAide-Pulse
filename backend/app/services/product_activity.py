@@ -101,6 +101,19 @@ def purge(db: Session, *, days: int) -> int:
 # ---- Umami, cached ----
 
 _cache: dict[tuple, tuple[float, dict]] = {}
+
+#: How long a failed Umami answer is kept. Not caching failures at all meant a
+#: dashboard load during an outage asked again for every product, each call
+#: waiting out ``umami_timeout_seconds``, on every refresh. Shorter than a good
+#: answer's ``umami_cache_seconds`` so a recovery shows up quickly; shared with
+#: :mod:`app.services.seo_traffic`, which reads the same Umami.
+ERROR_CACHE_SECONDS = 15
+
+
+def cache_seconds_for(result: dict) -> float:
+    """How long *result* may be served from the cache: briefly, if it is a failure."""
+    ttl = settings.umami_cache_seconds
+    return min(ERROR_CACHE_SECONDS, ttl) if result.get("status") == "error" else ttl
 _cache_lock = threading.Lock()
 _sites: tuple[float, dict[str, str]] | None = None
 
@@ -155,11 +168,10 @@ def _umami_for(
     client: UmamiClient, product: Product, website_id: str, days: int, *, force: bool
 ) -> dict:
     key = (product.key, website_id, days)
-    ttl = settings.umami_cache_seconds
     if not force:
         with _cache_lock:
             hit = _cache.get(key)
-        if hit and time.monotonic() - hit[0] < ttl:
+        if hit and time.monotonic() - hit[0] < cache_seconds_for(hit[1]):
             return hit[1]
 
     if not website_id:
@@ -181,7 +193,10 @@ def _umami_for(
             events = []
     except UmamiError as exc:
         logger.warning("umami: %s (%s) failed: %s", product.key, website_id, exc)
-        return {"status": "error", "error": str(exc)}
+        failed = {"status": "error", "error": str(exc)}
+        with _cache_lock:
+            _cache[key] = (time.monotonic(), failed)
+        return failed
 
     result = {
         "status": "ok",

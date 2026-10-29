@@ -24,7 +24,6 @@ from urllib.parse import urlsplit
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models.content import Content
 from app.models.mixins import utcnow
 from app.models.project import Project
@@ -111,7 +110,7 @@ def _site_traffic(client: UmamiClient, site: Site, website_id: str, days: int) -
     key = (site.key, website_id, days)
     with _cache_lock:
         hit = _cache.get(key)
-    if hit and time.monotonic() - hit[0] < settings.umami_cache_seconds:
+    if hit and time.monotonic() - hit[0] < product_activity.cache_seconds_for(hit[1]):
         return hit[1]
     if not website_id:
         return {"status": "not_found", "error": f"No Umami site for {site.domain}"}
@@ -129,7 +128,12 @@ def _site_traffic(client: UmamiClient, site: Site, website_id: str, days: int) -
             referrers = []
     except UmamiError as exc:
         logger.warning("umami traffic: %s (%s) failed: %s", site.key, website_id, exc)
-        return {"status": "error", "error": str(exc)}
+        # Kept briefly, as the products dashboard keeps one: see
+        # ``product_activity.ERROR_CACHE_SECONDS``.
+        failed = {"status": "error", "error": str(exc)}
+        with _cache_lock:
+            _cache[key] = (time.monotonic(), failed)
+        return failed
     result = {
         "status": "ok",
         "pageviews": stats["pageviews"],
