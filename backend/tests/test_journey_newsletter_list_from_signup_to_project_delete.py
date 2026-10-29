@@ -86,3 +86,25 @@ def test_a_newsletter_list_from_signup_to_project_delete(client, auth, db, proje
     assert resp.status_code == 200
     db.expire_all()
     assert {s.email for s in db.query(Subscriber).all()} == {"widget@example.com"}
+
+
+def test_a_deleted_project_then_an_erased_account_leaves_none_of_its_readers(
+    client, auth, db, project, two_projects
+):
+    """The case 2813959 was for. A project's list orphaned on delete was out
+    of an account erasure's reach (it deletes the readers of projects it still
+    owns), so addresses collected on the account's pages outlived the account."""
+    first, second, _other = two_projects
+    _subscribe(client, "ana@example.com", first.slug)
+    _subscribe(client, "ben@example.com", second.slug)
+    _subscribe(client, "widget@example.com")  # the install's, not the account's
+
+    # A project goes first; later the whole account asks to be forgotten.
+    assert client.delete(f"{API}/projects/{project.id}", headers=auth).status_code == 204
+    erased = client.request(
+        "DELETE", f"{API}/auth/me", headers=auth, json={"password": "hunter2hunter2"}
+    )
+    assert erased.status_code == 204, erased.text
+
+    db.expire_all()
+    assert {s.email for s in db.query(Subscriber).all()} == {"widget@example.com"}
