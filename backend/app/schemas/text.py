@@ -17,9 +17,10 @@ label lie about itself (C104 M1):
   whitespace — newlines and tabs included — collapse to one space, and the
   other control characters go.
 
-The first two are removed. Zero-width *joiners* (U+200D, U+200C) are kept: they hold
-emoji sequences like 👨‍👩‍👧 together and are part of how Persian and several
-Indic scripts are written, so removing them would damage real text.
+The first two are removed. Zero-width *joiners* (U+200D, U+200C) are kept: they
+hold emoji sequences together (the family emoji is three people joined by
+U+200D) and are part of how Persian and several Indic scripts are written, so
+removing them would damage real text.
 """
 from __future__ import annotations
 
@@ -29,14 +30,19 @@ import unicodedata
 #: Characters with no legitimate job in a one-line label.
 _REMOVED = frozenset(
     {
-        # Bidirectional embedding, override and isolate controls, and marks.
-        "‎", "‏", "؜",
-        "‪", "‫", "‬", "‭", "‮",
-        "⁦", "⁧", "⁨", "⁩",
+        # Written as escapes, never as the characters: this is the one list
+        # whose job is invisible characters, and spelled raw it could not be
+        # reviewed, and an editor stripping a stray BOM or zero-width space on
+        # save would silently empty an entry.
+        #
+        # Bidirectional marks, embeddings and overrides, and isolates.
+        "\u200e", "\u200f", "\u061c",
+        "\u202a", "\u202b", "\u202c", "\u202d", "\u202e",
+        "\u2066", "\u2067", "\u2068", "\u2069",
         # Invisible spacers and the byte-order mark.
-        "​", "⁠", "﻿", "᠎",
+        "\u200b", "\u2060", "\ufeff", "\u180e",
         # Soft hyphen: invisible unless the line breaks inside the word.
-        "­",
+        "\u00ad",
     }
 )
 
