@@ -164,11 +164,21 @@ async def _store(file: UploadFile, limit: int) -> UploadOut:
 @router.get(
     "/{filename}",
     summary="Serve an uploaded image",
-    responses=errors(
-        status.HTTP_400_BAD_REQUEST,
-        status.HTTP_404_NOT_FOUND,
-        status.HTTP_429_TOO_MANY_REQUESTS,
-    ),
+    # The bytes, not JSON. Without these the schema documented the 200 as an
+    # empty ``application/json`` object — the one success response in the API
+    # whose documented shape was nothing like what it sends.
+    response_class=FileResponse,
+    responses={
+        status.HTTP_200_OK: {
+            "description": "The image, with its own content type.",
+            "content": {media: {} for media in sorted(ALLOWED_CONTENT_TYPES)},
+        },
+        **errors(
+            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_404_NOT_FOUND,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+        ),
+    },
 )
 @limiter.limit(settings.rate_limit_public_read)
 async def serve_image(

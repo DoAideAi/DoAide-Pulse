@@ -223,3 +223,25 @@ def test_the_contract_census_sees_what_it_is_looking_for():
     limited = [r for r in (p.values[0] for p in ROUTES) if "@limiter.limit" in _inspect.getsource(r.endpoint)]
     assert len(found) > 40
     assert len(limited) > 20
+
+
+def test_no_success_response_is_documented_as_an_empty_object():
+    """A 2xx whose JSON schema is ``{}`` documents nothing — no field, no type
+    — and is what FastAPI writes for a route that returns a bare ``dict`` or a
+    non-JSON response without saying so. ``GET /uploads/{filename}`` was one:
+    it serves image bytes and was documented as an empty JSON object."""
+    empty = []
+    for path, ops in create_app().openapi()["paths"].items():
+        for method, op in ops.items():
+            for code, response in op.get("responses", {}).items():
+                if not code.startswith("2"):
+                    continue
+                schema = response.get("content", {}).get("application/json", {}).get("schema")
+                if schema == {} or (
+                    schema is not None
+                    and schema.get("type") == "object"
+                    and not schema.get("properties")
+                    and not schema.get("additionalProperties")
+                ):
+                    empty.append(f"{method.upper()} {path} {code}")
+    assert not empty, empty
