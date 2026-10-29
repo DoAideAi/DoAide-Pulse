@@ -216,30 +216,44 @@ those paths.
 
 ## Health check
 
-`GET /api/v1/health` probes its dependencies rather than returning a bare 200:
-`SELECT 1` against Postgres and a `PING` against Redis, each with a 2 s budget
-(`HEALTH_CHECK_TIMEOUT_SECONDS`). The body reports both, plus the LLM chain and
-breaker state.
+Two endpoints. **`GET /api/v1/health`** is public and is Caddy's `health_uri`;
+**`GET /api/v1/health/detail`** needs a token and answers "why isn't X
+working?". Both run the same two local probes, `SELECT 1` against Postgres
+and a `PING` against Redis, each with a 2 s budget
+(`HEALTH_CHECK_TIMEOUT_SECONDS`). The public body is just those two;
+everything below is on the detail endpoint only.
 
-**The status code is load-bearing** — it is Caddy's `health_uri`, so a non-2xx
-takes this uvicorn out of the upstream pool, and with one upstream that means
-`/api/*` starts answering 502. So it fails only on a dependency Pulse cannot
-work without:
+**The status code is load-bearing.** A non-2xx takes this uvicorn out of
+Caddy's upstream pool, and with one upstream `/api/*` then answers 502. So
+exactly one dependency decides it:
 
-| Dependency | Required | Down ⇒ |
+| Dependency | On | Down ⇒ |
 |---|---|---|
-| Postgres | always | 503 |
-| Redis | when `CELERY_ENABLED=true` (production) | 503 |
-| Redis | when `CELERY_ENABLED=false` | reported, still 200 |
+| `database` | both | **503**, `status: degraded` |
+| `redis` | both | reported `unavailable`, `required: false`, warning in the journal, still 200 |
 
-Redis counting as fatal in production is deliberate: with the worker and beat
-running, a dead broker means every generate and publish is queued into nothing
-and silently lost. A loud 502 is better than accepting work that will never
-happen. The tradeoff is that a Redis blip takes the whole API down with it —
-`systemctl status redis` is the first thing to check on an unexplained 502.
+Redis used to be fatal with Celery on. It is not, because the API serves
+without it: the limiter fails open and a publish whose broker handoff fails
+runs inline (`content._dispatch`). Making it required turned a Redis outage,
+which costs background work, into a total one, including the detail page you
+need to see what broke (M6). An unexplained 502 is Postgres or the API process
+itself, not Redis.
 
-`deploy.sh` ends with `curl -fsS …/health`, so a deploy that leaves a dependency
-broken fails at the last step instead of looking fine.
+The detail endpoint adds, all `required: false`, so none can fail the probe:
+
+| Field | Says | Not `ok` when |
+|---|---|---|
+| `workers` | a Celery worker answered `ping` | none answered (`unavailable`), or `disabled` with Celery off |
+| `scheduler` | scheduled publications are going out | rows are well past due: `behind`, check pulse-beat |
+| `queue` | tasks waiting in the broker | past `HEALTH_QUEUE_BACKLOG_WARN`: `behind`, the worker is not keeping up |
+| `backups` | the newest `*.dump`'s age in `BACKUP_DIR` | older than `BACKUP_MAX_AGE_HOURS` (36) or none: `stale`; `unknown` if unreadable |
+
+plus the LLM chain, every breaker's state (LLM, publishing, idea tool) and
+which platforms are implemented. Each probe that is not `ok` also writes a
+warning, so the fact is in the journal as well as on the page.
+
+`deploy.sh` ends with `curl -fsS …/health`, so a deploy that leaves the
+database unreachable fails at the last step instead of looking fine.
 
 ## Auth surface
 
@@ -311,22 +325,39 @@ sudo -u pulse env $(grep -E '^DATABASE_URL=' /opt/Pulse/.env | xargs) \
 
 ## What `deploy.sh` does, in order
 
-1. **Free space.** Refuses to start below 1 GiB free on `/opt/Pulse`
-   (`PULSE_DEPLOY_MIN_FREE_MB`): a sync that runs out of disk half way leaves a
-   tree no commit ever had. Nothing is changed when it refuses.
-2. **Dependencies, before the code.** Only `backend/requirements.txt` goes up
-   first and is installed. A pip failure (PyPI down, a yanked pin) stops the
-   deploy with the box exactly as it was. Skipped when the file hashes to
-   `/opt/Pulse/.venv/.requirements.sha256`, the stamp of the last install, so a
-   deploy that changes no pin needs no PyPI at all.
-3. **Code.** `rsync --delete --exclude-from deploy/rsync-excludes`, then
+Every step before 6 refuses with the box exactly as it was.
+
+1. **A clean checkout.** Uncommitted or untracked changes stop it
+   (`--allow-dirty` ships them, recorded as `<commit>-dirty`).
+2. **The frontend build is this commit's.** `npm run build` stamps
+   `frontend/dist/.build-commit` (package.json's `postbuild`); a build with no
+   stamp, or whose `frontend/` differs from HEAD's, is refused. That is what
+   stops `--no-build` shipping an old UI in front of new code. `pulse-web` never
+   serves dot-files, so the stamp does not publish the production commit.
+3. **Room on the box.** At least 1 GiB free on `/opt/Pulse`
+   (`PULSE_DEPLOY_MIN_FREE_MB`) and 600 MiB available memory
+   (`PULSE_DEPLOY_MIN_MEM_MB`).
+4. **A backup.** `systemctl start pulse-backup.service`: a verified database
+   dump and uploads archive from minutes before anything changes. A failed
+   backup stops the deploy.
+5. **Dependencies, before the code.** `backend/requirements.txt` and
+   `backend/constraints.txt` go up together and are installed. requirements pins
+   what Pulse imports, and constraints pins everything under it, so CI and the
+   box resolve one set (see constraints.txt's header to regenerate it). Skipped
+   when the pair hashes to `/opt/Pulse/.venv/.requirements.sha256`, the stamp of
+   the last install. A pip failure stops the deploy.
+6. **Code.** `rsync --delete --exclude-from deploy/rsync-excludes`, then
    `frontend/dist`. The exclude list is shared with `rollback.sh` and is the
    list of what survives `--delete`: `.env`, the venv, `backend/uploads/`,
    `.deploy-history`, the beat schedule. Add to it, never to an inline copy.
-4. **Units.** Every file in `deploy/systemd` is installed into
-   `/etc/systemd/system` if it differs; `daemon-reload` runs only then.
-5. **Migrate** under advisory lock 737868, with worker and beat stopped.
-6. **Restart** api and web, start worker and beat, and poll `/health`.
+7. **Units.** Every file in `deploy/systemd` is installed into
+   `/etc/systemd/system` if it differs; `daemon-reload` runs only then, and
+   every timer is enabled.
+8. **Migrate** under advisory lock 737868, with worker and beat stopped. If it
+   fails they **stay stopped** (they would import the new code against the old
+   schema), the API keeps serving the previous code from memory, and the
+   message points at `rollback.sh`.
+9. **Restart** api and web, start worker and beat, and poll `/health`.
 
 ## Seeding
 
@@ -428,12 +459,13 @@ which at 03:00 reads like a corrupt backup and is not one. Stage a copy the
 
 ```bash
 # What is in the dump. As root, which is not subject to the mode bits.
-pg_restore --list /var/backups/pulse/pulse-<stamp>.dump
+# <database> is PGDATABASE from DATABASE_URL: herald-<stamp>.dump on the box.
+pg_restore --list /var/backups/pulse/<database>-<stamp>.dump
 
 # Stage it where postgres can read it, without widening the mode.
 install -d -o postgres -g postgres -m 0700 /var/backups/pulse-restore
 install -o postgres -g postgres -m 0600 \
-  /var/backups/pulse/pulse-<stamp>.dump /var/backups/pulse-restore/dump
+  /var/backups/pulse/<database>-<stamp>.dump /var/backups/pulse-restore/dump
 
 # One table, into a scratch database first — never straight over prod.
 sudo -u postgres createdb pulse_restore

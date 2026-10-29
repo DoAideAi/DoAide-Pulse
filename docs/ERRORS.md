@@ -182,7 +182,7 @@ Operator-only 500s that do say more:
 | 503 | `The database is unavailable for a moment, so nothing was saved.` | PostgreSQL unreachable, every pooled connection busy for `DB_POOL_TIMEOUT_SECONDS`, out of disk, or read-only (a standby after failover, or writes switched off during maintenance). Sent with `Retry-After: 5`. | Retry. If it persists, check `GET /api/v1/health`. |
 | 503 | `No provider could translate …` / `AI generation is temporarily unavailable …` | Every LLM provider in the chain failed or returned nothing usable. A failed re-translation **keeps the previous translation**. | Retry shortly. Configure fallback providers (`GEMINI_API_KEY`, `GROQ_API_KEY`) so one spent quota isn't an outage. |
 | 503 | `Product event ingest is not enabled …` | `PRODUCT_INGEST_TOKEN` is unset. | Set it on the server and in the reporting product. |
-| 503 | (health) | `GET /api/v1/health` answers 503 when a required dependency (database, Redis) is down. Caddy uses it to take the API out of rotation. | See `deploy/DEPLOYMENT.md`. |
+| 503 | (health) | `GET /api/v1/health` answers 503 when the database is down. Caddy uses it to take the API out of rotation. Redis being down is reported but does not fail it. | See `deploy/DEPLOYMENT.md`. |
 
 ---
 
