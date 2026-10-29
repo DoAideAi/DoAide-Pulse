@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import copy
 import logging
-import secrets
 import unicodedata
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import (
     APIRouter,
@@ -3094,7 +3093,7 @@ def set_content_status(
                 "created."
             ),
         },
-        **errors(*OWNED, status.HTTP_429_TOO_MANY_REQUESTS),
+        **errors(*OWNED, status.HTTP_409_CONFLICT, status.HTTP_429_TOO_MANY_REQUESTS),
     },
 )
 @limiter.limit(settings.rate_limit_ai_generate, key_func=account_key)
@@ -3147,28 +3146,84 @@ def write_from_idea(
         # writing it again is the useful answer rather than a dead reference.
         idea.used_content_id = None
 
-    generated = content_generator.generate(
-        project,
-        idea.content_type,
-        instructions=f"Work to this angle: {idea.headline}. {idea.rationale}",
-    )
+    # Claimed, not held. The lock used to stay on this row — and the pooled
+    # connection under it — for the whole model call, so a second click, a
+    # calendar plan or dismiss, and a project delete (whose cascade needs this
+    # row) all waited minutes behind it. Now the lock lasts one commit: a fresh
+    # claim answers a second request with 409, and one older than
+    # IDEA_CLAIM_SECONDS is a request that died mid-write and can be taken over.
+    claimed_at = _idea_claim(idea)
+    if claimed_at is not None and utcnow() - claimed_at < timedelta(seconds=IDEA_CLAIM_SECONDS):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This idea is being written right now. The draft will appear "
+            "in Content when it is done.",
+        )
+    idea_id, content_type = idea.id, idea.content_type
+    headline, rationale = idea.headline, idea.rationale
+    idea.source = {**(idea.source or {}), "writing_since": utcnow().isoformat()}
+    db.commit()
+
+    project = owned_project(project.id, db, user)
+    release_for_slow_work(db, project)
+    try:
+        generated = content_generator.generate(
+            project,
+            content_type,
+            instructions=f"Work to this angle: {headline}. {rationale}",
+        )
+    except BaseException:
+        _release_idea_claim(db, idea_id)
+        raise
+
     content = content_generator.content_from_generated(
         db,
         project_id=project.id,
-        content_type=idea.content_type,
+        content_type=content_type,
         generated=generated,
         status=ContentStatus.DRAFT,
-        source={"kind": "idea", "idea_id": idea.id, "headline": idea.headline},
+        source={"kind": "idea", "idea_id": idea_id, "headline": headline},
     )
-    db.add(content)
     try:
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-        content.slug = f"{content.slug}-{secrets.token_hex(3)}"
-        db.add(content)
-        db.flush()
-    idea.used_content_id = content.id
-    db.commit()
+        content_store.commit_new(db, content)
+    except BaseException:
+        _release_idea_claim(db, idea_id)
+        raise
+    idea = db.scalar(
+        select(ContentIdea)
+        .where(ContentIdea.id == idea_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if idea is not None:
+        idea.used_content_id = content.id
+        idea.source = {k: v for k, v in (idea.source or {}).items() if k != "writing_since"}
+        db.commit()
     db.refresh(content)
     return to_detail(content)
+
+
+#: How long a claim on an idea being written stands before it is taken for a
+#: request that died mid-write. Well past ``generate``'s worst case.
+IDEA_CLAIM_SECONDS = 600
+
+
+def _idea_claim(idea: ContentIdea) -> datetime | None:
+    """When the idea was claimed for writing, if it is."""
+    raw = (idea.source or {}).get("writing_since")
+    if not raw:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
+def _release_idea_claim(db: Session, idea_id: int) -> None:
+    """Drop the claim after a write that failed, so the idea can be written again."""
+    db.rollback()
+    idea = db.get(ContentIdea, idea_id)
+    if idea is not None and "writing_since" in (idea.source or {}):
+        idea.source = {k: v for k, v in idea.source.items() if k != "writing_since"}
+        db.commit()
