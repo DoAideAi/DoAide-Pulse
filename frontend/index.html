@@ -34,8 +34,11 @@
     <meta name="twitter:title" content="DoAide Pulse — AI-Powered Newsletters" />
     <meta name="twitter:description" content="Create and send AI-powered newsletters with AI." />
 
-    <!-- Umami Analytics -->
-    <script defer src="https://analytics.doaide.com/script.js" data-website-id="46c10e24-65e9-4677-9b41-77c9261b575b"></script>
+    <!-- Umami Analytics. analytics-redact.js first, and blocking: it defines the
+         before-send hook that takes preview and password-reset tokens out of
+         every URL Umami records, including the first pageview. -->
+    <script src="/analytics-redact.js"></script>
+    <script defer src="https://analytics.doaide.com/script.js" data-website-id="46c10e24-65e9-4677-9b41-77c9261b575b" data-before-send="pulseRedactAnalytics"></script>
 
     <!-- JSON-LD Structured Data -->
     <script type="application/ld+json">

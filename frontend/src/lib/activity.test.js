@@ -25,6 +25,16 @@ describe("activity tracker", () => {
     expect(routePattern("/analytics")).toBe("/analytics");
   });
 
+  it("never records a preview link's token, as the name or as the path", () => {
+    const token = "Zk3_q-9aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789";
+    trackPageView(`/preview/${token}`);
+    vi.advanceTimersByTime(5000);
+
+    const [event] = sent()[0].body.events;
+    expect(event).toEqual({ kind: "page_view", name: "/preview/:token", path: "/preview/:token" });
+    expect(JSON.stringify(sent())).not.toContain(token);
+  });
+
   it("batches events and sends them after a pause, with the bearer token", () => {
     trackPageView("/content/7?q=secret");
     trackAction("POST /content/:id/approve", "/content/7");

@@ -30,10 +30,30 @@ let enabled = import.meta.env?.MODE !== "test";
 /** Collapse ids so "/content/42" and "/content/43" count as one page. */
 export function routePattern(path) {
   const bare = String(path || "/").split(/[?#]/)[0] || "/";
-  return bare
+  return redactSecrets(bare)
     .split("/")
     .map((seg) => (/^\d+$/.test(seg) || /^[0-9a-f-]{32,36}$/i.test(seg) ? ":id" : seg))
     .join("/");
+}
+
+/** Path segments that follow these are credentials, whatever they look like. */
+const SECRET_SEGMENTS = { preview: ":token" };
+
+/**
+ * ``path`` with credential segments replaced — ``/preview/<token>`` becomes
+ * ``/preview/:token``. A preview token is 43 URL-safe characters, neither a
+ * number nor a UUID, so ``routePattern`` passed it through and it was stored
+ * verbatim, as the event name and as its path, for anyone signed in who opened
+ * one: the bearer credential the backend keeps only as a hash. The same rule
+ * as ``public/analytics-redact.js`` applies to what Umami sees.
+ */
+export function redactSecrets(path) {
+  const parts = String(path).split("/");
+  for (let i = 1; i < parts.length; i++) {
+    const hidden = SECRET_SEGMENTS[parts[i - 1]];
+    if (hidden && parts[i]) parts[i] = hidden;
+  }
+  return parts.join("/");
 }
 
 function token() {
@@ -55,7 +75,7 @@ function enqueue(kind, name, path) {
   queue.push({
     kind,
     name: String(name).slice(0, NAME_MAX),
-    path: path ? String(path).split(/[?#]/)[0].slice(0, PATH_MAX) : null,
+    path: path ? redactSecrets(String(path).split(/[?#]/)[0]).slice(0, PATH_MAX) : null,
   });
   if (queue.length >= MAX_QUEUE) flush();
   else if (!timer) timer = setTimeout(flush, FLUSH_MS);
