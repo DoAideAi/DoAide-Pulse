@@ -30,6 +30,10 @@ set -euo pipefail
 ENV_FILE="${PULSE_ENV_FILE:-/opt/Pulse/.env}"
 DEST="${PULSE_BACKUP_DIR:-/var/backups/pulse}"
 RETENTION_DAYS="${PULSE_BACKUP_RETENTION_DAYS:-14}"
+# The uploaded images (covers, inline images). Files, not rows, so the dump
+# never had them, and every deploy's sync leaves them out: until this they
+# existed in exactly one place. The service runs as pulse, which owns them.
+UPLOADS="${PULSE_UPLOADS_DIR:-/opt/Pulse/backend/uploads}"
 # A dump that fills the disk takes out six products, not one. This is the floor
 # the dump refuses to start below, in MiB.
 MIN_FREE_MB="${PULSE_BACKUP_MIN_FREE_MB:-1024}"
@@ -96,7 +100,7 @@ eval "$connection"
 # — used to be kept for good. Swept here, before the free-space check it would
 # otherwise count against. A day old, because no run takes that long and a
 # younger one may be another run still writing.
-find "$DEST" -maxdepth 1 -type f -name '*.dump.partial' -mmin +1440 -print -delete \
+find "$DEST" -maxdepth 1 -type f \( -name '*.dump.partial' -o -name '*.tar.gz.partial' \) -mmin +1440 -print -delete \
     | sed 's/^/Removed abandoned /'
 
 free_mb="$(df -Pm "$DEST" | awk 'NR == 2 { print $4 }')"
@@ -129,12 +133,31 @@ pg_restore --list "$partial" >/dev/null \
 mv "$partial" "$target"
 log "Wrote $target ($(du -h "$target" | cut -f1))"
 
+# The images beside the dump, under the same stamp, so a restore can take the
+# pair. A piece restored from the dump alone kept its image URLs and every one
+# of them answered 404. In-progress uploads (*.part) are not images yet. Read
+# back before it counts, as the dump is; an install that has uploaded nothing
+# has no directory, and that is not a failed backup.
+if [ -d "$UPLOADS" ]; then
+    archive="$DEST/uploads-${stamp}.tar.gz"
+    tar -czf "$archive.partial" --exclude='*.part' -C "$UPLOADS" . \
+        || { rm -f "$archive.partial"; die "could not archive $UPLOADS; the dump $target is kept"; }
+    tar -tzf "$archive.partial" >/dev/null \
+        || { rm -f "$archive.partial"; die "wrote an uploads archive that cannot be read back"; }
+    mv "$archive.partial" "$archive"
+    log "Wrote $archive ($(du -h "$archive" | cut -f1))"
+else
+    log "No uploads directory at $UPLOADS; nothing to archive"
+fi
+
 # ---- Retention ------------------------------------------------------------
 # Only reached after a dump that verified, so this cannot leave the directory
 # empty — unless RETENTION_DAYS is 0, which would delete the file just written
 # and is treated as a configuration error rather than a policy.
 [ "$RETENTION_DAYS" -ge 1 ] || die "PULSE_BACKUP_RETENTION_DAYS must be at least 1"
 find "$DEST" -maxdepth 1 -type f -name '*.dump' -mtime "+$RETENTION_DAYS" -print -delete \
+    | sed 's/^/Pruned /'
+find "$DEST" -maxdepth 1 -type f -name 'uploads-*.tar.gz' -mtime "+$RETENTION_DAYS" -print -delete \
     | sed 's/^/Pruned /'
 
 kept="$(find "$DEST" -maxdepth 1 -type f -name '*.dump' | wc -l)"
