@@ -69,3 +69,26 @@ describe.each(Object.entries(SURFACES))("on the %s", (_name, surface) => {
     expect(contrast(hex(variable("text-muted")), surface)).toBeGreaterThanOrEqual(4.5);
   });
 });
+
+// The sign-in inputs drop the browser's focus outline, and all that replaced
+// it was the border turning teal at half alpha: about 2:1 against the near-black
+// field, under the 3:1 WCAG 1.4.11 asks of a focus indicator. A keyboard user
+// tabbing through the form every account signs in with could not see which field
+// they were in. The indicator is now a solid ring in --accent-secondary.
+describe("the sign-in inputs show where focus is", () => {
+  function rule(selector) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = CSS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
+    return match ? match[1] : "";
+  }
+
+  it("draws a solid ring, not a half-transparent border", () => {
+    const focus = rule(".landing-input:focus-visible");
+    expect(focus).toMatch(/box-shadow:[^;]*var\(--accent-secondary\)/);
+    expect(rule(".landing-input:focus")).not.toMatch(/rgba\(13,\s*148,\s*136,\s*0\.5\)/);
+  });
+
+  it("the ring stands out from the page at 3:1 or better", () => {
+    expect(contrast(hex(variable("accent-secondary")), hex(variable("bg")))).toBeGreaterThanOrEqual(3);
+  });
+});

@@ -361,8 +361,17 @@
   transition: border-color 150ms ease;
 }
 
+/* The outline is gone (see .landing-input), so this is the whole focus cue.
+   It was the border turning teal at half alpha — about 2:1 on this field,
+   under the 3:1 a focus indicator needs (WCAG 1.4.11). A solid ring in the
+   bright accent instead; LandingPage.contrast.test.js holds it there. */
 .landing-input:focus {
-  border-color: rgba(13, 148, 136, 0.5);
+  border-color: var(--accent-secondary);
+}
+
+.landing-input:focus-visible {
+  border-color: var(--accent-secondary);
+  box-shadow: 0 0 0 2px var(--accent-secondary);
 }
 
 .landing-input::placeholder {
