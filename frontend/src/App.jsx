@@ -68,14 +68,16 @@ function PageLoading() {
  */
 function Protected({ children }) {
   const { user, loading } = useAuth();
-  const { pathname } = useLocation();
+  const { pathname, search, hash } = useLocation();
   // Signed-in pages only: the tracker files events under the account, so this
   // is the one wrapper every page it can record passes through.
   useEffect(() => {
     if (user) trackPageView(pathname);
   }, [user, pathname]);
   if (loading) return <Loading />;
-  if (!user) return <Navigate to="/" replace />;
+  // The destination goes along, so signing in finishes the trip — a link from
+  // an email (the digest's /settings#digest) used to end on the dashboard.
+  if (!user) return <Navigate to="/" replace state={{ from: pathname + search + hash }} />;
   return (
     <Shell>
       <RouteErrorBoundary title="This page stopped working" message={PAGE_MESSAGE} section="page">

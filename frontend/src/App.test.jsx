@@ -36,9 +36,15 @@ vi.mock("./pages/Dashboard", () => ({
   },
 }));
 
-vi.mock("./pages/LandingPage", () => ({
-  default: () => <p>landing</p>,
-}));
+vi.mock("./pages/LandingPage", async () => {
+  const { useLocation } = await import("react-router-dom");
+  return {
+    default: function Landing() {
+      const from = useLocation().state?.from;
+      return <p>landing{from ? ` (back to ${from})` : ""}</p>;
+    },
+  };
+});
 
 vi.mock("./pages/Projects", () => ({
   default: () => <p>the projects page</p>,
@@ -115,7 +121,18 @@ describe("the gate", () => {
 
     await draw("/dashboard");
 
-    expect(screen.getByText("landing")).toBeInTheDocument();
+    expect(screen.getByText(/^landing/)).toBeInTheDocument();
+  });
+
+  // A link from an email — the digest's "turn it off" goes to /settings#digest
+  // — used to land on the dashboard once the visitor had signed in, with the
+  // place they were sent to forgotten at the gate.
+  it("remembers where the signed-out visitor was going", async () => {
+    signedIn({ user: null, loading: false });
+
+    await draw("/settings?tab=x#digest");
+
+    expect(screen.getByText("landing (back to /settings?tab=x#digest)")).toBeInTheDocument();
   });
 });
 

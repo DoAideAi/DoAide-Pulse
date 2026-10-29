@@ -1,13 +1,13 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import LandingPage from "./LandingPage";
 
-const auth = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn() }));
+const auth = vi.hoisted(() => ({ login: vi.fn(), register: vi.fn(), user: null }));
 
 vi.mock("../hooks/useAuth", () => ({
   useAuth: () => ({
-    user: null,
+    user: auth.user,
     loading: false,
     login: auth.login,
     register: auth.register,
@@ -131,6 +131,48 @@ describe("LandingPage", () => {
       fireEvent.click(screen.getByRole("tab", { name: "Create account" }));
       expect(screen.queryByRole("link", { name: "Forgot your password?" })).not.toBeInTheDocument();
     });
+  });
+
+  describe("after signing in", () => {
+    afterEach(() => {
+      auth.user = null;
+    });
+
+    function Where() {
+      const { pathname, search, hash } = useLocation();
+      return <p>at {pathname + search + hash}</p>;
+    }
+
+    const arrive = (from) =>
+      render(
+        <MemoryRouter initialEntries={[{ pathname: "/", state: from === undefined ? undefined : { from } }]}>
+          <Routes>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="*" element={<Where />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+
+    it("goes back to the page the gate turned the visitor away from", () => {
+      auth.user = { email: "writer@example.com" };
+      arrive("/settings#digest");
+      expect(screen.getByText("at /settings#digest")).toBeInTheDocument();
+    });
+
+    it("goes to the dashboard when there was nowhere to go back to", () => {
+      auth.user = { email: "writer@example.com" };
+      arrive();
+      expect(screen.getByText("at /dashboard")).toBeInTheDocument();
+    });
+
+    it.each(["//evil.example/x", "/\\evil.example", "https://evil.example/", "/", "settings", 42])(
+      "does not follow %s",
+      (from) => {
+        auth.user = { email: "writer@example.com" };
+        arrive(from);
+        expect(screen.getByText("at /dashboard")).toBeInTheDocument();
+      },
+    );
   });
 
   describe("an invite-only install", () => {

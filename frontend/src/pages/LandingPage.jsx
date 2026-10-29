@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { SESSION_ENDED } from "../lib/api";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../lib/limits";
+import { safeReturnPath } from "../lib/returnPath";
 import { useAuth } from "../hooks/useAuth";
 import AnalyticsMockup from "../components/AnalyticsMockup";
 import CrossProductLinks from "../components/CrossProductLinks";
@@ -535,6 +536,9 @@ export default function LandingPage() {
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
 
+  // Where the sign-in gate turned this visitor away from, if anywhere — see
+  // `Protected` in App.jsx. Checked, because it becomes a navigation.
+  const returnTo = safeReturnPath(useLocation().state?.from);
   const isSignUp = mode === "signup";
   // Only where it can matter: an install with no invite code set never asks.
   // Shown when a link brought one, or once the server has said it wants one —
@@ -577,7 +581,7 @@ export default function LandingPage() {
     return () => document.head.removeChild(ld);
   }, []);
 
-  if (user) return <Navigate to="/dashboard" replace />;
+  if (user) return <Navigate to={returnTo ?? "/dashboard"} replace />;
 
   async function onSubmit(event) {
     event.preventDefault();
