@@ -106,7 +106,8 @@ def test_register_refused_without_the_right_invite_token(client, monkeypatch, to
     payload = _payload() if token is None else _payload(invite_token=token)
     resp = client.post(REGISTER, json=payload)
     assert resp.status_code == 403
-    assert "invite token" in resp.json()["detail"].lower()
+    # "code", the word the sign-up form uses (7a79de5), not "token".
+    assert "invite code" in resp.json()["detail"].lower()
 
 
 def test_register_accepted_with_the_right_invite_token(client, monkeypatch):

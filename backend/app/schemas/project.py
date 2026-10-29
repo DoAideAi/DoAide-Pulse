@@ -91,13 +91,15 @@ class ProjectBase(BaseModel):
     description: str = Field(default="", max_length=5000)
     repo_url: str | None = Field(default=None, max_length=500)
     live_url: str | None = Field(default=None, max_length=500)
-    # The same item types ``ProjectUpdate`` uses. These were bare ``str``, so a
-    # project could be *created* with a keyword as long as the body limit —
-    # stored, and handed to every prompt and SEO check written for it — that a
-    # PATCH of the same value would refuse.
-    tech_stack: list[TechStackEntry] = Field(default=[], max_length=25)
+    # Plain strings here, and the per-entry caps on ``ProjectCreate`` and
+    # ``ProjectUpdate``, which is where 6d4dceb meant them: this base is also
+    # ``ProjectOut``, the read model, and a cap here made every project stored
+    # with a longer entry (from before the cap, or written any other way) a 500
+    # on read — on the very endpoint that would show the user what to shorten.
+    # ``_clean_list`` still trims, dedupes and keeps 25 on the way out.
+    tech_stack: list[str] = []
     target_audience: str = Field(default="", max_length=500)
-    keywords: list[Keyword] = Field(default=[], max_length=25)
+    keywords: list[str] = []
     tone: Tone = Tone.TECHNICAL
     is_active: bool = True
     autopilot_mode: AutopilotMode = AutopilotMode.OFF

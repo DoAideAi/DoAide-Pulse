@@ -80,6 +80,11 @@ def two_providers(monkeypatch):
     monkeypatch.setattr(settings, "groq_api_key", "key-groq")
     monkeypatch.setattr(settings, "gemini_fallback_models", "")
     monkeypatch.setattr(settings, "groq_fallback_models", "")
+    # Named, not inherited. The fallback test configures "gemini-flash-latest"
+    # as Gemini's fallback, which is also the code default for the primary; a
+    # developer's .env happened to set a different primary, so the test passed
+    # locally and failed in CI, where primary and fallback were the same model.
+    monkeypatch.setattr(settings, "gemini_model", "gemini-2.0-flash")
 
 
 # --------------------------------------------------------------------------- #

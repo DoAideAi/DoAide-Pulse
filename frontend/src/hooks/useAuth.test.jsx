@@ -124,10 +124,12 @@ describe("registering", () => {
       await result.current.register("writer@example.com", "hunter2", "A Writer");
     });
 
+    // The fourth argument is the invite code (4bbf1bc): none here.
     expect(api.register).toHaveBeenCalledWith(
       "writer@example.com",
       "hunter2",
       "A Writer",
+      undefined,
     );
     expect(api.login).toHaveBeenCalledWith("writer@example.com", "hunter2");
     expect(result.current.user).toEqual(ME);

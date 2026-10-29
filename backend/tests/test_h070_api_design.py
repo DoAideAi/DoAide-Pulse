@@ -165,6 +165,10 @@ class TestDeleteReturns204OrBody:
 _NO_MODEL_ALLOWLIST = {
     "project_feed",
     "serve_image",
+    # Streamed a batch at a time (6979afb); a response_model would make FastAPI
+    # build the whole account in memory to validate it. Documented through
+    # ``responses={200: {"model": AccountExportOut}}`` instead.
+    "export_me",
 }
 
 

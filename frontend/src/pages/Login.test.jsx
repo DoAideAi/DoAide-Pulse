@@ -101,7 +101,8 @@ describe("switching to sign up", () => {
     await user.type(screen.getByLabelText("Password"), "hunter22222");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(register).toHaveBeenCalledWith("new@example.com", "hunter22222", "Ada Lovelace");
+    // The fourth argument is the invite code (4bbf1bc): none on this install.
+    expect(register).toHaveBeenCalledWith("new@example.com", "hunter22222", "Ada Lovelace", null);
     expect(login).not.toHaveBeenCalled();
   });
 
@@ -114,7 +115,7 @@ describe("switching to sign up", () => {
     await user.type(screen.getByLabelText("Password"), "hunter22222");
     await user.click(screen.getByRole("button", { name: "Create account" }));
 
-    expect(register).toHaveBeenCalledWith("new@example.com", "hunter22222", null);
+    expect(register).toHaveBeenCalledWith("new@example.com", "hunter22222", null, null);
   });
 
   it("clears a prior error when the mode is toggled", async () => {
