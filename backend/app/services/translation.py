@@ -53,6 +53,7 @@ from sqlalchemy.orm import Session, load_only
 from app.models.content import Content
 from app.models.mixins import utcnow
 from app.models.translation import ContentTranslation, TranslationStatus, text_fingerprint
+from app.schemas.text import visible_label
 from app.services import ai, languages
 from app.services.errors import sanitize_unexpected_error
 
@@ -504,10 +505,16 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
         )
 
     try:
-        title = ai.as_str(payload.get("title"))[:300]
+        # The one-line fields cleaned as a person's are (control, zero-width and
+        # reordering characters out) and before validation, so an empty title
+        # after cleaning is reported as one. They go to platforms, feeds and
+        # search snippets under the account's name, and reach this row without
+        # a request schema in between — the same gap content_from_generated
+        # closed for generated pieces.
+        title = visible_label(ai.as_str(payload.get("title")))[:300]
         translated_body = ai.as_str(payload.get("body_markdown"))
-        excerpt = ai.as_str(payload.get("excerpt"))
-        meta_description = ai.as_str(payload.get("meta_description"))[:320]
+        excerpt = visible_label(ai.as_str(payload.get("excerpt")))
+        meta_description = visible_label(ai.as_str(payload.get("meta_description")))[:320]
 
         issues = validate(
             source=content,

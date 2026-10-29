@@ -114,3 +114,43 @@ def test_a_generated_title_of_nothing_visible_still_has_a_title(db, project):
 
     assert row.title == "Untitled"
     assert row.slug
+
+
+def test_a_translation_keeps_none_of_it(client, auth, db, project, monkeypatch):
+    """Translated one-line fields come from a model too, and go to platforms."""
+    from app.models.content import Content, ContentStatus, ContentType
+    from app.services import ai, llm_router
+
+    piece = Content(
+        project_id=project.id,
+        content_type=ContentType.TUTORIAL,
+        status=ContentStatus.DRAFT,
+        title="Retries",
+        slug="retries",
+        body_markdown="How retries work in practice, explained step by step. " * 10,
+    )
+    db.add(piece)
+    db.commit()
+    monkeypatch.setattr(
+        ai,
+        "json_completion",
+        lambda *_a, **_k: (
+            {
+                "title": "Les" + SNEAKY,
+                "body_markdown": "Comment fonctionnent les relances, étape par étape. " * 10,
+                "excerpt": SNEAKY,
+                "meta_description": SNEAKY,
+            },
+            llm_router.Completion(text="", provider="stub", model="stub"),
+        ),
+    )
+
+    resp = client.post(
+        f"/api/v1/content/{piece.id}/translations", headers=auth, json={"language": "fr"}
+    )
+    assert resp.status_code == 201, resp.text
+    detail = client.get(f"/api/v1/content/{piece.id}/translations/fr", headers=auth).json()
+
+    assert detail["title"] == "Les" + CLEAN
+    assert detail["excerpt"] == CLEAN
+    assert detail["meta_description"] == CLEAN
