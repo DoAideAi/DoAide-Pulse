@@ -32,10 +32,12 @@ class Site:
 
     @property
     def url(self) -> str:
+        """The site's home page."""
         return f"https://{self.domain}/"
 
     @property
     def sitemap_url(self) -> str:
+        """Where the site's sitemap is published."""
         return f"https://{self.domain}{self.sitemap_path}"
 
 

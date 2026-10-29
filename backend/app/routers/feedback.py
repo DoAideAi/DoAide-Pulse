@@ -62,6 +62,7 @@ def clean_page_url(raw: str) -> str:
 
 
 def require_operator(user: User = Depends(get_current_user)) -> User:
+    """The signed-in user, if they are this install's operator; a 403 otherwise."""
     if not accounts.is_operator(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

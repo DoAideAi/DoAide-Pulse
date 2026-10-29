@@ -54,6 +54,7 @@ class FetchError(Exception):
 
 
 def http_client(timeout: float, transport: httpx.BaseTransport | None = None) -> httpx.Client:
+    """An HTTP client for fetching sitemaps and pages: at most 3 redirects, Pulse's user agent."""
     return httpx.Client(
         timeout=timeout,
         follow_redirects=True,

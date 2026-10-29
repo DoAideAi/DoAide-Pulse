@@ -64,11 +64,13 @@ def _page_link(domain: str, path: str) -> str | None:
     return None
 
 def clear_cache() -> None:
+    """Forget every cached Umami answer."""
     with _cache_lock:
         _cache.clear()
 
 
 def is_search_engine(referrer: str) -> bool:
+    """Whether a referrer (URL or bare host) is a known search engine."""
     host = (urlsplit(referrer).hostname if "//" in referrer else referrer.split("/")[0]) or ""
     host = host.lower()
     return any(f".{engine}" in f".{host}" for engine in SEARCH_ENGINES)
@@ -148,6 +150,8 @@ def traffic(
     force: bool = False,
     client: UmamiClient | None = None,
 ) -> dict:
+    """Umami traffic over ``days`` for each site the account owns, with search
+    referrers and the account's own articles picked out."""
     client = client or get_client()
     if not client.configured:
         return {

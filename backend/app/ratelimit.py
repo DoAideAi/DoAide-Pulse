@@ -60,15 +60,17 @@ import hashlib
 import logging
 import math
 import time
+from collections.abc import Callable
+from typing import Any
 
-from limits import parse_many
+from limits import RateLimitItem, parse_many
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.config import settings
+from app.config import Settings, settings
 from app.security import decode_access_token
 
 logger = logging.getLogger(__name__)
@@ -169,12 +171,17 @@ class PulseLimiter(Limiter):
     swallowed storage error leaves no headers instead of no response.
     """
 
-    def _check_request_limit(self, request, endpoint_func, in_middleware=True):
+    def _check_request_limit(
+        self,
+        request: Request,
+        endpoint_func: Callable[..., Any] | None,
+        in_middleware: bool = True,
+    ) -> None:
         request.state.view_rate_limit = None
         return super()._check_request_limit(request, endpoint_func, in_middleware)
 
 
-def storage_uri(config=settings) -> str:
+def storage_uri(config: Settings = settings) -> str:
     """Where the limit counters live.
 
     ``RATE_LIMIT_STORAGE_URI`` when it is set. When it is not, production uses
@@ -199,7 +206,7 @@ def storage_uri(config=settings) -> str:
     return "memory://"
 
 
-def storage_options(uri: str, config=settings) -> dict[str, float]:
+def storage_options(uri: str, config: Settings = settings) -> dict[str, float]:
     """Socket timeouts for a Redis counter store, or nothing for any other.
 
     ``swallow_errors`` below only helps once the client *raises*. A Redis that
@@ -321,7 +328,7 @@ def clear_login_failures(email: str) -> None:
         logger.warning("login failure counter unavailable; not cleared", exc_info=True)
 
 
-def _describe_limit(item) -> str:
+def _describe_limit(item: RateLimitItem) -> str:
     """``10 per minute``, ``100 per 3 hours`` — the limit as a sentence."""
     unit = item.GRANULARITY.name
     if item.multiples == 1:
@@ -341,7 +348,7 @@ def _describe_wait(seconds: float) -> str:
     return f"{hours} hour{'s' if hours != 1 else ''}"
 
 
-def too_many_requests_detail(current_limit) -> str:
+def too_many_requests_detail(current_limit: tuple[object, list[str]] | None) -> str:
     """What a 429 says: which limit, and how long until it lifts.
 
     "Slow down and try again shortly" was all it said, while the response's

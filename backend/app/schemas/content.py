@@ -342,6 +342,7 @@ class PublicationOut(BaseModel):
     )
     @property
     def outcome_unknown(self) -> bool:
+        """A failure after which nobody knows whether the platform published it."""
         return self.status == PublicationStatus.FAILED and is_outcome_unknown(self.error)
 
 

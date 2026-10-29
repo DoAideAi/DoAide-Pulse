@@ -74,6 +74,7 @@ class UmamiClient:
 
     @property
     def configured(self) -> bool:
+        """Whether a base URL and either an API token or a login are set."""
         return bool(self.base_url and (self._api_token or (self._username and self._password)))
 
     # ---- transport ----
@@ -165,6 +166,7 @@ class UmamiClient:
         ]
 
     def stats(self, website_id: str, start_ms: int, end_ms: int) -> dict[str, int]:
+        """Pageviews, visitors and the other summary counts between two epoch-ms times."""
         data = self._get(
             f"/api/websites/{website_id}/stats", {"startAt": start_ms, "endAt": end_ms}
         )
@@ -176,6 +178,7 @@ class UmamiClient:
         }
 
     def active(self, website_id: str) -> int:
+        """Visitors on the site right now."""
         data = self._get(f"/api/websites/{website_id}/active")
         if isinstance(data, list):
             data = data[0] if data else {}

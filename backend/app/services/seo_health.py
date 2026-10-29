@@ -83,6 +83,8 @@ def calendar(posts: list[dict], *, today: date, zone: ZoneInfo) -> list[dict]:
 
 
 def health(db: Session, user_id: int, *, tz: str = "UTC") -> dict:
+    """The SEO health summary of an account's posts and sites, dated in ``tz``
+    (UTC when the zone is unknown)."""
     try:
         zone = ZoneInfo(tz)
     except (KeyError, ValueError):

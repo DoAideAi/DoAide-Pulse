@@ -91,6 +91,7 @@ def record(db: Session, events: Iterable[dict]) -> int:
 
 
 def purge(db: Session, *, days: int) -> int:
+    """Delete product events older than ``days``; returns how many went."""
     cutoff = utcnow() - timedelta(days=days)
     result = db.execute(delete(ProductEvent).where(ProductEvent.occurred_at < cutoff))
     db.commit()
@@ -105,6 +106,7 @@ _sites: tuple[float, dict[str, str]] | None = None
 
 
 def clear_cache() -> None:
+    """Forget every cached Umami answer, including the site list."""
     global _sites
     with _cache_lock:
         _cache.clear()
@@ -234,6 +236,8 @@ def recent(db: Session, *, limit: int = RECENT_LIMIT) -> list[dict]:
 def dashboard(
     db: Session, *, days: int, force: bool = False, client: UmamiClient | None = None
 ) -> dict:
+    """The products dashboard: reported signups and events plus Umami traffic,
+    per product, over ``days``."""
     client = client or get_client()
     since = utcnow() - timedelta(days=days)
     reported = _reported_counts(db, since)

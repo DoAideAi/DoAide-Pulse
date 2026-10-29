@@ -30,6 +30,7 @@ import ipaddress
 import logging
 import re
 import socket
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -194,7 +195,15 @@ class _PublicOnlyBackend(httpcore.SyncBackend):
     hostname, not the address the socket was opened to.
     """
 
-    def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[httpcore.SOCKET_OPTION] | None = None,
+    ) -> httpcore.NetworkStream:
+        """Connect to a public address of ``host``, refusing it if any address is private."""
         try:
             infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
         except socket.gaierror as exc:

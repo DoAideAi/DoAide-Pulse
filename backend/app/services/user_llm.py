@@ -129,6 +129,7 @@ def build_provider(
 
 
 def get_row(db: Session, user_id: int) -> UserLLMKey | None:
+    """The user's stored LLM key row, or ``None``."""
     return db.scalar(select(UserLLMKey).where(UserLLMKey.user_id == user_id))
 
 

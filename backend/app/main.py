@@ -270,6 +270,7 @@ class _FormNulScanner:
         self.tail = b""
 
     def feed(self, chunk: bytes) -> None:
+        """Scan one body chunk for a NUL, raw or %00, including one split across chunks."""
         window = self.tail + chunk
         if b"\x00" in window or b"%00" in window:
             self.has_nul = True

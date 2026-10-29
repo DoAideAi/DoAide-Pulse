@@ -136,6 +136,7 @@ class AccessPathRedactor(logging.Filter):
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
+        """Redact the path in an access-log record's arguments; never drops the record."""
         args = record.args
         if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
             record.args = (*args[:2], redact_path(args[2]), *args[3:])

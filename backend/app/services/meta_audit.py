@@ -99,6 +99,7 @@ def parse_head(html: str) -> dict:
 
 
 def page_issues(site: Site, head: dict) -> list[str]:
+    """Issue codes (``missing_title``, ``title_too_long``, …) for one page's head tags."""
     issues = []
     title = head["title"]
     if not title:

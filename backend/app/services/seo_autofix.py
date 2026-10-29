@@ -69,6 +69,7 @@ class AutofixResult:
 
     @property
     def changed(self) -> bool:
+        """Whether the autofix changed anything."""
         return bool(self.changes)
 
 
@@ -263,6 +264,7 @@ class LinkScope:
     urls: set[str] = field(default_factory=set)
 
     def owns(self, url: str) -> bool:
+        """Whether ``url`` is one of the owner's own pages, so a link to it may be rewritten."""
         url = (url or "").strip()
         if not url or url.startswith(("mailto:", "tel:")):
             return False
@@ -294,6 +296,7 @@ def _body_links(body_markdown: str) -> list[str]:
 def scope_from_targets(
     targets: list[tuple[str, str]], project: Project | None = None
 ) -> LinkScope:
+    """The owner's pages and hosts: every target's URL, plus the project's live site."""
     scope = LinkScope(urls={_norm_url(u) for _, u in targets if u})
     if project is not None and project.live_url:
         scope.hosts.add(_host(project.live_url))

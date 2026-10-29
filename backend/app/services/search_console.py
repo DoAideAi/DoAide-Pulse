@@ -76,10 +76,12 @@ class SearchConsoleClient:
 
     @property
     def configured(self) -> bool:
+        """Whether a service-account key was loaded."""
         return self._account is not None
 
     @property
     def client_email(self) -> str | None:
+        """The service account's address — the one to add as a user in Search Console."""
         return self._account.get("client_email") if self._account else None
 
     def _http(self) -> httpx.Client:
@@ -235,6 +237,7 @@ _client: SearchConsoleClient | None = None
 
 
 def get_client() -> SearchConsoleClient:
+    """The process-wide Search Console client, built on first use."""
     global _client
     if _client is None:
         _client = SearchConsoleClient(

@@ -74,6 +74,7 @@ class ProjectDraft:
 
 
 def extension(filename: str) -> str:
+    """The file's extension, lower-cased with its dot (``.pdf``), or ``""``."""
     return PurePath(filename or "").suffix.lower()
 
 

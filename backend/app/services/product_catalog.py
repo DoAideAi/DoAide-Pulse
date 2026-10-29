@@ -38,6 +38,7 @@ class Product:
 
     @property
     def url(self) -> str:
+        """The product's home page."""
         return f"https://{self.domain}"
 
 
