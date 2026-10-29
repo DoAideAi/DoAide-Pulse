@@ -400,3 +400,42 @@ describe("the skip link's target", () => {
     expect(main).toHaveFocus();
   });
 });
+
+describe("the theme picker is a radio group a keyboard can use", () => {
+  // Three buttons with role="radio" in a role="radiogroup": a screen reader
+  // announces "Light theme, radio button, 1 of 3", and the arrow keys that
+  // role promises did nothing — each option was its own Tab stop instead.
+  beforeEach(() => localStorage.setItem("pulse-theme", "light"));
+
+  it("keeps only the checked option in the tab order", async () => {
+    await draw();
+    const [group] = screen.getAllByRole("radiogroup", { name: "Theme" });
+    const radios = within(group).getAllByRole("radio");
+    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1]);
+  });
+
+  it("moves the choice and the focus with the arrow keys, wrapping", async () => {
+    await draw();
+    const [group] = screen.getAllByRole("radiogroup", { name: "Theme" });
+    const [light, system, dark] = within(group).getAllByRole("radio");
+
+    light.focus();
+    fireEvent.keyDown(light, { key: "ArrowRight" });
+    expect(system).toHaveAttribute("aria-checked", "true");
+    expect(system).toHaveFocus();
+
+    fireEvent.keyDown(system, { key: "ArrowDown" });
+    expect(dark).toHaveFocus();
+    fireEvent.keyDown(dark, { key: "ArrowRight" });
+    expect(light).toHaveFocus();
+    expect(light).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.keyDown(light, { key: "ArrowLeft" });
+    expect(dark).toHaveFocus();
+    fireEvent.keyDown(dark, { key: "Home" });
+    expect(light).toHaveFocus();
+    fireEvent.keyDown(light, { key: "End" });
+    expect(dark).toHaveAttribute("aria-checked", "true");
+    expect(localStorage.getItem("pulse-theme")).toBe("dark");
+  });
+});

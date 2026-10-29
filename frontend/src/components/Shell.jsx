@@ -442,6 +442,8 @@ function applyTheme(t) {
     ?.setAttribute("content", dark ? "dark" : "light");
 }
 
+const THEMES = ["light", "system", "dark"];
+
 function ThemeToggle() {
   const [theme, setTheme] = useState(
     () => localStorage.getItem("pulse-theme") || "system",
@@ -462,11 +464,37 @@ function ThemeToggle() {
     return () => mq.removeEventListener("change", handler);
   }, [theme]);
 
+  // A radio group answers the arrow keys, and only its checked option is a
+  // Tab stop. role="radio" on plain buttons announced "radio button, 1 of 3"
+  // and then ignored the keys that announcement tells a screen-reader user to
+  // press, while making each option a Tab stop of its own.
+  const group = useRef(null);
+  const onKeyDown = useCallback(
+    (event) => {
+      const at = THEMES.indexOf(theme);
+      const next = {
+        ArrowRight: (at + 1) % THEMES.length,
+        ArrowDown: (at + 1) % THEMES.length,
+        ArrowLeft: (at - 1 + THEMES.length) % THEMES.length,
+        ArrowUp: (at - 1 + THEMES.length) % THEMES.length,
+        Home: 0,
+        End: THEMES.length - 1,
+      }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      pick(THEMES[next]);
+      group.current?.querySelectorAll('[role="radio"]')[next]?.focus();
+    },
+    [theme, pick],
+  );
+
   return (
     <div
+      ref={group}
       className="inline-flex gap-0.5 rounded-lg border border-line p-0.5"
       role="radiogroup"
       aria-label="Theme"
+      onKeyDown={onKeyDown}
     >
       <ThemeBtn active={theme === "light"} onClick={() => pick("light")} label="Light">
         <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
@@ -492,9 +520,11 @@ function ThemeToggle() {
 function ThemeBtn({ active, onClick, label, children }) {
   return (
     <button
+      type="button"
       role="radio"
       aria-checked={active}
       aria-label={`${label} theme`}
+      tabIndex={active ? 0 : -1}
       className={[
         "rounded-md p-1.5 transition-colors",
         active
