@@ -1908,9 +1908,18 @@ def _count(value: object) -> int | None:
         value = int(value)
     if isinstance(value, str) and value.strip().isdigit():
         value = int(value.strip())
-    if isinstance(value, int) and value >= 0:
+    # Bounded above as well as below: the columns are 32-bit ``Integer``. A
+    # count past 2**31 - 1 passed every check here and then overflowed the
+    # column at PostgreSQL's commit — the batch rollback this function exists
+    # to prevent, and a self-hosted Mastodon instance is a server the account
+    # holder runs and can make report anything.
+    if isinstance(value, int) and 0 <= value <= _COUNT_MAX:
         return value
     return None
+
+
+#: The largest count a ``content_metrics`` column holds (32-bit ``Integer``).
+_COUNT_MAX = 2**31 - 1
 
 
 __all__ = [
