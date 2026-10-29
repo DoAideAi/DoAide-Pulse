@@ -300,14 +300,12 @@ def login_locked(email: str) -> bool:
         return False
 
 
-def login_lock_detail(email: str) -> str:
-    """What a locked address is told: the lock, and how long it lasts.
+def _login_lock_wait(email: str) -> float | None:
+    """Seconds until *email*'s lock lifts, or ``None`` if that cannot be read.
 
-    It used to add "or reset your password", and there is no page to do that
-    from — the one way out it offered was not one. The wait is read from the
-    same counter the lock is, rounded up as every other 429 here is.
+    Read from the same counter the lock is. Best effort: the lock itself has
+    already been decided, and this only says how long it lasts.
     """
-    base = "Too many failed sign-ins for this account."
     key = _account_bucket(email)
     waits = []
     try:
@@ -316,10 +314,33 @@ def login_lock_detail(email: str) -> str:
                 reset_at, _ = limiter._limiter.get_window_stats(item, "login-failures", key)
                 waits.append(reset_at - time.time())
     except Exception:  # noqa: BLE001 - the wording is best effort
-        waits = []
-    if not waits:
+        return None
+    return max(waits) if waits else None
+
+
+def login_lock_detail(email: str) -> str:
+    """What a locked address is told: the lock, and how long it lasts.
+
+    It used to add "or reset your password", and there is no page to do that
+    from — the one way out it offered was not one. The wait is rounded up as
+    every other 429 here is.
+    """
+    base = "Too many failed sign-ins for this account."
+    wait = _login_lock_wait(email)
+    if wait is None:
         return f"{base} Wait a while and try again."
-    return f"{base} Try again in {_describe_wait(max(waits))}."
+    return f"{base} Try again in {_describe_wait(wait)}."
+
+
+def login_lock_headers(email: str) -> dict[str, str]:
+    """``Retry-After`` for a locked address's 429, as every other 429 here has.
+
+    The sentence said how long and the header did not, so a client backing off
+    on the header — a script or a CI step signing in — retried straight into
+    the lock. With the wait unreadable, a minute: a guess beats no header.
+    """
+    wait = _login_lock_wait(email)
+    return {"Retry-After": str(max(1, math.ceil(wait)) if wait is not None else 60)}
 
 
 def record_login_failure(email: str) -> None:
@@ -427,6 +448,7 @@ __all__ = [
     "PulseLimiter",
     "limiter",
     "login_lock_detail",
+    "login_lock_headers",
     "login_locked",
     "rate_limit_exceeded_handler",
     "record_login_failure",

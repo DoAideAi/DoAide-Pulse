@@ -198,3 +198,28 @@ def test_the_lockout_says_how_long_it_lasts_and_offers_no_dead_end(client, user)
     # looking for one.
     assert "reset" not in detail.lower()
 
+
+
+def test_the_lockout_carries_retry_after_like_every_other_429(client, user):
+    """The sentence said how long, and the header did not.
+
+    Every other 429 here — slowapi's, the idea breaker's, the project scan's —
+    sends ``Retry-After``. This one, raised by hand, sent none, so a client
+    backing off on the header (a script, a CI step signing in) had nothing to
+    wait on and retried straight into the lock it was in.
+    """
+    for n in range(BUDGET):
+        _login(client, user.email, "wrong-password", f"203.0.113.{n}")
+
+    resp = _login(client, user.email, "hunter2hunter2", "198.51.100.9")
+
+    assert resp.status_code == 429
+    wait = int(resp.headers["Retry-After"])
+    assert 1 <= wait <= 3600, wait
+
+
+def test_an_unreadable_wait_still_sends_a_retry_after(monkeypatch):
+    monkeypatch.setattr(ratelimit, "_login_lock_wait", lambda email: None)
+
+    assert ratelimit.login_lock_headers("a@example.com") == {"Retry-After": "60"}
+    assert "Wait a while" in ratelimit.login_lock_detail("a@example.com")

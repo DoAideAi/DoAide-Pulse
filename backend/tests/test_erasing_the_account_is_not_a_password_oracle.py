@@ -56,3 +56,13 @@ def test_the_right_password_still_erases_it(client, auth, user, db):
     resp = _erase(client, auth, "hunter2hunter2", "198.51.100.9")
 
     assert resp.status_code == 204, resp.text
+
+
+def test_a_locked_erase_says_when_to_retry_in_the_header_too(client, auth, user):
+    for _ in range(BUDGET):
+        record_login_failure(user.email)
+
+    resp = _erase(client, auth, "hunter2hunter2", "198.51.100.8")
+
+    assert resp.status_code == 429
+    assert int(resp.headers["Retry-After"]) >= 1

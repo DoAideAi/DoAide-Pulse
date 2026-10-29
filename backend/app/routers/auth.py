@@ -43,6 +43,7 @@ from app.ratelimit import (
     client_key,
     limiter,
     login_lock_detail,
+    login_lock_headers,
     login_locked,
     record_login_failure,
     reset_request_allowed,
@@ -242,6 +243,7 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=login_lock_detail(form.username),
+            headers=login_lock_headers(form.username),
         )
     user = accounts.find_by_email(db, form.username)
 
@@ -583,6 +585,7 @@ def delete_me(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=login_lock_detail(current_user.email),
+            headers=login_lock_headers(current_user.email),
         )
     if not verify_password(payload.password, current_user.hashed_password):
         record_login_failure(current_user.email)
