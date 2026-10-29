@@ -7,8 +7,9 @@
 #   ./deploy/rollback.sh --list-backups     # list available database backups
 #
 # The rollback is a full redeploy of the specified commit: it syncs the old
-# code, downgrades the database if needed, and restarts services. The database
-# backup taken before migration (by deploy.sh) is kept as a safety net.
+# code, downgrades the database if needed, and restarts services. The dump
+# deploy.sh takes before it changes anything (pulse-backup.service, into
+# /var/backups/pulse) is the safety net: --list-backups shows it.
 set -euo pipefail
 
 HOST=${PULSE_HOST:-89.167.8.178}

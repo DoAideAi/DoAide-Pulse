@@ -359,7 +359,10 @@ revision the database is at. It also installs the old commit's requirements
 and rewrites the pip stamp to match, so the next forward deploy reinstalls
 rather than skipping pip on a stale match.
 
-Take a code and database snapshot before anything risky:
+`deploy.sh` takes a database dump itself before it changes anything — it
+starts `pulse-backup.service` and stops if the dump fails — so a migration
+always has a dump from minutes before it. For a code snapshot as well, before
+anything risky:
 
 ```bash
 ssh … 'tar czf /opt/backups/pulse-code-$(date +%s).tar.gz -C /opt Pulse'

@@ -107,6 +107,24 @@ if [ "$mem_mb" -lt "$MIN_MEM_MB" ]; then
   exit 1
 fi
 
+# A fresh, verified dump before anything changes. rollback.sh has always said
+# "the database backup taken before migration (by deploy.sh) is kept as a
+# safety net" and there was none: a migration that went wrong had only the
+# nightly dump, up to a day of posts and sign-ups older than the break. The
+# unit is a oneshot, so start returns when backup.sh has written and checked
+# the dump (or failed), and a failure stops here with the box untouched. A box
+# that has not had the unit installed yet (the first deploy) is told so.
+echo "==> backing up the database on $HOST"
+if "${SSH[@]}" "systemctl cat pulse-backup.service >/dev/null 2>&1"; then
+  if ! "${SSH[@]}" "systemctl start pulse-backup.service"; then
+    echo "the pre-deploy backup failed — nothing was changed." \
+      "journalctl -u pulse-backup -n 50 says why." >&2
+    exit 1
+  fi
+else
+  echo "pulse-backup.service is not installed yet; deploying without a fresh dump" >&2
+fi
+
 echo "==> installing backend dependencies (before the code changes)"
 rsync -az -e "ssh -i $SSH_KEY" \
   backend/requirements.txt "root@$HOST:$REMOTE/.deploy-requirements.txt"
