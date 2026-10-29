@@ -186,6 +186,39 @@ def _queue() -> DependencyOut:
     return DependencyOut(status="behind", required=False, detail=detail)
 
 
+def _beat() -> DependencyOut:
+    """Whether pulse-beat is running, read off the schedule file it keeps.
+
+    The scheduler probe sees beat only through publications that went past
+    due, so with nothing scheduled a dead beat showed nowhere — trigger polls,
+    autopilot scans, metrics, webhook retries and the digest all stopped with
+    every probe green. Beat rewrites its ``--schedule`` file about every three
+    minutes while it runs; the newest of the file and the suffixed copies some
+    dbm backends write is beat's own pulse.
+    """
+    if not settings.celery_enabled:
+        return DependencyOut(status="disabled", required=False)
+    base = Path(settings.beat_schedule_file)
+    candidates = [base, *base.parent.glob(base.name + ".*")]
+    stamps = []
+    for path in candidates:
+        try:
+            stamps.append(path.stat().st_mtime)
+        except OSError:
+            continue
+    if not stamps:
+        return DependencyOut(
+            status="unknown", required=False, detail=f"no beat schedule file at {base}"
+        )
+    age = time.time() - max(stamps)
+    detail = f"schedule written {round(age / 60)} min ago"
+    if age <= settings.health_beat_stale_seconds:
+        return DependencyOut(status="ok", required=False, detail=detail)
+    detail += " — pulse-beat looks stopped: nothing is firing the sweeps"
+    logger.warning("beat is stale: %s", detail)
+    return DependencyOut(status="stale", required=False, detail=detail)
+
+
 def _backups() -> DependencyOut:
     """How old the newest database dump is.
 
@@ -382,6 +415,7 @@ def health_detail(
         scheduler=scheduler_out,
         queue=_queue(),
         backups=_backups(),
+        beat=_beat(),
         llm_providers=llm_router.configured_providers(),
         llm_breakers_open=llm_router.breaker.snapshot(),
         publish_breakers_open=publishers_breaker.snapshot(),

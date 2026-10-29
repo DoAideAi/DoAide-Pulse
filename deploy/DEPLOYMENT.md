@@ -247,6 +247,7 @@ The detail endpoint adds, all `required: false`, so none can fail the probe:
 | `scheduler` | scheduled publications are going out | rows are well past due: `behind`, check pulse-beat |
 | `queue` | tasks waiting in the broker | past `HEALTH_QUEUE_BACKLOG_WARN`: `behind`, the worker is not keeping up |
 | `backups` | the newest `*.dump`'s age in `BACKUP_DIR` | older than `BACKUP_MAX_AGE_HOURS` (36) or none: `stale`; `unknown` if unreadable |
+| `beat` | pulse-beat is running: its schedule file's age (`BEAT_SCHEDULE_FILE`) | older than `HEALTH_BEAT_STALE_SECONDS` (600): `stale`; no file: `unknown`; Celery off: `disabled` |
 
 plus the LLM chain, every breaker's state (LLM, publishing, idea tool) and
 which platforms are implemented. Each probe that is not `ok` also writes a

@@ -365,6 +365,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BACKUP_DIR", "PULSE_BACKUP_DIR"),
     )
     backup_max_age_hours: int = 36
+    # Beat rewrites this file about every three minutes while it runs (its
+    # --schedule, relative to backend/), so its age is beat's own pulse;
+    # /health/detail calls beat stale once it is older than this.
+    beat_schedule_file: str = "celerybeat-schedule"
+    health_beat_stale_seconds: int = 600
 
     # ---- AI (OpenRouter — free models only) ----
     openrouter_api_key: str = ""
@@ -1091,6 +1096,7 @@ class Settings(BaseSettings):
         "link_check_max_urls",
         "health_queue_backlog_warn",
         "backup_max_age_hours",
+        "health_beat_stale_seconds",
     )
     @classmethod
     def _non_negative_operational(cls, v: float) -> float:
