@@ -24,9 +24,11 @@ import os
 import secrets
 from dataclasses import dataclass, field
 
+from dotenv import dotenv_values
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import Settings
 from app.database import SessionLocal
 from app.models.content import ContentIdea, ContentType
 from app.models.project import AutopilotMode, Project, Tone, slugify
@@ -325,6 +327,27 @@ def _backfill(project: Project, spec: ProjectSpec) -> list[str]:
     return filled
 
 
+def _seed_env(name: str) -> str:
+    """*name* from the environment, else from the ``.env`` file ``Settings`` reads.
+
+    Deliberately not a ``Settings`` field — the running API has no business
+    carrying a bootstrap password — but read from the same place one would be.
+    ``.env.example`` documents these as ``.env`` lines, and ``Settings`` loads
+    that file without exporting it, so ``python -m app.seed`` run directly
+    never saw them and seeded the default address instead. Blank is unset.
+    """
+    value = (os.environ.get(name) or "").strip()
+    if value:
+        return value
+    # Last file first: with several, pydantic-settings lets the later win.
+    for path in reversed(tuple(Settings.model_config.get("env_file") or ())):
+        if os.path.isfile(path):
+            found = (dotenv_values(path).get(name) or "").strip()
+            if found:
+                return found
+    return ""
+
+
 def seed(email: str | None = None, password: str | None = None) -> None:
     """Create or top up the seed account, and print the password once.
 
@@ -337,11 +360,15 @@ def seed(email: str | None = None, password: str | None = None) -> None:
     # contract is that running it twice tops the same account up rather than
     # building a second one, and a ``SEED_EMAIL`` retyped in another case broke
     # that silently — see :mod:`app.services.accounts`.
-    email = accounts.normalize_email(email or os.environ.get("SEED_EMAIL", DEFAULT_EMAIL))
+    email = accounts.normalize_email(email or _seed_env("SEED_EMAIL") or DEFAULT_EMAIL)
     # A generated password beats a hardcoded one that ends up in a public repo
-    # and then in production. It is printed once, here.
-    generated = password is None and "SEED_PASSWORD" not in os.environ
-    password = password or os.environ.get("SEED_PASSWORD") or secrets.token_urlsafe(12)
+    # and then in production. It is printed once, here — whenever it was
+    # generated, which is decided by the value and not by whether the key
+    # exists: Compose exports the example's blank ``SEED_PASSWORD=`` line, and
+    # "is it set" used to say yes, generate one anyway, and print nothing.
+    password = password or _seed_env("SEED_PASSWORD")
+    generated = not password
+    password = password or secrets.token_urlsafe(12)
 
     db = SessionLocal()
     try:
