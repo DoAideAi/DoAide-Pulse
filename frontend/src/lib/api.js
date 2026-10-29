@@ -601,6 +601,10 @@ export const api = {
   pingWebhook: (id) => request(`/webhooks/${id}/ping`, { method: "POST" }),
   webhookDeliveries: (id, params = {}) =>
     request(`/webhooks/${id}/deliveries${qs(params)}`),
+  // A page of deliveries and how many there are in all — for a log that has
+  // to say there is more than it is showing.
+  webhookDeliveriesPage: (id, params = {}) =>
+    request(`/webhooks/${id}/deliveries${qs(params)}`, { page: true }),
   // Send a past delivery again — the one way to recover an event an endpoint
   // missed while it was down, once its own retries are spent.
   redeliverWebhook: (webhookId, deliveryId) =>

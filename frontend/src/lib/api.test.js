@@ -757,6 +757,7 @@ describe("every endpoint's path and verb", () => {
     ["rotateWebhookSecret", [1], "/webhooks/1/rotate-secret", "POST"],
     ["pingWebhook", [1], "/webhooks/1/ping", "POST"],
     ["webhookDeliveries", [1], "/webhooks/1/deliveries", "GET"],
+    ["webhookDeliveriesPage", [3, { limit: 10 }], "/webhooks/3/deliveries?limit=10", "GET"],
 
     ["apiKeyScopes", [], "/api-keys/scopes", "GET"],
     ["listApiKeys", [], "/api-keys", "GET"],

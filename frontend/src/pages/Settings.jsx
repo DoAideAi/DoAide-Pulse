@@ -668,14 +668,33 @@ function ChoicesFailed({ what, onRetry }) {
  * showed only the last error, so an event an endpoint missed while it was down
  * could not be recovered from here once its retries were spent.
  */
+// Deliveries shown at a time, and the most the endpoint answers (``le=200``).
+const DELIVERY_PAGE = 10;
+const DELIVERY_MAX = 200;
+
 function WebhookDeliveries({ webhook, onChanged }) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(null);
-  const { data, error, loading, reload } = useApi(
-    () => (open ? api.webhookDeliveries(webhook.id, { limit: 10 }) : Promise.resolve(null)),
-    [webhook.id, open],
+  // It asked for the newest ten and stopped there. An outage is exactly what
+  // puts more than ten failures behind the deliveries that followed it, so the
+  // ones worth redelivering were the ones this could not reach. Now it says
+  // how many there are, reads further back on request, and can show only the
+  // failed ones — which is what somebody recovering from an outage wants.
+  const [shown, setShown] = useState(DELIVERY_PAGE);
+  const [failedOnly, setFailedOnly] = useState(false);
+  const { data: page, error, loading, reload } = useApi(
+    () =>
+      open
+        ? api.webhookDeliveriesPage(webhook.id, {
+            limit: shown,
+            status: failedOnly ? "failed" : undefined,
+          })
+        : Promise.resolve(null),
+    [webhook.id, open, shown, failedOnly],
   );
+  const data = page?.items ?? null;
+  const total = page?.total ?? 0;
 
   async function redeliver(delivery) {
     setBusy(delivery.id);
@@ -702,6 +721,16 @@ function WebhookDeliveries({ webhook, onChanged }) {
       >
         {open ? "Hide deliveries" : "Recent deliveries"}
       </button>
+      {open && (
+        <label className="ml-2 inline-flex items-center gap-1.5 text-xs text-ink-500">
+          <input
+            type="checkbox"
+            checked={failedOnly}
+            onChange={(e) => setFailedOnly(e.target.checked)}
+          />
+          Failed only
+        </label>
+      )}
       {open &&
         (loading && !data ? (
           <Skeleton rows={2} />
@@ -739,6 +768,21 @@ function WebhookDeliveries({ webhook, onChanged }) {
             ))}
           </ul>
         ))}
+      {open && data?.length > 0 && data.length < total && (
+        <p className="mt-1.5 flex items-center gap-2 text-xs text-ink-400">
+          <span role="status">
+            Showing {data.length} of {total}
+          </span>
+          <button
+            type="button"
+            className="btn-quiet text-xs"
+            onClick={() => setShown((n) => Math.min(n + DELIVERY_PAGE, DELIVERY_MAX))}
+            disabled={loading || shown >= DELIVERY_MAX}
+          >
+            Show older
+          </button>
+        </p>
+      )}
     </div>
   );
 }

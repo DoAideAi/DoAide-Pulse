@@ -33,6 +33,7 @@ vi.mock("../lib/api", () => ({
     pingWebhook: vi.fn(),
     exportAccount: vi.fn(),
     webhookDeliveries: vi.fn(),
+    webhookDeliveriesPage: vi.fn(),
     redeliverWebhook: vi.fn(),
     listApiKeys: vi.fn(),
     apiKeyScopes: vi.fn(),
@@ -894,17 +895,20 @@ describe("outbound webhooks", () => {
       ...overrides,
     });
     api.listWebhooks.mockResolvedValue([webhook()]);
-    api.webhookDeliveries.mockResolvedValue([
-      delivery({ id: 7, status: "failed", response_status: 503, error: "Returned 503" }),
-      delivery({ id: 6 }),
-    ]);
+    api.webhookDeliveriesPage.mockResolvedValue({
+      items: [
+        delivery({ id: 7, status: "failed", response_status: 503, error: "Returned 503" }),
+        delivery({ id: 6 }),
+      ],
+      total: 2,
+    });
     api.redeliverWebhook.mockResolvedValue(delivery({ id: 8 }));
     const user = userEvent.setup();
     draw();
 
     const toggle = await screen.findByRole("button", { name: "Recent deliveries" });
     // Nothing is fetched until somebody asks.
-    expect(api.webhookDeliveries).not.toHaveBeenCalled();
+    expect(api.webhookDeliveriesPage).not.toHaveBeenCalled();
     await user.click(toggle);
 
     expect(await screen.findByText("Returned 503")).toBeInTheDocument();
@@ -915,6 +919,41 @@ describe("outbound webhooks", () => {
 
     expect(api.redeliverWebhook).toHaveBeenCalledWith(webhook().id, 7);
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Redelivered"));
+  });
+
+  // The panel asked for the newest ten and stopped. It exists to recover what
+  // an endpoint missed while it was down, and an outage is exactly what puts
+  // more than ten failures behind the deliveries that came after it — so the
+  // ones worth redelivering were the ones the page could not reach.
+  it("reaches deliveries past the first ten, and can show only the failed ones", async () => {
+    const all = Array.from({ length: 25 }, (_, i) => ({
+      id: 25 - i, webhook_id: 1, event: "content.published",
+      status: i < 12 ? "delivered" : "failed", attempts: 5,
+      response_status: i < 12 ? 200 : 503, error: i < 12 ? null : `Returned 503 (#${25 - i})`,
+      created_at: "2026-08-01T10:00:00Z", payload: {},
+    }));
+    api.listWebhooks.mockResolvedValue([webhook()]);
+    api.webhookDeliveriesPage.mockImplementation(async (_id, { limit, status }) => {
+      const rows = status ? all.filter((d) => d.status === status) : all;
+      return { items: rows.slice(0, limit), total: rows.length };
+    });
+    const user = userEvent.setup();
+    draw();
+
+    await user.click(await screen.findByRole("button", { name: "Recent deliveries" }));
+    expect(await screen.findByText("Showing 10 of 25")).toBeInTheDocument();
+    expect(screen.queryByText("Returned 503 (#1)")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Show older" }));
+    expect(await screen.findByText("Showing 20 of 25")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: "Failed only" }));
+    expect(await screen.findByText("Returned 503 (#1)")).toBeInTheDocument();
+    expect(api.webhookDeliveriesPage).toHaveBeenLastCalledWith(
+      webhook().id,
+      expect.objectContaining({ status: "failed" }),
+    );
+    expect(screen.queryByText("Show older")).not.toBeInTheDocument();
   });
 
   it("pings a webhook and shows success", async () => {
