@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.api_key import ALL_SCOPES, ApiKeyScope
 from app.models.content import ContentType
 from app.schemas.limits import BoundedId
+from app.schemas.text import visible_label
 from app.services.api_keys import MAX_EXPIRY_DAYS, MAX_GRACE_HOURS
 
 
@@ -42,6 +43,17 @@ class ApiKeyCreate(BaseModel):
     expires_in_days: int | None = Field(default=None, ge=1, le=MAX_EXPIRY_DAYS)
 
     _scopes = field_validator("scopes")(_validate_scopes)
+
+    @field_validator("name")
+    @classmethod
+    def _visible_name(cls, value: str) -> str:
+        # Shown in the keys list and written to the log on every rotation and
+        # revocation, so cleaned like every other label: a terminal escape in
+        # a key's name otherwise reaches whoever tails the journal.
+        name = visible_label(value)
+        if not name:
+            raise ValueError("A key needs a name.")
+        return name
 
 
 class ApiKeyRotate(BaseModel):

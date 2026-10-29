@@ -74,6 +74,19 @@ def _clean_focus_keyword(value: str | None) -> str | None:
     return visible_label(value)
 
 
+def _visible_summary(value: str | None) -> str | None:
+    """The excerpt and meta description, cleaned the way the title is.
+
+    Both are one line of text Pulse hands to somebody else — the ``<meta>``
+    tag, the RSS item, Dev.to's description, a search result's snippet — and
+    neither was cleaned while the title beside them was. A right-to-left
+    override (U+202E) reversed how the rest of the line displays, a zero-width
+    space hid inside a word, and a terminal escape went into the logs and the
+    feed. Empty stays empty: both have a default built from the body.
+    """
+    return None if value is None else visible_label(value)
+
+
 def _absolute_image_url(value: str | None) -> str | None:
     """Accept an absolute http(s) URL, or nothing.
 
@@ -233,6 +246,8 @@ class ContentCreate(BaseModel):
     #: caller that sets this can match on it with no extra endpoint.
     campaign_key: str | None = Field(default=None, max_length=200)
 
+    _clean_summaries = field_validator("excerpt", "meta_description")(_visible_summary)
+
     @field_validator("title")
     @classmethod
     def _strip_title(cls, value: str) -> str:
@@ -269,6 +284,8 @@ class ContentUpdate(BaseModel):
     status: ContentStatus | None = None
     scheduled_for: datetime | None = None
     timezone: Timezone | None = Field(default=None, description=TIMEZONE_HELP)
+
+    _clean_summaries = field_validator("excerpt", "meta_description")(_visible_summary)
 
     @field_validator("title")
     @classmethod
