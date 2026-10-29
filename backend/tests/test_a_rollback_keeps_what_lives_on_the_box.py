@@ -78,3 +78,25 @@ def test_the_deploy_installs_dependencies_before_the_code_changes():
 def test_an_unchanged_requirements_file_needs_no_pypi():
     assert "requirements.sha256" in DEPLOY
     assert "skipping pip" in DEPLOY
+
+
+def test_a_rollback_rewrites_the_stamp_for_what_it_installed():
+    """Otherwise the stamp names the newer requirements while the venv holds
+    the older ones, and redeploying the newer commit skips pip on a match."""
+    stamp = "/opt/Pulse/.venv/.requirements.sha256"
+    assert stamp in ROLLBACK
+    removed = ROLLBACK.index('rm -f "$stamp"')
+    installed = ROLLBACK.index("pip install -q -r /opt/Pulse/backend/requirements.txt")
+    rewritten = ROLLBACK.index('> "$stamp"')
+    assert removed < installed < rewritten
+    # The same digest deploy.sh compares against.
+    assert "sha256sum /opt/Pulse/backend/requirements.txt | cut -d' ' -f1" in ROLLBACK
+    assert "sha256sum \"$req\" | cut -d' ' -f1" in DEPLOY
+
+
+def test_the_deploy_refuses_to_start_short_of_disk():
+    """Out of space half way through the sync is a tree no commit ever had."""
+    floor = DEPLOY.index("MIN_FREE_MB=")
+    assert floor < DEPLOY.index("pip install -q -r")
+    assert floor < DEPLOY.index('./ "root@$HOST:$REMOTE/"')
+    assert re.search(r'if \[ "\$\{free_mb:-0\}" -lt "\$MIN_FREE_MB" \]; then', DEPLOY)

@@ -53,6 +53,19 @@ fi
 # Skipped when the file is the one last installed, so a deploy that changes no
 # pin does not need PyPI to be up at all. The stamp lives in the venv: it is
 # about what is installed there, and rsync never touches it.
+# A deploy that runs out of disk half way through the sync stops (set -e) with
+# some files new and some old, under services still running — a tree no commit
+# ever had. pip, the frontend sync and the migration all write too. So it does
+# not start below a floor, the same check backup.sh makes before a dump.
+MIN_FREE_MB=${PULSE_DEPLOY_MIN_FREE_MB:-1024}
+echo "==> checking free space on $HOST:$REMOTE"
+free_mb=$("${SSH[@]}" "df -Pm $REMOTE | awk 'NR==2 {print \$4}'")
+if [ "${free_mb:-0}" -lt "$MIN_FREE_MB" ]; then
+  echo "only ${free_mb:-?}MiB free on $HOST:$REMOTE, below the ${MIN_FREE_MB}MiB floor —" \
+    "nothing was changed. Free some space and deploy again." >&2
+  exit 1
+fi
+
 echo "==> installing backend dependencies (before the code changes)"
 rsync -az -e "ssh -i $SSH_KEY" \
   backend/requirements.txt "root@$HOST:$REMOTE/.deploy-requirements.txt"

@@ -128,8 +128,12 @@ def test_the_reload_is_conditional_on_something_having_changed(script: str, inst
     body = install_loop.group("body")
     assert "cmp -s" in body
 
+    # ``\?``: the remote half is an unquoted heredoc, so the script spells the
+    # variable ``\$units_changed`` for it to expand on the box. Without the
+    # optional backslash this matched nothing and the check sat red — a guard
+    # that fails on correct code is one nobody reads when it fails on wrong.
     guarded = re.search(
-        r'if \[ "\$units_changed" -eq 1 \]; then\s+systemctl daemon-reload', script
+        r'if \[ "\\?\$units_changed" -eq 1 \]; then\s+systemctl daemon-reload', script
     )
     assert guarded, "daemon-reload is no longer guarded on a unit having changed"
 

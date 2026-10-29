@@ -116,8 +116,18 @@ rsync -az --delete -e "ssh -i $SSH_KEY" \
 echo "==> restarting services with rollback code"
 "${SSH[@]}" bash -euo pipefail <<'REMOTE_SCRIPT'
 chown -R pulse:pulse /opt/Pulse
+# deploy.sh skips pip when backend/requirements.txt hashes to the stamp in the
+# venv. Installing the older pins here without touching it left the stamp
+# naming the newer file, so redeploying that newer commit matched it, skipped
+# pip, and ran the new code on the rolled-back packages. Removed first so an
+# install that fails half way leaves no stamp at all (the next deploy then
+# installs in full), and rewritten only once this one has succeeded.
+stamp=/opt/Pulse/.venv/.requirements.sha256
+rm -f "$stamp"
 sudo -u pulse /opt/Pulse/.venv/bin/pip install -q --upgrade pip
 sudo -u pulse /opt/Pulse/.venv/bin/pip install -q -r /opt/Pulse/backend/requirements.txt
+sha256sum /opt/Pulse/backend/requirements.txt | cut -d' ' -f1 > "$stamp"
+chown pulse:pulse "$stamp"
 
 systemctl stop pulse-beat pulse-worker || true
 
