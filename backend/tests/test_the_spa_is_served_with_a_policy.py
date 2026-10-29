@@ -55,6 +55,8 @@ def root(tmp_path_factory) -> Path:
     (directory / "index.html").write_text("<!doctype html><title>Pulse</title>", "utf-8")
     (directory / "assets").mkdir()
     (directory / "assets" / "index-abc123.js").write_text("export default 1;", "utf-8")
+    # What `npm run build` leaves in dist for deploy.sh to read; not for the web.
+    (directory / ".build-commit").write_text("deadbeefcafe\n", "utf-8")
     return directory
 
 
@@ -121,6 +123,14 @@ def test_the_spa_fallback_still_serves_the_shell(base_url: str):
     resp = httpx.get(f"{base_url}/calendar")
     assert resp.status_code == 200
     assert "<title>Pulse</title>" in resp.text
+
+
+def test_a_dotfile_in_the_build_is_never_served(base_url: str):
+    """``dist/.build-commit`` names the exact commit in production: deploy.sh's
+    to read, nobody else's. No path segment starting with a dot is served."""
+    for path in ("/.build-commit", "/assets/../.build-commit", "/%2ebuild-commit"):
+        resp = httpx.get(f"{base_url}{path}")
+        assert "deadbeefcafe" not in resp.text, path
 
 
 def test_a_missing_asset_is_still_a_404(base_url: str):

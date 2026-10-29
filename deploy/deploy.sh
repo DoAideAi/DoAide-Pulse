@@ -68,6 +68,28 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   (cd frontend && npm run build)
 fi
 
+# ---- The frontend build is this commit's ------------------------------------
+# --no-build syncs whatever frontend/dist holds, and nothing said which commit
+# built it: build on one commit, check out another, deploy with --no-build, and
+# the backend went out at the new commit with the old one's UI in front of it,
+# under a history line naming one commit for both. `npm run build` stamps
+# dist/.build-commit (package.json's postbuild); a build with no stamp, or one
+# whose frontend/ differs from HEAD's, is refused before anything changes. A
+# stamp from an older commit is fine when nothing under frontend/ moved since.
+DIST_STAMP=${DIST_STAMP:-frontend/dist/.build-commit}
+built=$(cat "$DIST_STAMP" 2>/dev/null || true)
+if [ -z "$built" ]; then
+  echo "refusing to deploy: no record of which commit frontend/dist was built from" \
+    "($DIST_STAMP) — run 'npm run build' in frontend/, or deploy without --no-build." >&2
+  exit 1
+fi
+if ! git diff --quiet "$built" HEAD -- frontend 2>/dev/null; then
+  echo "refusing to deploy: frontend/dist was built from ${built:0:7}, and frontend/" \
+    "has changed since (or that commit is unknown here). Rebuild it." >&2
+  exit 1
+fi
+# ---- end frontend build check
+
 # Dependencies go in before the code they serve, from the requirements file
 # alone. Installed after the sync, a pip failure (PyPI down, a yanked pin) left
 # the new code on disk under services still running with the old packages —

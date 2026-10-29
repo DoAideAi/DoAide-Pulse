@@ -53,8 +53,28 @@ def checkout(tmp_path):
     return repo, bin_dir, calls
 
 
+def _stamped(repo) -> str:
+    """A build stamp naming this checkout's HEAD, kept outside the tree.
+
+    deploy.sh refuses a frontend build it cannot tie to the commit (see
+    test_a_deploy_ships_the_frontend_of_the_commit_it_deploys); outside the
+    checkout, so the working tree stays as clean as each test means it to be.
+    """
+    head = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    stamp = repo.parent / "build-commit"
+    stamp.write_text(head + "\n")
+    return str(stamp)
+
+
 def _deploy(repo, bin_dir, mem_mb):
-    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "FAKE_MEM_MB": str(mem_mb)}
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "FAKE_MEM_MB": str(mem_mb),
+        "DIST_STAMP": _stamped(repo),
+    }
     return subprocess.run(
         ["bash", str(repo / "deploy" / "deploy.sh"), "--skip-preflight", "--no-build"],
         cwd=repo, env=env, capture_output=True, text=True, timeout=60,

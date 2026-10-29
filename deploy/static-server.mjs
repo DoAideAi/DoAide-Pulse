@@ -112,6 +112,13 @@ async function resolveFile(pathname) {
   // /../../etc/passwd cannot escape ROOT.
   const candidate = join(ROOT, normalize(decodeURIComponent(pathname)));
   if (candidate !== ROOT && !candidate.startsWith(ROOT + sep)) return null;
+  // No dot-files. The build leaves dist/.build-commit for deploy.sh to check
+  // which commit it came from; served, it named the exact commit in production
+  // to anyone who asked. Read off the resolved path, so an encoded or
+  // dot-dot spelling of the same file is refused as well.
+  if (candidate.slice(ROOT.length).split(sep).some((part) => part.startsWith("."))) {
+    return null;
+  }
   try {
     const s = await stat(candidate);
     if (s.isFile()) return candidate;

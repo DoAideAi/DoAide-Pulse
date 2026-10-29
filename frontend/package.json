@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "postbuild": "git rev-parse HEAD > dist/.build-commit 2>/dev/null || true",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
