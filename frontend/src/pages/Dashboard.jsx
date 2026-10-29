@@ -24,8 +24,12 @@ import {
 
 export default function Dashboard() {
   const { data, error, loading, reload } = useApi(() => api.dashboard(), []);
+  // The preview shows six; that is all it asks for. How many are waiting is
+  // `needs_review`, not the length of a page — the queue pages at 50, so the
+  // count, the "In review (n)" heading and the Approve button all read 50
+  // with 120 drafts waiting.
   const { data: reviewItems, reload: reloadReview } = useApi(
-    () => api.reviewQueue(),
+    () => api.reviewQueue({ limit: 6 }),
     [],
   );
   // Only the first-run checklist reads this, and it treats null as "not yet".
@@ -61,7 +65,7 @@ export default function Dashboard() {
     by_project,
   } = data;
   const nothingYet = totals.content_count === 0;
-  const reviewCount = reviewItems?.length ?? needs_review;
+  const reviewCount = needs_review;
 
   function handleApproved() {
     reload();

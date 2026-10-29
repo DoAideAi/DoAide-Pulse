@@ -11,6 +11,7 @@ import Dialog from "../components/ui/Dialog";
 import { useToast } from "../components/ui/Toast";
 import { useApi } from "../hooks/useApi";
 import { api } from "../lib/api";
+import { inBatches } from "../lib/bulk";
 import { automaticOrigin, formatWhen, titleize } from "../lib/format";
 import trackEvent from "../lib/trackEvent";
 
@@ -34,9 +35,6 @@ const TYPES = [
 const PAGE_SIZE = 100;
 // The most rows /content returns per request (its ``limit`` is ``le=500``).
 const MAX_PER_REQUEST = 500;
-// The most ids one bulk request takes (BulkContentIn ``max_length=100``).
-// With more than a page on screen, "Approve all" can name more than that.
-const BULK_LIMIT = 100;
 
 /** The first `shown` rows that match `filters`, and how many match in all. */
 async function loadContent(filters, shown) {
@@ -50,21 +48,6 @@ async function loadContent(filters, shown) {
     if (page.items.length === 0) break;
   } while (items.length < Math.min(shown, total));
   return { items, total };
-}
-
-/**
- * Run a bulk action over any number of ids, at most BULK_LIMIT per request,
- * and add the answers together. `key` is the list of ids that worked, which
- * approve and reject name differently.
- */
-async function inBatches(ids, action, key) {
-  const merged = { [key]: [], failed: [] };
-  for (let i = 0; i < ids.length; i += BULK_LIMIT) {
-    const result = await action(ids.slice(i, i + BULK_LIMIT));
-    merged[key].push(...(result?.[key] ?? []));
-    merged.failed.push(...(result?.failed ?? []));
-  }
-  return merged;
 }
 
 /** Everything written, filterable, plus the button that writes something new. */

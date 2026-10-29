@@ -8,7 +8,7 @@ import { ROUTER_FUTURE } from "../lib/routerFuture";
 
 vi.mock("../lib/api", () => ({
   api: {
-    reviewQueue: vi.fn(),
+    reviewQueuePage: vi.fn(),
     bulkApprove: vi.fn(),
   },
 }));
@@ -51,9 +51,10 @@ describe("QuickActions", () => {
   });
 
   it("calls bulkApprove with all review queue IDs when clicked", async () => {
-    api.reviewQueue.mockResolvedValue([
-      { id: 1 }, { id: 2 }, { id: 3 },
-    ]);
+    api.reviewQueuePage.mockResolvedValue({
+      items: [{ id: 1 }, { id: 2 }, { id: 3 }],
+      total: 3,
+    });
     api.bulkApprove.mockResolvedValue({ succeeded: [1, 2, 3], failed: [] });
 
     const onApproved = vi.fn();
@@ -61,7 +62,7 @@ describe("QuickActions", () => {
 
     await userEvent.click(screen.getByTitle("Approve all 3 reviews"));
 
-    expect(api.reviewQueue).toHaveBeenCalled();
+    expect(api.reviewQueuePage).toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(api.bulkApprove).toHaveBeenCalledWith([1, 2, 3]);
     });
@@ -75,5 +76,43 @@ describe("QuickActions", () => {
     [...buttons, ...links].forEach((el) => {
       expect(el.className).toContain("quick-action-btn");
     });
+  });
+});
+
+describe("a queue longer than a page", () => {
+  it("approves every piece waiting, not the first page of them", async () => {
+    // 150 waiting: the queue pages at 200 at most, and a bulk approve takes
+    // at most 100 ids, so this is one read and two approvals.
+    const waiting = Array.from({ length: 150 }, (_, i) => ({ id: i + 1 }));
+    api.reviewQueuePage.mockImplementation(async ({ limit, offset }) => ({
+      items: waiting.slice(offset, offset + limit),
+      total: waiting.length,
+    }));
+    api.bulkApprove.mockImplementation(async (ids) => ({ succeeded: ids, failed: [] }));
+    draw({ reviewCount: 150 });
+
+    await userEvent.click(screen.getByTitle("Approve all 150 reviews"));
+
+    await vi.waitFor(() => expect(api.bulkApprove).toHaveBeenCalledTimes(2));
+    expect(api.bulkApprove.mock.calls.flatMap(([ids]) => ids)).toEqual(
+      waiting.map((w) => w.id),
+    );
+    expect(api.bulkApprove.mock.calls.every(([ids]) => ids.length <= 100)).toBe(true);
+    expect(toast.success).toHaveBeenCalledWith("Approved 150 items");
+  });
+
+  it("reads past the first page when the queue is longer than one read", async () => {
+    const waiting = Array.from({ length: 250 }, (_, i) => ({ id: i + 1 }));
+    api.reviewQueuePage.mockImplementation(async ({ limit, offset }) => ({
+      items: waiting.slice(offset, offset + limit),
+      total: waiting.length,
+    }));
+    api.bulkApprove.mockImplementation(async (ids) => ({ succeeded: ids, failed: [] }));
+    draw({ reviewCount: 250 });
+
+    await userEvent.click(screen.getByTitle("Approve all 250 reviews"));
+
+    await vi.waitFor(() => expect(toast.success).toHaveBeenCalledWith("Approved 250 items"));
+    expect(api.reviewQueuePage).toHaveBeenCalledWith({ limit: 200, offset: 200 });
   });
 });

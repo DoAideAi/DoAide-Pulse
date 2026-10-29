@@ -592,6 +592,7 @@ describe("every endpoint's path and verb", () => {
     ["publishContent", [3, { platforms: [] }], "/content/3/publish", "POST"],
     ["retryPublication", [3, 8], "/content/3/retry/8", "POST"],
     ["reviewQueue", [], "/content/queue/review", "GET"],
+    ["reviewQueuePage", [{ limit: 200, offset: 0 }], "/content/queue/review?limit=200&offset=0", "GET"],
     ["bulkApprove", [[1, 2]], "/content/bulk/approve", "POST"],
     ["bulkReject", [[1, 2]], "/content/bulk/reject", "POST"],
     ["bulkPublish", [[1, 2], ["devto"]], "/content/bulk/publish", "POST"],

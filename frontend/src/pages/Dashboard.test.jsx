@@ -363,3 +363,27 @@ describe("Dashboard published links", () => {
     expect(link).toHaveAttribute("href", "https://dev.to/pulse/shipping-faster");
   });
 });
+
+describe("a review queue longer than a page", () => {
+  // /content/queue/review answers 50 rows by default; the dashboard's own
+  // `needs_review` is the count. The page used to count the rows it was given.
+  it("counts what is waiting, not what one page of it holds", async () => {
+    api.dashboard.mockResolvedValue(payload({ needs_review: 120 }));
+    api.reviewQueue.mockResolvedValue(
+      Array.from({ length: 6 }, (_, i) => ({
+        id: i + 1,
+        title: `Draft ${i}`,
+        project_name: "Pulse",
+        content_type: "tutorial",
+        confidence: 0.9,
+        status: "review",
+      })),
+    );
+    draw();
+
+    expect(await screen.findByTitle("Approve all 120 reviews")).toBeInTheDocument();
+    expect(screen.getByText("In review (120)")).toBeInTheDocument();
+    // Only the preview's six rows are asked for.
+    expect(api.reviewQueue).toHaveBeenCalledWith({ limit: 6 });
+  });
+});

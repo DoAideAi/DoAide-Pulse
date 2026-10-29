@@ -327,7 +327,11 @@ export const api = {
     request(`/content/${id}/publish`, { method: "POST", body: payload }),
   retryPublication: (contentId, publicationId) =>
     request(`/content/${contentId}/retry/${publicationId}`, { method: "POST" }),
-  reviewQueue: () => request("/content/queue/review"),
+  reviewQueue: (params = {}) => request(`/content/queue/review${qs(params)}`),
+  // A page of the queue and how long the whole queue is. The plain call above
+  // answers the default page of 50, and its length is not the queue's.
+  reviewQueuePage: (params = {}) =>
+    request(`/content/queue/review${qs(params)}`, { page: true }),
   bulkApprove: (contentIds, dryRun = false) =>
     request("/content/bulk/approve", {
       method: "POST",

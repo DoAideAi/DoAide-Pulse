@@ -2,6 +2,20 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "./ui/Toast";
 import { api } from "../lib/api";
+import { inBatches } from "../lib/bulk";
+
+// The most rows /content/queue/review answers per request (``le=200``).
+const QUEUE_PAGE = 200;
+
+/** Every id waiting for review, however many pages that takes. */
+async function allReviewIds() {
+  const ids = [];
+  for (;;) {
+    const page = await api.reviewQueuePage({ limit: QUEUE_PAGE, offset: ids.length });
+    ids.push(...page.items.map((item) => item.id));
+    if (page.items.length === 0 || ids.length >= page.total) return ids;
+  }
+}
 
 export default function QuickActions({ reviewCount, onApproved }) {
   const navigate = useNavigate();
@@ -12,15 +26,16 @@ export default function QuickActions({ reviewCount, onApproved }) {
     if (reviewCount === 0) return;
     setApproving(true);
     try {
-      const queue = await api.reviewQueue();
-      const ids = queue.map((item) => item.id);
+      // All of it, not the first page: the button says how many are waiting,
+      // and it used to approve the 50 one default page held and stop.
+      const ids = await allReviewIds();
       if (ids.length === 0) {
         toast.info("Nothing to approve");
         return;
       }
-      const result = await api.bulkApprove(ids);
-      const ok = result.succeeded?.length ?? 0;
-      const fail = result.failed?.length ?? 0;
+      const result = await inBatches(ids, api.bulkApprove, "succeeded");
+      const ok = result.succeeded.length;
+      const fail = result.failed.length;
       if (ok > 0) toast.success(`Approved ${ok} item${ok === 1 ? "" : "s"}`);
       if (fail > 0)
         toast.error(
