@@ -2192,7 +2192,17 @@ function TranslationsPanel({ contentId }) {
               onClick={() => translate(l.code)}
               disabled={translating !== null}
             >
-              {translating === l.code ? "Translating…" : l.endonym}
+              {translating === l.code ? (
+                "Translating…"
+              ) : (
+                // Each name in its own language, so marked as that language: a
+                // screen reader otherwise reads "العربية" or "हिन्दी" with the
+                // page's English voice, and Arabic and Hebrew need their
+                // direction (WCAG 3.1.2, language of parts).
+                <span lang={l.code} dir={l.rtl ? "rtl" : "ltr"}>
+                  {l.endonym}
+                </span>
+              )}
             </button>
           ))}
         </div>

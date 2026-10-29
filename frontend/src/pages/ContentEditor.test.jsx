@@ -1566,6 +1566,23 @@ describe("translations", () => {
     expect(await screen.findByRole("button", { name: "हिन्दी" })).toBeInTheDocument();
   });
 
+  it("marks each language's own name with its language and direction", async () => {
+    api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
+    api.listLanguages.mockResolvedValue([
+      { code: "en", name: "English", endonym: "English", rtl: false },
+      { code: "hi", name: "Hindi", endonym: "हिन्दी", rtl: false },
+      { code: "ar", name: "Arabic", endonym: "العربية", rtl: true },
+    ]);
+    draw();
+
+    const hindi = (await screen.findByRole("button", { name: "हिन्दी" })).querySelector("[lang]");
+    expect(hindi).toHaveAttribute("lang", "hi");
+    expect(hindi).toHaveAttribute("dir", "ltr");
+    const arabic = screen.getByRole("button", { name: "العربية" }).querySelector("[lang]");
+    expect(arabic).toHaveAttribute("lang", "ar");
+    expect(arabic).toHaveAttribute("dir", "rtl");
+  });
+
   it("translates and reloads on success", async () => {
     api.listTranslations.mockResolvedValue({ items: [], source_language: "en" });
     api.listLanguages.mockResolvedValue([
