@@ -65,4 +65,37 @@ def visible_label(value: str) -> str:
     return unicodedata.normalize("NFC", cleaned)
 
 
-__all__ = ["visible_label"]
+
+
+def clean_tags(value: list[str] | None) -> list[str] | None:
+    """A tag list without blanks or repeats, in the order it was written.
+
+    Stored raw, ``["", "  "]`` became two empty chips on the piece, and
+    ``["Release", "release", " release "]`` three tags where the tag tree
+    (:func:`app.services.tags.normalize_all`) counts one. Trimmed, blanks
+    dropped, and a repeat that differs only in case dropped — the first
+    spelling kept. Deliberately not the tree's full normalisation, which clips
+    a segment to 24 characters: a 100-character tag the schema accepts must not
+    come back as a different one.
+
+    Public, and here rather than beside the request schemas, because the model
+    writes tags too: :func:`app.services.content_generator.content_from_generated`
+    only clipped them, so ``["Python", "python"]`` was stored twice and the
+    editor's first autosave "changed" the tags of a piece nobody had touched.
+    """
+    if value is None:
+        return None
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in value:
+        # ``visible_label`` rather than ``strip``: a zero-width space is not
+        # whitespace to Python, so ``"\u200b"`` survived as a chip that
+        # rendered as nothing, and a bidi override as one drawn backwards.
+        tag = visible_label(raw)
+        if tag and tag.casefold() not in seen:
+            seen.add(tag.casefold())
+            out.append(tag)
+    return out
+
+
+__all__ = ["clean_tags", "visible_label"]

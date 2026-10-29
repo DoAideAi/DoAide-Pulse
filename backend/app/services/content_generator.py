@@ -42,7 +42,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.content import TARGET_WORDS, ContentIdea, ContentType
 from app.models.project import Project, Tone
-from app.schemas.text import visible_label
+from app.schemas.text import clean_tags, visible_label
 from app.services import ai, dedup, formats, seo
 from app.services.github_client import RepoActivity
 from app.services.signals import TriggerSignal, from_repo_activity
@@ -317,7 +317,7 @@ def content_from_generated(
         excerpt=excerpt,
         meta_description=meta_description,
         keywords=generated.keywords,
-        tags=clamp_tags(generated.tags),
+        tags=clean_tags(clamp_tags(generated.tags)),
         focus_keyword=focus_keyword,
         confidence=generated.confidence,
         generated_by_provider=generated.provider,
