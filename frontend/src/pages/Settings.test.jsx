@@ -464,7 +464,12 @@ describe("disconnecting", () => {
 
     await user.click(await screen.findByRole("button", { name: "Disconnect" }));
 
-    expect(confirm).toHaveBeenCalledWith("Disconnect Dev.to?");
+    const [question] = confirm.mock.calls[0];
+    expect(question).toMatch(/^Disconnect Dev\.to\?/);
+    // Says what happens to what is still queued: it fails, for good, until
+    // reconnected and retried — the one consequence the user cannot see.
+    expect(question).toMatch(/scheduled to go out on Dev\.to will fail/);
+    expect(question).toMatch(/reconnect and retry/);
     expect(api.deleteConnection).not.toHaveBeenCalled();
   });
 

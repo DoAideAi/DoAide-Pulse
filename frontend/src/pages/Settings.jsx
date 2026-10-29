@@ -558,7 +558,16 @@ function PlatformRow({ platform, onConnect, onChanged }) {
   }
 
   async function disconnect() {
-    if (!window.confirm(`Disconnect ${platform.display_name}?`)) return;
+    // Said here because nothing else says it: a publication queued for this
+    // platform fails for good when its time comes (``NotConnected`` is
+    // terminal), and reconnecting afterwards does not bring it back — the
+    // backend only logged that, to a journal the user never reads.
+    const confirmed = window.confirm(
+      `Disconnect ${platform.display_name}?\n\nAnything still scheduled to go out on ` +
+        `${platform.display_name} will fail when its time comes, and stays failed until you ` +
+        "reconnect and retry it. What is already published there is not touched.",
+    );
+    if (!confirmed) return;
     setBusy(true);
     try {
       await api.deleteConnection(platform.platform);
