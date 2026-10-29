@@ -43,6 +43,7 @@ from __future__ import annotations
 
 # Imported at runtime, not under TYPE_CHECKING: SQLAlchemy 2.0 resolves the
 # `Mapped[...]` annotations at class-definition time and needs the real name.
+import hashlib
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
@@ -110,6 +111,19 @@ class TranslationStatus(StrEnum):
         }[self.value]
 
 
+def text_fingerprint(content: Content) -> str:
+    """A hash of exactly the words a translation translates.
+
+    Title, body, excerpt and meta description — the four fields
+    ``build_request`` swaps for the translated ones. Keywords, tags, status and
+    dates are left out: a change to any of them changes nothing a reader of the
+    translation would see.
+    """
+    parts = (content.title, content.body_markdown, content.excerpt, content.meta_description)
+    joined = "\x1f".join(part or "" for part in parts)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
 class ContentTranslation(Base, TimestampMixin):
     """One piece of content, rendered in one other language."""
 
@@ -150,6 +164,14 @@ class ContentTranslation(Base, TimestampMixin):
     #: and therefore reads as stale — correct, because a pending row has no text
     #: and nothing should publish it.
     source_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    #: :func:`text_fingerprint` of the piece's words at the moment they were sent
+    #: for translation. What :meth:`is_stale` compares, because ``version`` is the
+    #: optimistic lock and moves on *every* write — approving, scheduling and
+    #: publishing all bump it without touching a word — so a translation made of
+    #: a draft read as stale by the time the publish worker looked, and every
+    #: destination got English. ``None`` on rows made before this column, which
+    #: fall back to the version rule.
+    source_fingerprint: Mapped[str | None] = mapped_column(String(64))
 
     #: What validation found, as ``{"code": ..., "message": ...}`` objects. See
     #: :mod:`app.services.translation`. Empty is the good case and the default.
@@ -181,6 +203,8 @@ class ContentTranslation(Base, TimestampMixin):
         the translation back rather than the one that publishes it.
         """
         source = content if content is not None else self.content
+        if self.source_fingerprint:
+            return text_fingerprint(source) != self.source_fingerprint
         return source.version > self.source_version
 
     @property

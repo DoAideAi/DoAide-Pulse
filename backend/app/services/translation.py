@@ -52,7 +52,7 @@ from sqlalchemy.orm import Session, load_only
 
 from app.models.content import Content
 from app.models.mixins import utcnow
-from app.models.translation import ContentTranslation, TranslationStatus
+from app.models.translation import ContentTranslation, TranslationStatus, text_fingerprint
 from app.services import ai, languages
 from app.services.errors import sanitize_unexpected_error
 
@@ -445,6 +445,8 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
 
     row = upsert_pending(db, content, code)
     source_version = content.version
+    # Read with the version, before the call, for the same reason — see below.
+    source_fingerprint = text_fingerprint(content)
     try:
         db.commit()
     except IntegrityError as exc:
@@ -524,6 +526,7 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
         # the later number would mark this translation current for text it has never
         # seen — the exact confusion `source_version` exists to prevent.
         row.source_version = source_version
+        row.source_fingerprint = source_fingerprint
         row.quality_issues = [issue.as_dict() for issue in issues]
         row.status = TranslationStatus.NEEDS_REVIEW if issues else TranslationStatus.READY
         row.error = ""
