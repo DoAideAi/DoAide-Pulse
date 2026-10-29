@@ -41,7 +41,7 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.config import settings
 from app.models.user import User
@@ -176,8 +176,9 @@ def is_operator(user: User) -> bool:
     """Whether *user* runs this install, as opposed to merely having an account on it.
 
     The listed ``PRODUCT_ACTIVITY_ADMIN_EMAILS`` when there are any. With none
-    listed, every account counts — Pulse is single-user by default — unless
-    registration is open, because then "every account" is whoever signed up.
+    listed, the install's first account — Pulse is single-user by default, and
+    that is the seeded one — and nobody while registration is open, because
+    then the accounts are whoever signed up.
     For the few things that belong to the install rather than to an account:
     the cross-product dashboards, and newsletter sign-ups nobody attributed to
     a project.
@@ -189,4 +190,14 @@ def is_operator(user: User) -> bool:
     }
     if admins:
         return (user.email or "").lower() in admins
-    return not settings.registration_enabled
+    if settings.registration_enabled:
+        return False
+    # Registration being closed *now* does not make this a one-account
+    # install: opening it for a few invitees and closing it again left every
+    # one of them the operator — all feedback, the cross-product dashboards,
+    # other people's newsletter addresses. So the operator is the install's
+    # first account, the one ``app.seed`` made; deactivating it promotes nobody.
+    db = object_session(user)
+    if db is None:
+        return False
+    return db.scalar(select(func.min(User.id))) == user.id
