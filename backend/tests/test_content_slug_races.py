@@ -24,11 +24,16 @@ API = "/api/v1/content"
 def collide_once(db, monkeypatch):
     """Make the next commit (or flush) raise as the unique constraint would."""
 
-    def _install(method: str = "commit"):
+    def _install(method: str = "commit", *, inserting=None):
         real = getattr(db, method)
         calls = {"n": 0}
 
         def flaky(*args, **kwargs):
+            # With *inserting*, only a call that is about to insert one of those
+            # counts: the idea write commits its claim first, and the slug race
+            # is the later commit that inserts the draft.
+            if inserting is not None and not any(isinstance(o, inserting) for o in db.new):
+                return real(*args, **kwargs)
             calls["n"] += 1
             if calls["n"] == 1:
                 db.rollback()
@@ -142,7 +147,9 @@ def idea(db, project) -> ContentIdea:
 def test_an_idea_write_that_loses_the_slug_race_still_produces_a_draft(
     client, auth, idea, db, collide_once
 ):
-    collide_once("flush")
+    # The draft is written through content_store.commit_new, whose commit is
+    # where the slug race surfaces and is retried.
+    collide_once("commit", inserting=Content)
 
     resp = client.post(f"{API}/ideas/{idea.id}/write", headers=auth)
 
@@ -154,7 +161,9 @@ def test_the_idea_is_still_retired_after_a_retried_write(
     client, auth, idea, db, collide_once
 ):
     """The link back matters: without it the idea is offered again forever."""
-    collide_once("flush")
+    # The draft is written through content_store.commit_new, whose commit is
+    # where the slug race surfaces and is retried.
+    collide_once("commit", inserting=Content)
 
     content_id = client.post(f"{API}/ideas/{idea.id}/write", headers=auth).json()["id"]
 
@@ -166,7 +175,9 @@ def test_exactly_one_draft_exists_after_a_retried_write(
     client, auth, idea, db, collide_once
 ):
     """The rollback must not leave the first attempt behind as a second row."""
-    collide_once("flush")
+    # The draft is written through content_store.commit_new, whose commit is
+    # where the slug race surfaces and is retried.
+    collide_once("commit", inserting=Content)
 
     client.post(f"{API}/ideas/{idea.id}/write", headers=auth)
 
