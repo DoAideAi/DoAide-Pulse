@@ -345,12 +345,40 @@ function InboundUrl({ url, signed }) {
   );
 }
 
-/** Recent firings, and what became of each. */
+const EVENTS_PAGE = 20;
+
+/** Recent firings, and what became of each — and the older ones, on request. */
 function TriggerEvents({ triggerId }) {
-  const { data: events, error, loading, reload } = useApi(
-    () => api.triggerEvents(triggerId, { limit: 20 }),
+  const { data: first, error, loading, reload } = useApi(
+    () => api.triggerEvents(triggerId, { limit: EVENTS_PAGE }),
     [triggerId],
   );
+  // Older pages, appended on "Show older". The panel used to show the newest
+  // twenty and stop: an hourly feed fills that in under a day, so yesterday's
+  // failed firing could not be reached. A full page means there may be more; a
+  // short one is the last. De-duplicated by id, because a firing that lands
+  // while somebody reads shifts every offset by one.
+  const [older, setOlder] = useState({ items: [], done: false, busy: false });
+  const events = first ? [...first, ...older.items.filter((e) => !first.some((f) => f.id === e.id))] : first;
+  const more =
+    !older.done && (older.items.length ? older.items.length % EVENTS_PAGE === 0 : first?.length === EVENTS_PAGE);
+
+  async function showOlder() {
+    setOlder((o) => ({ ...o, busy: true }));
+    try {
+      const page = await api.triggerEvents(triggerId, {
+        limit: EVENTS_PAGE,
+        offset: (first?.length ?? 0) + older.items.length,
+      });
+      setOlder((o) => ({
+        items: [...o.items, ...page],
+        done: page.length < EVENTS_PAGE,
+        busy: false,
+      }));
+    } catch {
+      setOlder((o) => ({ ...o, busy: false }));
+    }
+  }
 
   return (
     <div className="mt-4 border-t border-line pt-4">
@@ -387,6 +415,11 @@ function TriggerEvents({ triggerId }) {
             </li>
           ))}
         </ul>
+      )}
+      {more && (
+        <button type="button" className="btn-quiet mt-2" onClick={showOlder} disabled={older.busy}>
+          {older.busy ? "Loading…" : "Show older"}
+        </button>
       )}
     </div>
   );

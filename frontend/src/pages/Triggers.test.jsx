@@ -683,6 +683,52 @@ describe("activity", () => {
     expect(screen.queryByRole("link", { name: "Open draft" })).not.toBeInTheDocument();
   });
 
+  // The panel showed the newest twenty and nothing older: an hourly feed fills
+  // twenty in under a day, so yesterday's failed firing — the one you open the
+  // panel to find — could not be reached.
+  it("reaches older firings past the first twenty", async () => {
+    const event = (id) => ({
+      id,
+      trigger_id: 1,
+      headline: `Firing ${id}`,
+      status: "generated",
+      detail: "",
+      content_id: null,
+      dedupe_key: null,
+      payload: {},
+      created_at: "2026-07-30T10:00:00Z",
+    });
+    api.triggerEvents.mockImplementation(async (_id, { offset = 0 } = {}) =>
+      offset === 0
+        ? Array.from({ length: 20 }, (_, i) => event(100 - i))
+        : [event(80), event(79)],
+    );
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    expect(await screen.findByText("Firing 100")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Show older" }));
+
+    expect(await screen.findByText("Firing 79")).toBeInTheDocument();
+    expect(api.triggerEvents).toHaveBeenLastCalledWith(1, { limit: 20, offset: 20 });
+    // A short page is the last one.
+    expect(screen.queryByRole("button", { name: "Show older" })).not.toBeInTheDocument();
+  });
+
+  it("offers nothing older when the first page is not full", async () => {
+    api.triggerEvents.mockResolvedValue([
+      {
+        id: 9, trigger_id: 1, headline: "Only one", status: "generated", detail: "",
+        content_id: null, dedupe_key: null, payload: {}, created_at: "2026-07-30T10:00:00Z",
+      },
+    ]);
+    draw();
+    await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
+    await screen.findByText("Only one");
+
+    expect(screen.queryByRole("button", { name: "Show older" })).not.toBeInTheDocument();
+  });
+
   it("says so when a trigger has never fired", async () => {
     draw();
     await userEvent.click(await screen.findByRole("button", { name: "Activity" }));
