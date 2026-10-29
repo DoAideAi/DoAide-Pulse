@@ -301,7 +301,8 @@ def test_retention_can_never_delete_the_last_copy():
     # The guard has to precede the retention delete, not merely exist. (The
     # earlier ``-delete`` is the sweep of abandoned ``*.dump.partial`` files,
     # which never touches a finished dump.)
-    retention = body.index("-name '*.dump' -mtime")
+    # The prune is the Python block that globs the dumps (daily, then weekly).
+    retention = body.index('dest.glob("*.dump")')
     assert body.index('"$RETENTION_DAYS" -ge 1') < retention
 
 

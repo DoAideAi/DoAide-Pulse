@@ -406,8 +406,11 @@ ssh … 'sudo -u postgres pg_dump pulse | gzip > /opt/backups/pulse-db-$(date +%
 `pulse-backup.timer` runs `deploy/backup.sh` at 03:30 UTC. It writes a
 verified `pg_dump --format=custom` into `/var/backups/pulse`, beside it an
 `uploads-<stamp>.tar.gz` of `backend/uploads` (the cover and inline images,
-which the dump does not contain and no deploy syncs), and prunes both after 14
-days. Restoring the database without the images brings back every image URL as
+which the dump does not contain and no deploy syncs). It keeps every dump from
+the last 14 days (`PULSE_BACKUP_RETENTION_DAYS`), then the newest of each week
+for 8 weeks more (`PULSE_BACKUP_WEEKS`), so a mistake noticed a month late still
+has a copy from before it; an archive is kept exactly as long as its dump.
+Restoring the database without the images brings back every image URL as
 a 404; unpack the archive of the same stamp into `/opt/Pulse/backend/uploads`
 (`tar -xzf uploads-<stamp>.tar.gz -C /opt/Pulse/backend/uploads`, then
 `chown -R pulse:pulse` it). The snapshot above is still worth taking before a risky

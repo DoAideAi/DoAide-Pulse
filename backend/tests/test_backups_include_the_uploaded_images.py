@@ -84,6 +84,8 @@ def test_no_uploads_directory_is_not_a_failed_backup(tmp_path, fake_postgres):
 
 
 def test_old_archives_are_pruned_with_the_dumps():
+    # Pruned in the retention block, by the stamp of the dump it belongs to
+    # (see test_backups_keep_a_weekly_copy_past_the_daily_window).
     body = _SCRIPT.read_text()
-    assert "-name 'uploads-*.tar.gz' -mtime" in body
-    assert body.index('"$RETENTION_DAYS" -ge 1') < body.index("-name 'uploads-*.tar.gz' -mtime")
+    assert 'dest.glob("uploads-*.tar.gz")' in body
+    assert body.index('"$RETENTION_DAYS" -ge 1') < body.index('dest.glob("uploads-*.tar.gz")')

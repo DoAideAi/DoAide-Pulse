@@ -30,6 +30,8 @@ set -euo pipefail
 ENV_FILE="${PULSE_ENV_FILE:-/opt/Pulse/.env}"
 DEST="${PULSE_BACKUP_DIR:-/var/backups/pulse}"
 RETENTION_DAYS="${PULSE_BACKUP_RETENTION_DAYS:-14}"
+# Past the daily window, the newest dump of each week is kept this many weeks.
+WEEKS="${PULSE_BACKUP_WEEKS:-8}"
 # The uploaded images (covers, inline images). Files, not rows, so the dump
 # never had them, and every deploy's sync leaves them out: until this they
 # existed in exactly one place. The service runs as pulse, which owns them.
@@ -155,10 +157,46 @@ fi
 # empty — unless RETENTION_DAYS is 0, which would delete the file just written
 # and is treated as a configuration error rather than a policy.
 [ "$RETENTION_DAYS" -ge 1 ] || die "PULSE_BACKUP_RETENTION_DAYS must be at least 1"
-find "$DEST" -maxdepth 1 -type f -name '*.dump' -mtime "+$RETENTION_DAYS" -print -delete \
-    | sed 's/^/Pruned /'
-find "$DEST" -maxdepth 1 -type f -name 'uploads-*.tar.gz' -mtime "+$RETENTION_DAYS" -print -delete \
-    | sed 's/^/Pruned /'
+[ "$WEEKS" -ge 0 ] || die "PULSE_BACKUP_WEEKS must be 0 or more"
+# Every dump inside RETENTION_DAYS, then the newest dump of each ISO week for
+# WEEKS more. A flat cut at two weeks left nothing from before the mistakes
+# people notice late — a piece deleted three weeks ago, a column a sync has
+# been corrupting for a month. An uploads archive goes with the dump of its
+# stamp, so a kept dump keeps its images.
+DEST="$DEST" RETENTION_DAYS="$RETENTION_DAYS" WEEKS="$WEEKS" python3 - <<'PY' \
+    | while IFS= read -r doomed; do rm -f -- "$doomed" && log "Pruned $doomed"; done
+import os
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+dest = Path(os.environ["DEST"])
+daily = int(os.environ["RETENTION_DAYS"]) * 86400
+weekly_until = daily + int(os.environ["WEEKS"]) * 7 * 86400
+now = time.time()
+
+def age(path):
+    return now - path.stat().st_mtime
+
+dumps = sorted(dest.glob("*.dump"), key=lambda p: p.stat().st_mtime, reverse=True)
+kept, weeks = [], set()
+for dump in dumps:
+    if age(dump) <= daily:
+        kept.append(dump)
+        continue
+    week = datetime.fromtimestamp(dump.stat().st_mtime, timezone.utc).isocalendar()[:2]
+    if age(dump) <= weekly_until and week not in weeks:
+        weeks.add(week)
+        kept.append(dump)
+    else:
+        print(dump)
+
+stamps = {dump.name.rsplit("-", 1)[-1].removesuffix(".dump") for dump in kept}
+for archive in dest.glob("uploads-*.tar.gz"):
+    stamp = archive.name.removeprefix("uploads-").removesuffix(".tar.gz")
+    if stamp not in stamps and age(archive) > daily:
+        print(archive)
+PY
 
 kept="$(find "$DEST" -maxdepth 1 -type f -name '*.dump' | wc -l)"
-log "$kept dump(s) in $DEST, keeping ${RETENTION_DAYS} days"
+log "$kept dump(s) in $DEST: ${RETENTION_DAYS} days, then one a week for ${WEEKS} weeks"
