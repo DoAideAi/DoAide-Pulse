@@ -5,11 +5,14 @@ hard-coded — secrets come from the environment or the gitignored ``keys/`` dir
 """
 from __future__ import annotations
 
+import difflib
 import logging
+import re
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlsplit
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import AliasChoices, Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Shortest ``JWT_SECRET`` production will start with, in bytes. 256 bits, the
@@ -355,7 +358,12 @@ class Settings(BaseSettings):
     # Where pulse-backup.service writes its dumps, and how old the newest may be
     # before /health/detail calls the backup stale. A day plus the timer's
     # randomised delay and some slack: one missed night shows, a late one does not.
-    backup_dir: str = "/var/backups/pulse"
+    # Read under either name: backup.sh documents PULSE_BACKUP_DIR, and a probe
+    # reading only BACKUP_DIR looked at the old place after backups were moved.
+    backup_dir: str = Field(
+        default="/var/backups/pulse",
+        validation_alias=AliasChoices("BACKUP_DIR", "PULSE_BACKUP_DIR"),
+    )
     backup_max_age_hours: int = 36
 
     # ---- AI (OpenRouter — free models only) ----
@@ -1408,4 +1416,51 @@ def get_settings() -> Settings:
     return Settings()
 
 
+#: Keys an env file may hold that are not settings: Postgres's own (docker
+#: compose), the seed script's, and the deploy and backup scripts' PULSE_*.
+_NOT_SETTINGS = ("POSTGRES_", "SEED_", "PULSE_")
+_ENV_LINE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=")
+
+
+def unknown_env_keys(paths: list[Path]) -> list[tuple[str, str | None]]:
+    """``(key, probable setting)`` for each key in *paths* that Pulse does not read.
+
+    ``Settings`` loads with ``extra="ignore"``, so a misspelled key is accepted
+    and does nothing — ``SMTP_HOTS`` leaves mail unconfigured — and no value
+    check sees it, because it is a different key. Missing files are skipped.
+    """
+    fields = {name.upper() for name in Settings.model_fields}
+    aliases = {"BACKUP_DIR", "PULSE_BACKUP_DIR"}
+    known = fields | aliases
+    found: list[tuple[str, str | None]] = []
+    for path in paths:
+        try:
+            lines = Path(path).read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            match = _ENV_LINE.match(line)
+            if not match:
+                continue
+            key = match.group(1).upper()
+            if key in known or key.startswith(_NOT_SETTINGS):
+                continue
+            close = difflib.get_close_matches(key, sorted(fields), n=1, cutoff=0.8)
+            found.append((key, close[0] if close else None))
+    return found
+
+
+def warn_about_unknown_env_keys(paths: list[Path] | None = None) -> None:
+    """Log each key in the env files that is not a setting. Names only, never values."""
+    if paths is None:
+        paths = [Path(p) for p in Settings.model_config.get("env_file") or ()]
+    for key, guess in unknown_env_keys(paths):
+        logging.getLogger(__name__).warning(
+            "%s in the env file is not a setting Pulse reads, so it has no effect%s",
+            key,
+            f" — did you mean {guess}?" if guess else "",
+        )
+
+
 settings = get_settings()
+warn_about_unknown_env_keys()
