@@ -1,4 +1,7 @@
-const CACHE_NAME = "doaide-pulse-v2";
+// v3: v2 kept /analytics-redact.js, /theme-init.js and /embed.js cache-first
+// under a name no deploy changed, so returning visitors ran their first copy
+// of each for good. Bumping the name drops those on activate.
+const CACHE_NAME = "doaide-pulse-v3";
 const STATIC_ASSETS = ["/", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -31,8 +34,11 @@ self.addEventListener("fetch", (e) => {
   // would outlive a sign-out on a shared machine.
   if (url.pathname.startsWith("/api")) return;
 
+  // Cache-first only where a new file always has a new name: Vite's hashed
+  // /assets/ and the font CDN. Everything else — the unhashed scripts in
+  // public/ above all — changes in place, and goes to the network first below.
   if (
-    url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff2?)$/) ||
+    (url.origin === self.location.origin && url.pathname.startsWith("/assets/")) ||
     url.hostname === "fonts.googleapis.com" ||
     url.hostname === "fonts.gstatic.com"
   ) {
