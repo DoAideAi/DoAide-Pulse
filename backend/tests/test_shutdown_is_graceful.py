@@ -22,20 +22,14 @@ from pathlib import Path
 
 import pytest
 
-# Imported for the side effect as much as for the object: ``include=`` on the
-# app is lazy, so the registry is only complete once the task modules have
-# actually been imported.
-from app.tasks import (  # noqa: F401
-    autopilot_tasks,
-    digest_tasks,
-    headline_tasks,
-    maintenance_tasks,
-    metrics_tasks,
-    publish_tasks,
-    trigger_tasks,
-    webhook_tasks,
-)
 from app.tasks.celery_app import celery_app
+
+# ``include=`` on the app is lazy, so the registry is only complete once the
+# task modules have been imported — every one the app includes, by the app's
+# own list. This used to import a hand-written list that ``seo_tasks`` never
+# joined, so the weekly meta-tag audit (960s) was invisible here and the worker
+# test below passed against a 420s stop timeout that would kill it.
+celery_app.loader.import_default_modules()
 
 _UNITS = Path(__file__).resolve().parents[2] / "deploy" / "systemd"
 

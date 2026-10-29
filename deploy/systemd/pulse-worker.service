@@ -43,7 +43,13 @@ KillMode=mixed
 # the point. ``test_shutdown_is_graceful`` derives the bound from the task
 # registry, so a new task with a longer limit fails the suite rather than
 # quietly re-opening the gap.
-TimeoutStopSec=420
+#
+# It did re-open, and the suite did not say so: the weekly meta-tag audit
+# (``seo_tasks.audit_meta_tags``) carries a 960s hard limit, and the test's
+# hand-written import list never included ``seo_tasks``, so it checked 420
+# against a registry without it. A deploy on a Monday morning killed the audit
+# mid-crawl. 1020 clears 960 with the same minute of margin as 420 over 360.
+TimeoutStopSec=1020
 
 # Hardening
 NoNewPrivileges=true
