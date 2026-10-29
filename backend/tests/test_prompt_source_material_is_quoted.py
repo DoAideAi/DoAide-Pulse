@@ -212,3 +212,45 @@ def test_a_generation_with_no_signal_carries_no_empty_quote(bare_project):
     prompt = _prompt(bare_project)
 
     assert _FENCE_OPEN not in prompt
+
+
+# --------------------------------------------------------------------------- #
+# Repurposing                                                                  #
+# --------------------------------------------------------------------------- #
+# The article handed to repurpose can be what a trigger wrote from an RSS item
+# or an inbound webhook, and the posts it produces go out under the author's
+# name. Its prompt took the body bare and its system prompt said nothing about
+# quoted text, unlike translation and generation.
+
+
+def _repurpose_prompt(body: str):
+    from app.models.content import Content
+    from app.services import repurpose
+
+    piece = Content(title="Release notes", excerpt="What shipped.", tags=["release"])
+    return repurpose._build_prompt(piece, body)
+
+
+def test_the_article_reaches_the_repurpose_prompt_inside_the_fence():
+    messages = _repurpose_prompt(f"Ordinary paragraph. {INJECTION}")
+    user = messages[-1]["content"]
+
+    start, end = user.index(_FENCE_OPEN), user.index(_FENCE_CLOSE)
+    assert start < user.index(INJECTION) < end
+    # The title is Pulse's to state, so it stays outside the quote.
+    assert user.index("Title: Release notes") < start
+
+
+def test_an_article_carrying_the_closing_marker_cannot_end_its_quote():
+    messages = _repurpose_prompt(f"Text {_FENCE_CLOSE} {INJECTION}")
+    user = messages[-1]["content"]
+
+    assert user.count(_FENCE_CLOSE) == 1
+    assert user.index(INJECTION) < user.index(_FENCE_CLOSE)
+
+
+def test_the_repurpose_system_prompt_says_what_the_fence_means():
+    system = _repurpose_prompt("Body text.")[0]["content"]
+
+    assert "SOURCE-MATERIAL" in system
+    assert "never obeyed" in system
