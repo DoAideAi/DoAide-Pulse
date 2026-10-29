@@ -56,6 +56,10 @@ def load_service_account() -> dict | None:
     return info
 
 
+#: The most of one Search Console answer Pulse will hold.
+MAX_RESPONSE_BYTES = 1024 * 1024
+
+
 class SearchConsoleClient:
     def __init__(
         self,
@@ -135,10 +139,26 @@ class SearchConsoleClient:
 
     def _call(self, method: str, path: str) -> Any:
         token = self._access_token()
+        # Streamed with a ceiling, the last outbound read in the tree that held
+        # whatever came back in full (umami was the one before it). Search
+        # Console's answers are a few hundred bytes; the cap is for a proxy or a
+        # captive portal answering in Google's place.
         try:
-            with self._http() as http:
-                resp = http.request(
-                    method, f"{API}{path}", headers={"Authorization": f"Bearer {token}"}
+            with self._http() as http, http.stream(
+                method, f"{API}{path}", headers={"Authorization": f"Bearer {token}"}
+            ) as streamed:
+                body = bytearray()
+                for chunk in streamed.iter_bytes():
+                    body.extend(chunk)
+                    if len(body) > MAX_RESPONSE_BYTES:
+                        raise SearchConsoleError(
+                            "Search Console answered with more than "
+                            f"{MAX_RESPONSE_BYTES // 1024} KB"
+                        )
+                resp = httpx.Response(
+                    streamed.status_code,
+                    content=bytes(body),
+                    request=streamed.request,
                 )
         except httpx.HTTPError as exc:
             raise SearchConsoleError(f"Google unreachable: {type(exc).__name__}") from exc

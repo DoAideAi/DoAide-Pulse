@@ -76,3 +76,27 @@ def test_a_lifetime_that_is_not_a_number_still_signs_in(account):
     gsc = _gsc(account, httpx.Response(200, json={"access_token": "tok", "expires_in": "soon"}))
 
     gsc.sitemap("sc-domain:example.com", "https://example.com/s.xml")
+
+
+def test_an_oversized_search_console_answer_is_refused_without_reading_it_all(account):
+    from app.services import search_console
+
+    served: list[int] = []
+    chunk = b" " * 65_536
+
+    class _Body(httpx.SyncByteStream):
+        def __iter__(self):
+            for _ in range(80):  # 5 MB on offer
+                served.append(len(chunk))
+                yield chunk
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/token":
+            return httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
+        return httpx.Response(200, stream=_Body())
+
+    gsc = SearchConsoleClient(account, transport=httpx.MockTransport(handler))
+
+    with pytest.raises(SearchConsoleError, match="more than"):
+        gsc.sitemap("sc-domain:example.com", "https://example.com/s.xml")
+    assert sum(served) < 2 * search_console.MAX_RESPONSE_BYTES
