@@ -24,7 +24,7 @@ destinations on a schedule, and tracks which pieces actually got read.
 | **Autopilot** | Watch repos, write when something ships, publish without review only when the model is confident and you've said it may. |
 | **Templates** | Your own reusable shapes. A `literal` template fills its variables and produces a finished draft with no model call at all; a `prompt` template hands the rendered text to the generator instead. Preview renders half-filled rather than erroring. |
 | **Triggers** | Fire the pipeline on something other than a commit — RSS, GitHub, a schedule, or an inbound webhook. The inbound URL is the only way to start the pipeline without signing in: the 256-bit token in the path is the credential, and an HMAC signature can be required on top. (The other public endpoints — sign-up, sign-in, password reset, the health probe, published articles, preview links, uploaded images, newsletter sign-up, the free tools and the event, trigger-kind and API-key-scope catalogues — read or collect, and write no content.) |
-| **Webhooks** | Outbound notifications, signed, with retries and backoff. Settings has an on-demand test delivery; the delivery log and redelivery are API-only for now (`GET /webhooks/{id}/deliveries`, `POST …/redeliver`). |
+| **Webhooks** | Outbound notifications, signed, with retries and backoff. Settings has a Ping for a test delivery, each webhook's delivery log, and Redeliver for a failed one. Events, payloads and how to verify the signature: [`docs/WEBHOOKS.md`](docs/WEBHOOKS.md). |
 | **Digests** | A weekly summary on a calendar schedule rather than an interval, because a report that lands at 03:12 on a Thursday is one nobody opens. |
 
 ## Stack
