@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import { audit, previews } from "../lib/socialCards";
+import { onTabListKeyDown, tabProps } from "../lib/tabs";
 
 /**
  * What the post looks like when someone pastes its link into a feed.
@@ -38,12 +39,13 @@ export default function SocialPreview({ draft, url, contentId }) {
         className="flex flex-wrap gap-1"
         role="tablist"
         aria-label="Preview network"
+        onKeyDown={onTabListKeyDown}
       >
         {cards.map((card) => (
           <button
             key={card.network}
             role="tab"
-            aria-selected={card.network === network}
+            {...tabProps(card.network === network)}
             onClick={() => setNetwork(card.network)}
             className={[
               "rounded-full px-2.5 py-1 text-xs transition-colors",

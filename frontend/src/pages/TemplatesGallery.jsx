@@ -6,6 +6,7 @@ import CrossProductLinks from "../components/CrossProductLinks";
 import trackEvent from "../lib/trackEvent";
 import { usePageMeta } from "../lib/pageMeta";
 import { PUBLIC_ROUTE_META } from "../data/publicRouteMeta";
+import { onTabListKeyDown, tabProps } from "../lib/tabs";
 
 const TEMPLATES = [
   {
@@ -337,12 +338,12 @@ export default function TemplatesGallery() {
           </p>
         </div>
 
-        <div className="mb-8 flex flex-wrap justify-center gap-2" role="tablist" aria-label="Filter templates by category">
+        <div className="mb-8 flex flex-wrap justify-center gap-2" role="tablist" aria-label="Filter templates by category" onKeyDown={onTabListKeyDown}>
           {CATEGORIES.map((c) => (
             <button
               key={c}
               role="tab"
-              aria-selected={category === c}
+              {...tabProps(category === c)}
               onClick={() => setCategory(c)}
               className={
                 category === c

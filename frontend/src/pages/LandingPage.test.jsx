@@ -126,6 +126,18 @@ describe("LandingPage", () => {
       expect(password).toHaveAttribute("maxLength", "128");
     });
 
+    // role="tab" promises arrow keys to a screen reader; the buttons gave none.
+    it("switches between sign-in and sign-up with the arrow keys", () => {
+      wrap();
+      const signIn = screen.getByRole("tab", { name: "Sign in" });
+      signIn.focus();
+      fireEvent.keyDown(signIn, { key: "ArrowRight" });
+      const create = screen.getByRole("tab", { name: "Create account" });
+      expect(create).toHaveFocus();
+      expect(create).toHaveAttribute("aria-selected", "true");
+      expect(signIn).toHaveAttribute("tabindex", "-1");
+    });
+
     it("does not offer it while creating an account", () => {
       wrap();
       fireEvent.click(screen.getByRole("tab", { name: "Create account" }));

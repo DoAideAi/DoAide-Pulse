@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { SESSION_ENDED } from "../lib/api";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../lib/limits";
 import { safeReturnPath } from "../lib/returnPath";
+import { onTabListKeyDown, tabProps } from "../lib/tabs";
 import { useAuth } from "../hooks/useAuth";
 import AnalyticsMockup from "../components/AnalyticsMockup";
 import CrossProductLinks from "../components/CrossProductLinks";
@@ -649,12 +650,12 @@ export default function LandingPage() {
 
         <div className="landing-right">
           <div className="landing-auth-card">
-            <div className="landing-auth-tabs" role="tablist">
+            <div className="landing-auth-tabs" role="tablist" aria-label="Account" onKeyDown={onTabListKeyDown}>
               <button
                 type="button"
                 role="tab"
                 className={`landing-auth-tab ${!isSignUp ? "active" : ""}`}
-                aria-selected={!isSignUp}
+                {...tabProps(!isSignUp)}
                 onClick={() => { setMode("signin"); setError(null); }}
               >
                 Sign in
@@ -663,7 +664,7 @@ export default function LandingPage() {
                 type="button"
                 role="tab"
                 className={`landing-auth-tab ${isSignUp ? "active" : ""}`}
-                aria-selected={isSignUp}
+                {...tabProps(isSignUp)}
                 onClick={() => { setMode("signup"); setError(null); }}
               >
                 Create account

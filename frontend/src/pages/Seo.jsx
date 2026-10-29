@@ -5,6 +5,7 @@ import HealthPanel from "../components/seo/HealthPanel";
 import SeoPostsPanel from "../components/seo/SeoPostsPanel";
 import SitemapsPanel from "../components/seo/SitemapsPanel";
 import TrafficPanel from "../components/seo/TrafficPanel";
+import { onTabListKeyDown, tabProps } from "../lib/tabs";
 
 /**
  * SEO across every DoAide site. One page, one panel per job, the open one
@@ -32,12 +33,12 @@ export default function Seo() {
       </div>
 
       {SEO_TABS.length > 1 && (
-        <div className="flex flex-wrap gap-1 border-b border-line" role="tablist" aria-label="SEO">
+        <div className="flex flex-wrap gap-1 border-b border-line" role="tablist" aria-label="SEO" onKeyDown={onTabListKeyDown}>
           {SEO_TABS.map((t) => (
             <button
               key={t.key}
               role="tab"
-              aria-selected={t.key === active.key}
+              {...tabProps(t.key === active.key)}
               onClick={() => setParams({ tab: t.key }, { replace: true })}
               className={`-mb-px min-h-[48px] border-b-2 px-3 text-sm transition-colors ${
                 t.key === active.key
