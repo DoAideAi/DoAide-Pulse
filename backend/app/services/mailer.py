@@ -1,14 +1,14 @@
 """Outbound email over SMTP.
 
-Pulse sends exactly one kind of message — the password reset link — so this is
-deliberately the smallest thing that can do that: no templating, no queue, no
-provider SDK. ``smtplib`` against whatever host the operator points it at.
+Pulse sends two kinds of message — the password reset link and the weekly
+digest — so this is deliberately the smallest thing that can do that: no
+templating, no queue, no provider SDK. ``smtplib`` against whatever host the operator points it at.
 
 **When SMTP is not configured nothing is sent**, and a WARNING names the
 subject that was dropped — the subject, never the body. The body of a reset
 email is a working credential, and a log is read by more people, and kept
-longer, than a mailbox. :func:`configured` is surfaced on the health endpoint so
-the gap is visible before somebody needs a reset. Recipients are masked
+longer, than a mailbox. :func:`configured` is what the digest's "send now"
+answers with, so the gap is visible there before somebody needs a reset. Recipients are masked
 (``s***@example.com``) in every line this module writes.
 
 Sending is best-effort by design: :func:`send` returns False rather than raising,
