@@ -6,6 +6,7 @@ import PublicNav from "../components/PublicNav";
 import DoAideFooter from "../components/DoAideFooter";
 import ShareButtons from "../components/ShareButtons";
 import trackEvent from "../lib/trackEvent";
+import { loadWithReload } from "../lib/lazyPage";
 import { applyPageMeta } from "../lib/pageMeta";
 
 /**
@@ -25,7 +26,9 @@ function usePostContent(slug) {
     if (!load) return undefined;
     let cancelled = false;
     setState({ slug, content: null, failed: false });
-    load().then(
+    // ``loadWithReload``: after a deploy the chunk this tab knows the name of
+    // is gone, and Retry asked for the same missing file forever.
+    loadWithReload(load).then(
       (module) => {
         if (!cancelled) setState({ slug, content: module.default, failed: false });
       },

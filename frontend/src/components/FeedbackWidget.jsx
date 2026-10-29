@@ -1,8 +1,15 @@
 import { Suspense, lazy, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { loadWithReload } from "../lib/lazyPage";
 
 const loadForm = () => import("./FeedbackForm");
-const FeedbackForm = lazy(loadForm);
+// Through ``loadWithReload`` like every page: a tab opened before a deploy
+// asks for the old chunk name, which the deploy deleted, and plain ``lazy``
+// sent that straight to an error boundary.
+const FeedbackForm = lazy(() => loadWithReload(loadForm));
+// A warm-up on hover or focus. Its failure is not worth a word — the real load
+// recovers — but uncaught it was an unhandled rejection in the console.
+const prefetchForm = () => loadForm().catch(() => {});
 
 /**
  * Pages that are not Pulse's own UI: the subscribe widget runs inside other
@@ -36,8 +43,8 @@ export default function FeedbackWidget() {
         onClick={() => setOpen(true)}
         // Fetched when the pointer or focus arrives, so it is usually there by
         // the click; the click itself loads it otherwise.
-        onPointerEnter={loadForm}
-        onFocus={loadForm}
+        onPointerEnter={prefetchForm}
+        onFocus={prefetchForm}
         className="fixed bottom-5 right-4 z-30 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-white shadow-lg hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 sm:right-5 sm:px-4 print:hidden"
         style={{ backgroundColor: "#2563eb" }}
         aria-haspopup="dialog"

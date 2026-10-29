@@ -63,3 +63,32 @@ describe("loadWithReload", () => {
     expect(reload).not.toHaveBeenCalled();
   });
 });
+
+describe("every chunk the app loads on demand", () => {
+  // The pages went through ``lazyPage``; two other lazy loads did not. A blog
+  // post opened in a tab from before a deploy failed, and its Retry asked for
+  // the same deleted chunk forever; the feedback form went to an error
+  // boundary. Any dynamic import in the app has to take the one-time reload.
+  it("recovers from a deploy that removed it", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join, resolve } = await import("node:path");
+    const root = resolve(__dirname, "..");
+    const files = [];
+    const walk = (dir) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (/\.(jsx?)$/.test(name) && !/\.test\./.test(name)) files.push(path);
+      }
+    };
+    walk(root);
+
+    // A runtime import, not a JSDoc type such as ``import("react").ReactNode``.
+    const dynamic = /(?<![\w.])import\(\s*["'`][./]|import\.meta\.glob\(/;
+    const unguarded = files.filter((file) => {
+      const text = readFileSync(file, "utf8");
+      return dynamic.test(text) && !/\b(lazyPage|loadWithReload)\b/.test(text);
+    });
+    expect(unguarded.map((f) => f.slice(root.length + 1))).toEqual([]);
+  });
+});
