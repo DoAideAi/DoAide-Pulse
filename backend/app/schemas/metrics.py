@@ -196,10 +196,10 @@ class BreakersOut(BaseModel):
         description="Which process these snapshots came from. Always api-process."
     )
     llm: dict[str, dict[str, float]] = Field(
-        description="Provider name to failure count and seconds until retry."
+        description="Provider name to failure count, seconds until retry (counting a probe in flight) and whether one is out (probing: 1.0)."
     )
     publish: dict[str, dict[str, float]] = Field(
-        description="platform:account key to failure count and seconds until retry."
+        description="platform:account key to failure count, seconds until retry (counting a probe in flight) and whether one is out (probing: 1.0)."
     )
 
 

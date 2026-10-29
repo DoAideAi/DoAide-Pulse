@@ -165,13 +165,22 @@ class CircuitBreaker:
             self._state.clear()
 
     def snapshot(self) -> dict[str, dict[str, float]]:
-        """Current state, for the health endpoint / debugging."""
+        """Current state, for the health endpoint / debugging.
+
+        ``seconds_until_retry`` counts a probe's hold as well as the cool-down:
+        read off the cool-down alone it said ``0`` for a route every caller but
+        the prober was being turned away from. ``probing`` is 1.0 while a probe
+        is out — numeric because the snapshot is typed as floats.
+        """
         now = time.monotonic()
         with self._lock:
             return {
                 name: {
                     "failures": state.failures,
-                    "seconds_until_retry": max(0.0, state.open_until - now),
+                    "seconds_until_retry": max(
+                        0.0, state.open_until - now, state.probe_until - now
+                    ),
+                    "probing": 1.0 if state.probe_until > now else 0.0,
                 }
                 for name, state in self._state.items()
             }
