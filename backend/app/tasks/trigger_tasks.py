@@ -44,6 +44,17 @@ def check_trigger(trigger_id: int) -> dict:
         trigger = db.get(Trigger, trigger_id)
         if trigger is None or not trigger.is_active:
             return {"trigger_id": trigger_id, "status": "skipped"}
+        # Due when the sweep saw it, and possibly not any more. The sweep
+        # dispatches every due trigger each tick, and a trigger stays due until
+        # its check *finishes* — so with the worker behind (two slots, one held
+        # by a long generation) each tick queued the same triggers again, and
+        # every copy re-fetched the feed or spent another call against GitHub's
+        # hourly allowance once it reached the front. Duplicate work on a queue
+        # that was already behind, which put it further behind. The first copy
+        # to run stamps ``last_checked_at``; the rest stop here on one SELECT.
+        # Schedule triggers already asked this in ``_check_schedule``.
+        if not trigger_service.is_due(trigger):
+            return {"trigger_id": trigger_id, "status": "not_due"}
         with llm_router.acting_for(trigger.project.user_id if trigger.project else None):
             return trigger_service.check(db, trigger)
     except SoftTimeLimitExceeded:
