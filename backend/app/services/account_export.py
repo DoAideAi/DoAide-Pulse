@@ -179,8 +179,10 @@ def _pieces(db: Session, project_ids: list[int]) -> Iterator[Content]:
             )
         )
         if not batch:
+            # The query that found nothing opened a transaction too; the
+            # closing bytes are written after this returns.
+            db.rollback()
             return
-        yield from batch
         after = batch[-1].id
         # Out of the identity map, or the session keeps every batch alive and
         # the stream holds the whole account in memory after all.
@@ -188,6 +190,14 @@ def _pieces(db: Session, project_ids: list[int]) -> Iterator[Content]:
             for child in (*piece.publications, *piece.translations):
                 db.expunge(child)
             db.expunge(piece)
+        # And out of the transaction before any of it reaches the client. The
+        # stream waits on the reader between chunks, and an open transaction
+        # across that wait held a pooled connection — and, on PostgreSQL, the
+        # table locks a migration queues behind — for as long as a slow or
+        # stalled download took. Read-only, so ending it discards nothing; the
+        # keyset on ``id`` means the next batch neither repeats nor skips.
+        db.rollback()
+        yield from batch
 
 
 def build(db: Session, user: User) -> dict[str, Any]:
@@ -208,6 +218,8 @@ def stream(db: Session, user: User) -> Iterator[bytes]:
     wire. The small sections go first; ``content`` is the last key.
     """
     head, project_ids = _everything_but_the_pieces(db, user)
+    # Plain data from here on; give the connection back before the first byte.
+    db.rollback()
     opening = json.dumps(head, ensure_ascii=False)
     yield (opening[:-1] + ', "content": [').encode()
     first = True
