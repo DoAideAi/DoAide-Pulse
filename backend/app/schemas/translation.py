@@ -40,7 +40,7 @@ class TranslationRequestIn(BaseModel):
 
     language: str = Field(
         description=(
-            "A language code from ``GET /content/languages``. Regional tags are "
+            "A language code from ``GET /languages``. Regional tags are "
             "accepted and reduced to their base — ``fr-CA`` is French."
         ),
         max_length=16,
@@ -60,7 +60,7 @@ class TranslationRequestIn(BaseModel):
         code = languages.normalize(value)
         if code is None:
             raise ValueError(
-                f"{value!r} is not a supported language. See GET /content/languages."
+                f"{value!r} is not a supported language. See GET /languages."
             )
         if code == languages.SOURCE_LANGUAGE:
             raise ValueError("Pieces are already written in English.")
@@ -81,7 +81,7 @@ class TranslationOut(BaseModel):
 
     language: str
     #: The language's own name, so a picker need not join against
-    #: ``GET /content/languages`` to render one row.
+    #: ``GET /languages`` to render one row.
     name: str = ""
     endonym: str = ""
     rtl: bool = False
