@@ -833,6 +833,19 @@ describe("the publish dialog", () => {
     expect(api.platformCheck).toHaveBeenLastCalledWith(3, ["devto", "bluesky"], false);
   });
 
+  // A check that could not run was caught as null and rendered like a check
+  // that found nothing — an empty list, which reads as "all clear" — so the
+  // title Dev.to would refuse went out unwarned whenever the check failed.
+  it("says so when the platform check could not run, rather than looking clear", async () => {
+    api.platformCheck.mockRejectedValue(new Error("Service Unavailable"));
+    const user = await openDialog();
+
+    await user.click(screen.getByRole("checkbox", { name: /Dev\.to/ }));
+
+    expect(await screen.findByText(/couldn.t check what/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Publish now" })).toBeEnabled();
+  });
+
   it("will not publish with nothing selected", async () => {
     await openDialog();
 

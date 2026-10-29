@@ -2345,7 +2345,10 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
   const { data: checks } = useApi(
     () =>
       selected.length
-        ? api.platformCheck(content.id, selected, asDraft).catch(() => null)
+        ? // Marked, not null: null rendered like a check that found nothing,
+          // and an empty list reads as "all clear" — so a title Dev.to would
+          // refuse went out unwarned whenever the check itself failed.
+          api.platformCheck(content.id, selected, asDraft).catch(() => ({ unavailable: true }))
         : Promise.resolve(null),
     [content.id, selected.join(","), asDraft],
   );
@@ -2453,6 +2456,13 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
           );
         })}
       </div>
+
+      {checks?.unavailable && (
+        <p className="rounded bg-warn-wash px-2.5 py-1.5 text-xs text-warn" role="status">
+          Couldn&apos;t check what these platforms will refuse or change, so nothing here
+          has been checked. Publishing still works.
+        </p>
+      )}
 
       {findings.length > 0 && (
         <ul className="space-y-1.5" aria-label="Before you publish">
