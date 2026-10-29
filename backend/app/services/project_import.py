@@ -181,8 +181,22 @@ def _docx_text(data: bytes) -> str:
         root = ElementTree.fromstring(archive.read(info))
     paragraphs = []
     for paragraph in root.iter(f"{_W}p"):
-        text = "".join(node.text or "" for node in paragraph.iter(f"{_W}t"))
-        paragraphs.append(text)
+        # In document order, and not only the ``w:t`` runs: a Tab is
+        # ``<w:tab/>`` and a soft line break (Shift+Enter) is ``<w:br/>`` or
+        # ``<w:cr/>``, elements between the runs rather than characters in
+        # them. Joining the runs alone turned "Name<Tab>Pulse" into "NamePulse"
+        # and a soft-broken list into one word, which the model then read.
+        # Children of runs only: ``w:tab`` is also how paragraph properties
+        # define tab *stops* (``w:pPr/w:tabs/w:tab``), which are not text.
+        parts = []
+        for node in (child for run in paragraph.iter(f"{_W}r") for child in run):
+            if node.tag == f"{_W}t":
+                parts.append(node.text or "")
+            elif node.tag == f"{_W}tab":
+                parts.append("\t")
+            elif node.tag in (f"{_W}br", f"{_W}cr"):
+                parts.append("\n")
+        paragraphs.append("".join(parts))
     return "\n".join(paragraphs)
 
 
