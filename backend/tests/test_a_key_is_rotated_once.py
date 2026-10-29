@@ -59,11 +59,12 @@ def test_once_the_replacement_is_revoked_the_original_can_be_rotated(db, project
     assert again.rotated_from_id == key.id
 
 
-def test_the_api_refuses_the_second_rotation_with_a_422(client, auth, db, key):
+def test_the_api_refuses_the_second_rotation_with_a_409(client, auth, db, key):
+    """409, not 422: the request is well-formed; the key is in the wrong state."""
     url = f"/api/v1/api-keys/{key.id}/rotate"
     assert client.post(url, headers=auth, json={"grace_hours": 24}).status_code == 200
     resp = client.post(url, headers=auth, json={"grace_hours": 24})
-    assert resp.status_code == 422, resp.text
+    assert resp.status_code == 409, resp.text
     assert "already rotated" in resp.json()["detail"]
 
 
@@ -112,6 +113,6 @@ def test_a_refused_rotation_leaves_a_line(client, auth, db, key, caplog):
     with caplog.at_level(logging.INFO, logger="app.routers.api_keys"):
         resp = client.post(f"/api/v1/api-keys/{key.id}/rotate", headers=auth, json={})
 
-    assert resp.status_code == 422
+    assert resp.status_code == 409
     assert set(resp.json()) == {"detail"}
     assert f"api key {key.prefix} rotation refused" in caplog.text

@@ -254,8 +254,16 @@ def rotate_api_key(
         logger.info(
             "api key %s rotation refused for user %s: %s", key.prefix, user.id, exc
         )
+        # 409 for the key's state, 422 for a bad value — what docs/ERRORS.md
+        # says each means. All of these used to be 422, which told a client its
+        # request body was wrong when the body was fine and the key was not.
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if isinstance(exc, api_keys.ApiKeyStateError)
+                else status.HTTP_422_UNPROCESSABLE_CONTENT
+            ),
+            detail=str(exc),
         ) from exc
 
     return ApiKeyRotated(

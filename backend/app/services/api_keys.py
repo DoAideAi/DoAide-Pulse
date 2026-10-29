@@ -90,6 +90,12 @@ class ApiKeyError(ValueError):
     """A key cannot be minted or rotated as asked. The message is user-facing."""
 
 
+class ApiKeyStateError(ApiKeyError):
+    """The key is in a state that makes the request meaningless — revoked,
+    expired, or already rotated. A 409, where a bad value is a 422: the request
+    was well-formed, and sending it again will not help until the key changes."""
+
+
 def fingerprint(token: str) -> str:
     """The stored digest of *token* — SHA-256, hex.
 
@@ -349,7 +355,7 @@ def rotate(
     db.execute(select(ApiKey.id).where(ApiKey.id == key.id).with_for_update())
     db.refresh(key)
     if key.revoked_at is not None:
-        raise ApiKeyError("That key is already revoked. Create a new one instead.")
+        raise ApiKeyStateError("That key is already revoked. Create a new one instead.")
     successor = db.scalar(
         select(ApiKey.prefix).where(
             ApiKey.rotated_from_id == key.id, ApiKey.revoked_at.is_(None)
@@ -358,7 +364,7 @@ def rotate(
     if successor is not None:
         # In its grace window already. A second replacement would be a second
         # live key under one name, whose token one of the two responses showed.
-        raise ApiKeyError(
+        raise ApiKeyStateError(
             f"That key was already rotated; its replacement is {successor}. "
             "Rotate or revoke that one instead."
         )
@@ -375,7 +381,7 @@ def rotate(
         # this did — minted a replacement with no expiry at all: the one
         # outcome the paragraph above rules out, a key that had been dated to
         # die coming back as a credential that never does.
-        raise ApiKeyError("That key has expired. Create a new one instead.")
+        raise ApiKeyStateError("That key has expired. Create a new one instead.")
 
     project = db.get(Project, key.project_id)
     if project is None:  # pragma: no cover - FK makes this unreachable
@@ -424,6 +430,7 @@ __all__ = [
     "TOKEN_MARKER",
     "TOUCH_INTERVAL",
     "ApiKeyError",
+    "ApiKeyStateError",
     "authenticate",
     "expiry_from_days",
     "fingerprint",

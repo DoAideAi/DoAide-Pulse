@@ -78,7 +78,7 @@ def test_a_machine_key_from_issue_to_revocation(client, auth):
     assert client.get(f"{API}/machine/whoami", headers=writer).status_code == 200
     assert client.get(f"{API}/machine/whoami", headers=replacement).status_code == 200
     again = client.post(f"{API}/api-keys/{writer_id}/rotate", headers=auth, json={})
-    assert again.status_code == 422
+    assert again.status_code == 409
     assert rotated.json()["key"]["prefix"] in again.json()["detail"]
 
     # 5. Revoke both. Each is then refused with an answer saying what to do,
@@ -94,5 +94,5 @@ def test_a_machine_key_from_issue_to_revocation(client, auth):
 
     # 6. A revoked key cannot be rotated back to life either.
     revived = client.post(f"{API}/api-keys/{writer_id}/rotate", headers=auth, json={})
-    assert revived.status_code == 422
+    assert revived.status_code == 409
     assert "revoked" in revived.json()["detail"]

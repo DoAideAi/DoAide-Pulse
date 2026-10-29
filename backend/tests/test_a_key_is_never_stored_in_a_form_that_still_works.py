@@ -850,7 +850,7 @@ def test_creating_a_key_with_a_bad_expiry_is_a_422_not_a_500(client, auth, proje
     assert resp.status_code == 422
 
 
-def test_rotating_an_already_revoked_key_is_a_422_not_a_500(client, auth, project, db):
+def test_rotating_an_already_revoked_key_is_a_409_not_a_500(client, auth, project, db):
     created = client.post(
         f"{V1}/api-keys",
         headers=auth,
@@ -861,7 +861,7 @@ def test_rotating_an_already_revoked_key_is_a_422_not_a_500(client, auth, projec
     resp = client.post(
         f"{V1}/api-keys/{created['id']}/rotate", headers=auth, json={"grace_hours": 0}
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 409
     assert "already revoked" in resp.json()["detail"]
 
 

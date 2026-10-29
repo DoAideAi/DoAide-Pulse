@@ -103,6 +103,8 @@ Retrying won't help until the state changes.
 | `You already have a template called …` / `An account with this email already exists. Sign in instead.` | Unique names. | Pick another, or sign in. |
 | `This piece is already being translated into …` | Two translate requests for one language at once (a double-click). The first is already running and paying for the model call. | Reload in a moment. |
 | `Somebody else changed this while you were editing it. Reload and try again.` | Another request wrote the piece between your load and your save. Raised for any write that loses that race. | Reload and reapply. |
+| `That key is already revoked …` / `That key has expired …` / `That key was already rotated; its replacement is …` | `POST /api-keys/{id}/rotate` on a key that can no longer be rotated. | Create a new key, or rotate the replacement it names. |
+| `Only a translation waiting for review can be accepted …` / `The piece has been edited since this translation was made …` | `POST …/translations/{language}/accept` on a translation that isn't held for review, or is out of date. | Update the translation, then review the new one. |
 | `The project's idea queue is full …` | `POST /machine/ideas` when every banked idea is too recent to prune. | Use or dismiss some ideas. |
 
 ### 412: your copy is out of date
