@@ -1,7 +1,21 @@
 // v3: v2 kept /analytics-redact.js, /theme-init.js and /embed.js cache-first
 // under a name no deploy changed, so returning visitors ran their first copy
 // of each for good. Bumping the name drops those on activate.
-const CACHE_NAME = "doaide-pulse-v3";
+// v4: v3 kept error responses, so a browser could hold a stored 502 for an asset
+// it then served forever; a new name makes activate clear all of them.
+const CACHE_NAME = "doaide-pulse-v4";
+
+// Only a good answer is kept. Assets are served from here before the network
+// and never refetched, and pulse-web restarts on every deploy: a chunk first
+// asked for in that window got Caddy's 502 stored under its URL, and the page
+// it carries stayed broken in that browser until the cache was renamed by hand.
+// An opaque (cross-origin, no-cors) answer cannot be inspected, so it is not
+// kept either.
+function keep(request, res) {
+  if (!res || !res.ok || res.type === "opaque") return;
+  const clone = res.clone();
+  caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+}
 const STATIC_ASSETS = ["/", "/favicon.svg", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {
@@ -47,8 +61,7 @@ self.addEventListener("fetch", (e) => {
         (cached) =>
           cached ||
           fetch(request).then((res) => {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+            keep(request, res);
             return res;
           })
       )
@@ -59,8 +72,7 @@ self.addEventListener("fetch", (e) => {
   e.respondWith(
     fetch(request)
       .then((res) => {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        keep(request, res);
         return res;
       })
       .catch(() =>

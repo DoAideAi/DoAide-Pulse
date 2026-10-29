@@ -64,6 +64,8 @@ describe("the service worker", () => {
   });
 
   it("is a cache name the stale v2 copies are dropped under", () => {
-    expect(source).toMatch(/CACHE_NAME = "doaide-pulse-v3"/);
+    // Any version past v2; v4 also clears the error responses v3 kept.
+    const version = Number(source.match(/CACHE_NAME = "doaide-pulse-v(\d+)"/)[1]);
+    expect(version).toBeGreaterThanOrEqual(3);
   });
 });
