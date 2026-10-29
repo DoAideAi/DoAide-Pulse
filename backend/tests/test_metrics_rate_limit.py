@@ -209,4 +209,5 @@ def test_the_beat_task_shares_one_memory_across_the_whole_sweep(
 
     assert result["polled"] == 5
     assert result["recorded"] == 1
-    assert asked == ["0", "1"]
+    # Newest first (see ``collect_all_metrics``): "4" went live last.
+    assert asked == ["4", "3"]

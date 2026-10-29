@@ -101,8 +101,10 @@ def test_metrics_sweep_polls_the_rest_after_one_row_fails_to_commit(
     db, project, monkeypatch, task_session
 ):
     """The sweep records the second publication even though the first blew up."""
-    first = _published(db, project, 0)
+    # Created in this order because the sweep walks newest first: ``first`` is
+    # the one it reaches first.
     second = _published(db, project, 1)
+    first = _published(db, project, 0)
     monkeypatch.setattr(metrics_tasks, "SessionLocal", task_session)
 
     seen: list[int] = []

@@ -500,6 +500,12 @@ class Settings(BaseSettings):
     publish_scan_interval_seconds: int = 300
     # How often published posts are re-polled for view/reaction counts.
     metrics_scan_interval_seconds: int = 21600
+    # How long after going live a post is still polled. The sweep used to poll
+    # every post ever published, writing a metrics row each time, for the life
+    # of the install — and walked them oldest first, so once they outnumbered
+    # one run's time limit the newest were never reached. A post's numbers
+    # settle within weeks; past this they are left as last read.
+    metrics_poll_max_age_days: int = 90
     # A release, or this many commits since the last generated piece, is what
     # counts as "worth writing about". Below it the autopilot stays quiet.
     autopilot_commit_threshold: int = 10
@@ -1021,6 +1027,8 @@ class Settings(BaseSettings):
         # written, as for the retention settings in ``_positive``.
         "trigger_event_retention_days",
         "webhook_delivery_retention_days",
+        # Zero would poll nothing, as the age limit for being worth a poll.
+        "metrics_poll_max_age_days",
         # Zero would refuse every upload, open the LLM breaker on no failures,
         # start the autopilot on no commits, pick a headline on no data, and
         # let a second worker take a delivery the first is still sending.

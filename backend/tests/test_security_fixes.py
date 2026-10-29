@@ -230,7 +230,7 @@ def test_metrics_task_isolates_failures():
     ):
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
-        # The sweep reads ``(publication, owner_id)`` pairs: the owner comes back
+        # The sweep reads ``(publication, owner_id, went_live)`` rows: the owner comes back
         # as a column off the join rather than by walking
         # ``publication.content.project``, which does not survive the commit
         # ``collect_metrics`` makes after every row it records.
@@ -239,7 +239,7 @@ def test_metrics_task_isolates_failures():
         # to end too: one page, then nothing. A fixed return value hands back
         # the same three rows forever and the test never finishes.
         mock_session.execute.return_value.all.side_effect = [
-            [(mock_pub_ok, 7), (mock_pub_bad, 7), (mock_pub_ok2, 7)],
+            [(mock_pub_ok, 7, None), (mock_pub_bad, 7, None), (mock_pub_ok2, 7, None)],
             [],
         ]
 

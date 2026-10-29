@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from celery.exceptions import SoftTimeLimitExceeded
-from sqlalchemy import select
+from sqlalchemy import func, select, true, tuple_
 from sqlalchemy.exc import OperationalError
 
+from app.config import settings
 from app.database import SessionLocal
 from app.models.content import Content
+from app.models.mixins import utcnow
 from app.models.project import Project
 from app.models.publication import Publication, PublicationStatus
 from app.models.user import User
@@ -78,11 +81,22 @@ def collect_all_metrics() -> dict:
         touched_content: set[int] = set()
         rate_limited: set[publishing_service.RateLimitKey] = set()
         timed_out = False
-        last_id = 0
+        # Newest first, and nothing past the age limit. Oldest first under a
+        # five-minute soft limit meant a run that timed out had spent itself on
+        # posts whose numbers stopped moving long ago, and the next began at the
+        # same place: the newest posts — the ones the velocity windows and the
+        # underperformance alert are measured on — were never reached. Keyset
+        # on (went-live time, id), descending, so a page boundary cannot repeat
+        # or skip a row that shares its publish time with another.
+        cutoff = utcnow() - timedelta(days=settings.metrics_poll_max_age_days)
+        # A row published before ``published_at`` was always written has its
+        # creation time to go by, rather than dropping out of the sweep.
+        went_live = func.coalesce(Publication.published_at, Publication.created_at)
+        after: tuple | None = None
 
         while not timed_out:
             page = db.execute(
-                select(Publication, Project.user_id)
+                select(Publication, Project.user_id, went_live)
                 .join(Content, Content.id == Publication.content_id)
                 .join(Project, Project.id == Content.project_id)
                 .join(User, User.id == Project.user_id)
@@ -91,17 +105,18 @@ def collect_all_metrics() -> dict:
                     Publication.platform.in_(metric_platforms),
                     Publication.external_id.is_not(None),
                     User.is_active.is_(True),
-                    Publication.id > last_id,
+                    went_live >= cutoff,
+                    tuple_(went_live, Publication.id) < after if after is not None else true(),
                 )
-                .order_by(Publication.id)
+                .order_by(went_live.desc(), Publication.id.desc())
                 .limit(_METRICS_FETCH_SIZE)
             ).all()
 
             if not page:
                 break
 
-            for publication, user_id in page:
-                last_id = publication.id
+            for publication, user_id, live_at in page:
+                after = (live_at, publication.id)
                 polled += 1
                 publication_id = publication.id
                 content_id = publication.content_id
