@@ -111,16 +111,9 @@ SUGGESTION_LIMIT = 8
 #: is for what the piece is *about*.
 MIN_TERM_FREQUENCY = 3
 
-#: One word of a body, for counting.
-#:
-#: The same shape as :mod:`app.services.dedup`'s and not imported from it: that
-#: one is private, and the two want different things from a near-identical
-#: pattern. ``dedup`` compares two headlines and wants ``2.0`` and
-#: ``double-post`` held together; this counts body words and wants the same,
-#: for the same reason — ``fastapi`` and ``fast`` are not the same tag. What is
-#: shared is the judgement that matters, :data:`app.services.dedup.STOPWORDS`,
-#: which is public and imported below.
-_WORD = re.compile(r"[0-9a-z]+(?:[.\-][0-9a-z]+)*")
+#: Body words are counted with :func:`app.services.dedup.words`, the same
+#: tokenizer headlines are compared with — in any script, so a Hindi article
+#: has words to suggest and a Hindi tag can match it.
 
 
 def normalize(raw: str) -> str:
@@ -440,7 +433,7 @@ def _terms(content: Content) -> tuple[Counter[str], Counter[str], set[str]]:
     mentions: Counter[str] = Counter()
     in_title: set[str] = set()
     body = seo.strip_markdown(content.body_markdown or "")
-    for word in _WORD.findall(body.casefold()):
+    for word in dedup.words(body):
         if word not in dedup.STOPWORDS and not word.isdigit():
             counts[word] += 1
             mentions[word] += 1

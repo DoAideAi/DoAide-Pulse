@@ -44,6 +44,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from collections.abc import Iterable
 from datetime import timedelta
 from typing import Any
@@ -81,7 +82,26 @@ _POSSESSIVE = re.compile(r"['’]s\b|['’]")
 #: Kept together across a dot or hyphen so "2.0" and "double-post" stay one word
 #: — a version number split into "2" and "0" would make every release headline
 #: look like every other one.
-_TOKEN = re.compile(r"[0-9a-z]+(?:[.\-][0-9a-z]+)*")
+_TOKEN = re.compile(r"[^\s.\-]+(?:[.\-][^\s.\-]+)*")
+
+
+def words(text: str) -> list[str]:
+    """Every word of *text*, casefolded, in any script.
+
+    This was ``[0-9a-z]+``: a Hindi or Tamil headline had no words at all, so
+    :func:`is_restatement` could never call one a repeat (empty is "not a
+    duplicate") and the autopilot was free to write the same Hindi idea again;
+    and :mod:`app.services.tags` could neither suggest a Hindi word nor match a
+    Hindi tag the account already uses. Letters, marks and digits are kept by
+    Unicode category after NFC — the vowel signs of Devanagari are combining
+    marks, which ``\\w`` would have split off — and a dot or hyphen still joins,
+    so "2.0" and "double-post" stay one word.
+    """
+    folded = unicodedata.normalize("NFC", (text or "").casefold())
+    kept = "".join(
+        ch if unicodedata.category(ch)[0] in "LMN" or ch in ".-" else " " for ch in folded
+    )
+    return _TOKEN.findall(kept)
 
 #: How much of two headlines' subject matter must coincide before the second is
 #: taken as a restatement of the first. Tuned against the pair this has to keep
@@ -93,7 +113,7 @@ SIMILARITY_THRESHOLD = 0.8
 def tokens(headline: str) -> frozenset[str]:
     """The significant words of a headline, for comparing it against another."""
     plain = _POSSESSIVE.sub("", (headline or "").casefold())
-    return frozenset(w for w in _TOKEN.findall(plain) if w not in STOPWORDS)
+    return frozenset(w for w in words(plain) if w not in STOPWORDS)
 
 
 def is_restatement(candidate: str, existing: frozenset[str]) -> bool:
