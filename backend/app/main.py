@@ -750,15 +750,22 @@ def create_app() -> FastAPI:
             # Redacted: two routes carry a credential in the path.
             path = redact_path(request.url.path)
             status_code = response.status_code
+            # The account on the two lines worth reading, as the unhandled-
+            # exception handler already records it: "slow for whom" and "failing
+            # for whom" are the first questions either line raises, and the
+            # request id alone sends the reader to a second log to find out.
+            # Read from the signed token, never from the body.
             if settings.api_slow_request_ms and elapsed_ms >= settings.api_slow_request_ms:
                 logger.warning(
-                    "slow request: %s %s %d in %dms",
+                    "slow request: %s %s %d in %dms [user=%s]",
                     method, path, status_code, round(elapsed_ms),
+                    _bearer_subject(request.headers.get("authorization", "")) or "-",
                 )
             elif status_code >= 500:
                 logger.warning(
-                    "server error: %s %s %d in %dms",
+                    "server error: %s %s %d in %dms [user=%s]",
                     method, path, status_code, round(elapsed_ms),
+                    _bearer_subject(request.headers.get("authorization", "")) or "-",
                 )
             else:
                 logger.debug(

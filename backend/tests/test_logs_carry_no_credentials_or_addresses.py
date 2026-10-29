@@ -145,3 +145,20 @@ def test_a_duplicate_subscriber_is_not_logged_by_address(client, caplog):
     text = " ".join(r.getMessage() for r in caplog.records).lower()
     assert "reader@example.org" not in text
     assert "duplicate subscriber" in text
+
+
+def test_a_slow_request_line_names_the_account_and_never_the_token(
+    client, auth, user, caplog, monkeypatch
+):
+    """"Slow for whom" is the first question the line raises; the id comes from
+    the signed token, and the token itself stays out of the journal."""
+    monkeypatch.setattr(settings, "api_slow_request_ms", 1)  # every request is "slow"
+    token = auth["Authorization"].split(" ", 1)[1]
+    with caplog.at_level(logging.WARNING, logger="app.main"):
+        client.get("/api/v1/projects", headers=auth)
+        client.get("/api/v1/health")
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "app.main"]
+    assert any("/api/v1/projects" in line and f"[user={user.id}]" in line for line in lines)
+    assert any("/api/v1/health" in line and "[user=-]" in line for line in lines)
+    assert not any(token in line for line in lines)
