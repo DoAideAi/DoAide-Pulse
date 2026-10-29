@@ -449,6 +449,24 @@ describe("auto-save", () => {
     expect(screen.getByText(/Saved just now/)).toBeInTheDocument();
   });
 
+  it("keeps that time true while the writer sits reading, not 'just now' forever", async () => {
+    // Nothing re-rendered the label once the save landed — typing hides it —
+    // so a writer who stopped to read saw "Saved just now" twenty minutes on.
+    api.updateContent.mockResolvedValue(content({ title: "Saved title!" }));
+    draw();
+    const title = await screen.findByLabelText(/^Title/i);
+    useClock();
+
+    typeInto(title, "Saved title!");
+    await settle();
+    expect(screen.getByText(/Saved just now/)).toBeInTheDocument();
+
+    await settle(5 * 60 * 1000);
+
+    expect(screen.queryByText(/Saved just now/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Saved 5m ago/)).toBeInTheDocument();
+  });
+
   it("reports a failure inline rather than as a toast", async () => {
     // A toast per failed attempt is a stack of them for an offline laptop, and
     // the user never asked for the save that produced them.

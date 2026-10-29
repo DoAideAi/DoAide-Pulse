@@ -2531,6 +2531,9 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
   );
 }
 
+/** How often "Saved 3m ago" is worked out again. */
+const AUTOSAVE_LABEL_REFRESH_MS = 30_000;
+
 /**
  * What became of the last automatic save.
  *
@@ -2541,6 +2544,18 @@ function PublishDialog({ content, platforms, onClose, onDone, onError }) {
  * things worth knowing after ten minutes of typing without touching anything.
  */
 function AutoSaveStatus({ state, dirty, draft, onRetry }) {
+  // "Saved just now" is relative, and nothing else re-renders this while the
+  // writer sits reading what they wrote — typing hides it (the draft is dirty
+  // again). Without a tick it said "just now" twenty minutes later, which is
+  // the one question it exists to answer. Only while that label is showing.
+  const showingSaved = state.status !== "error" && !dirty && Boolean(state.at);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!showingSaved) return undefined;
+    const timer = setInterval(() => setTick((n) => n + 1), AUTOSAVE_LABEL_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [showingSaved]);
+
   if (state.status === "error") {
     const sameText = state.failedFor === draft;
     const gaveUp =
