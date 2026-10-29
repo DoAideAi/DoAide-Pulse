@@ -1912,6 +1912,9 @@ def create_content(
         source=_manual_source(user, payload.campaign_key),
     )
     content_store.commit_new(db, content)
+    logger.info(
+        "content %s created by hand in project %s by user %s", content.id, project.id, user.id
+    )
     return to_detail(content)
 
 
@@ -2241,7 +2244,16 @@ def approve_content(
         _assert_seo_ready(db, content, previous_status)
     _settle_status(db, content, previous_status)
     db.commit()
-    content_pipeline.release_approved(db, content)
+    released = content_pipeline.release_approved(db, content)
+    # The moment a person said yes — and, on a project that publishes by itself,
+    # the moment publishing was released. Neither left a line before.
+    logger.info(
+        "content %s approved by user %s (was %s%s)",
+        content.id,
+        user.id,
+        previous_status.value,
+        f", {len(released)} publication(s) released" if released else "",
+    )
     db.refresh(content)
     return to_out(content)
 

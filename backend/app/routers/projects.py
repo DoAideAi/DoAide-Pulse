@@ -295,6 +295,7 @@ def create_project(
         db.add(project)
         db.commit()
     db.refresh(project)
+    logger.info("project %s created by user %s", project.id, user.id)
     return _to_out(project, db=db)
 
 
