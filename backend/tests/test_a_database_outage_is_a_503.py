@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import InternalError, OperationalError, ProgrammingError
 from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
 from app.main import app, database_unavailable
@@ -41,6 +41,11 @@ def _op(orig, cls=OperationalError):
         (_op(_PgError("08006")), True),  # connection failure
         (_op(_PgError("53300")), True),  # too many connections
         (_op(_PgError("57P01")), True),  # admin shutdown
+        (_op(_PgError("53100")), True),  # disk full
+        # Read-only: a standby after failover, or writes switched off while a
+        # disk is dealt with. Was a 500 — class 25 is otherwise bugs.
+        (_op(_PgError("25006"), InternalError), True),
+        (_op(_PgError("25P02"), InternalError), False),  # failed transaction left open: a bug
         (_op(_PgError("42703"), ProgrammingError), False),  # undefined column: a bug
         (_op(_SqliteError()), False),  # "no such column" on SQLite
         (ValueError("not a database error"), False),

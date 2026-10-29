@@ -532,6 +532,15 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 #: connections, out of disk), and operator intervention (shutting down).
 _UNAVAILABLE_SQLSTATE_CLASSES = frozenset({"08", "53", "57"})
 
+#: Single codes from classes that are otherwise "the code is wrong". 25006 is
+#: ``read_only_sql_transaction``: a write reaching a database that cannot take
+#: one right now — a standby after failover, or ``default_transaction_read_only``
+#: set while the operator deals with a disk. Class 25 as a whole also holds
+#: 25P02, a failed transaction left open, which is a bug and stays a 500; this
+#: one code used to come out as "something went wrong on our end" when the
+#: true answer was "nothing was saved, try again shortly".
+_UNAVAILABLE_SQLSTATES = frozenset({"25006"})
+
 
 def database_unavailable(exc: BaseException) -> bool:
     """Whether *exc* means the database was unreachable rather than the query wrong."""
@@ -546,7 +555,7 @@ def database_unavailable(exc: BaseException) -> bool:
         getattr(orig, "diag", None), "sqlstate", None
     )
     if sqlstate:
-        return sqlstate[:2] in _UNAVAILABLE_SQLSTATE_CLASSES
+        return sqlstate[:2] in _UNAVAILABLE_SQLSTATE_CLASSES or sqlstate in _UNAVAILABLE_SQLSTATES
     # psycopg raises a bare OperationalError, with no SQLSTATE, when it cannot
     # connect at all. SQLite's OperationalError never has one either, and
     # covers schema mistakes, so only the PostgreSQL driver's counts.
