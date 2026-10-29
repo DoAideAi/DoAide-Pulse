@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ToastProvider } from "./components/ui/Toast";
+import { reportUncaughtErrors } from "./lib/clientErrors";
 import { AuthProvider } from "./hooks/useAuth";
 import { ROUTER_FUTURE } from "./lib/routerFuture";
 import registerServiceWorker from "./lib/registerServiceWorker";
@@ -29,5 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>,
 );
 
+// Throws the boundaries never see — handlers, timers, unhandled promises.
+reportUncaughtErrors();
 reportWebVitals();
 registerServiceWorker();

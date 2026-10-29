@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { whileCaught } from "../test/caught";
-import { _setEnabled, componentNames, reportRenderError } from "./clientErrors";
+import {
+  _setEnabled,
+  componentNames,
+  reportRenderError,
+  reportUncaughtErrors,
+} from "./clientErrors";
 
 // A boundary that tripped used to show its panel and nothing else: the stack
 // went to the one browser's console, and the server never heard of it.
@@ -96,5 +101,76 @@ describe("componentNames", () => {
     for (const stack of [chrome, firefox, react]) {
       expect(componentNames(stack)).toEqual(["Boom", "ErrorBoundary"]);
     }
+  });
+});
+
+describe("an error outside rendering", () => {
+  // An error boundary only sees render throws. A TypeError in a click handler,
+  // or a promise nobody awaited, went to the console of the browser it
+  // happened in and nowhere else — the server never heard of the commonest
+  // kind of front-end failure.
+  let stop;
+  beforeEach(() => {
+    stop = reportUncaughtErrors();
+  });
+  afterEach(() => stop());
+
+  it("is reported when a handler throws", () => {
+    const error = new TypeError("Cannot read properties of null (reading 'id')");
+    window.dispatchEvent(new ErrorEvent("error", { error, message: error.message }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [body] = sentBodies();
+    expect(body.section).toBe("window:error");
+    expect(body.name).toBe("TypeError");
+    expect(body.message).toContain("reading 'id'");
+  });
+
+  it("is reported when a promise is rejected and nobody handles it", () => {
+    const event = new Event("unhandledrejection");
+    event.reason = new RangeError("Invalid time value");
+    window.dispatchEvent(event);
+
+    const [body] = sentBodies();
+    expect(body.section).toBe("window:unhandledrejection");
+    expect(body.name).toBe("RangeError");
+  });
+
+  it("leaves out an API refusal, which the page already showed", () => {
+    // Every request() failure carries the HTTP status (0 for no answer); the
+    // server logged its own side, and the toast told the user.
+    const event = new Event("unhandledrejection");
+    event.reason = Object.assign(new Error("Too many requests"), { status: 429 });
+    window.dispatchEvent(event);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("leaves out a cross-origin script's opaque error and the ResizeObserver notice", () => {
+    window.dispatchEvent(new ErrorEvent("error", { message: "Script error." }));
+    window.dispatchEvent(
+      new ErrorEvent("error", { message: "ResizeObserver loop completed with undelivered notifications." }),
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reports an error event that carries only a message", () => {
+    window.dispatchEvent(new ErrorEvent("error", { message: "Something odd" }));
+    expect(sentBodies()[0].message).toBe("Something odd");
+  });
+
+  it("reports a rejection with something other than an Error", () => {
+    const event = new Event("unhandledrejection");
+    event.reason = "plain string";
+    window.dispatchEvent(event);
+    expect(sentBodies()[0].message).toBe("plain string");
+  });
+
+  it("stops listening when asked", () => {
+    stop();
+    window.dispatchEvent(new ErrorEvent("error", { error: new Error("late"), message: "late" }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    stop = () => {};
   });
 });

@@ -74,15 +74,18 @@ def _account(request: Request) -> str:
 @router.post(
     "",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Report a crash caught by an error boundary in the app",
+    summary="Report a crash in the browser: a tripped error boundary or an uncaught error",
     responses=errors(status.HTTP_413_CONTENT_TOO_LARGE, status.HTTP_429_TOO_MANY_REQUESTS),
 )
 @limiter.limit("20/minute;200/day")
 def report_client_error(request: Request, response: Response, payload: ClientErrorIn) -> Response:
-    """Write one WARNING line for a render crash in the browser. Stores nothing."""
+    """Write one WARNING line for a crash in the browser. Stores nothing."""
     components = ">".join(_clean(c, 60) for c in payload.components[:12] if c)
     logger.warning(
-        "client render error: section=%s route=%s user=%s release=%s error=%s: %s components=%s",
+        # "client error", not "render error": since Pass 39 M2 the browser also
+        # reports throws from handlers and unhandled promises, which arrive with
+        # section=window:error or window:unhandledrejection.
+        "client error: section=%s route=%s user=%s release=%s error=%s: %s components=%s",
         _clean(payload.section, 120) or "-",
         _clean(payload.route, 300) or "-",
         _account(request),

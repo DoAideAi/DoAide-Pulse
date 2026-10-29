@@ -80,6 +80,47 @@ export function reportRenderError(error, info, section) {
   }
 }
 
+/**
+ * Messages that are not Pulse's failure to report. "Script error." is all a
+ * browser will say about a throw in a cross-origin script (an extension, an
+ * analytics tag); the ResizeObserver line is a benign notice browsers raise
+ * as an error event.
+ */
+const NOT_OURS = [/^Script error\.?$/, /^ResizeObserver loop/];
+
+/**
+ * Report throws an error boundary never sees: from event handlers, timers and
+ * promises nobody handled. Those are the commonest front-end failures, and
+ * they went to one browser's console and nowhere else. Returns a function that
+ * stops listening.
+ *
+ * An API refusal is left out: every `request()` failure carries its HTTP
+ * `status`, the server has its own line for it, and the page already showed
+ * the person what went wrong. Reports share the per-page cap with render
+ * crashes, so a handler that throws on every keystroke is five lines, not a
+ * flood.
+ */
+export function reportUncaughtErrors() {
+  if (typeof window === "undefined") return () => {};
+  const onError = (event) => {
+    const message = String(event?.message || event?.error?.message || "");
+    if (NOT_OURS.some((pattern) => pattern.test(message))) return;
+    reportRenderError(event?.error || new Error(message), { componentStack: event?.error?.stack }, "window:error");
+  };
+  const onRejection = (event) => {
+    const reason = event?.reason;
+    if (typeof reason?.status === "number") return;
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    reportRenderError(error, { componentStack: error.stack }, "window:unhandledrejection");
+  };
+  window.addEventListener("error", onError);
+  window.addEventListener("unhandledrejection", onRejection);
+  return () => {
+    window.removeEventListener("error", onError);
+    window.removeEventListener("unhandledrejection", onRejection);
+  };
+}
+
 /** Test hook: switch reporting on or off and forget what was sent. */
 export function _setEnabled(value) {
   enabled = value;
