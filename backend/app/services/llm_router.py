@@ -711,6 +711,12 @@ def _call(
     try:
         choice = data["choices"][0]
         message = choice["message"]
+        # Indexing proves the keys are there, not what they hold: a null or
+        # string ``message`` got through and the ``.get`` calls below raised
+        # AttributeError — not an LLMError, so the chain stopped instead of
+        # asking the next provider.
+        if not isinstance(message, dict):
+            raise TypeError(f"message is {type(message).__name__}")
     except (KeyError, IndexError, TypeError) as exc:
         raise LLMError(
             f"{provider.name} returned a response that is missing expected fields"

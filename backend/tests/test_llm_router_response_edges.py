@@ -191,6 +191,13 @@ def test_a_body_that_is_not_json_names_itself_as_such(monkeypatch):
         pytest.param({"choices": [{}]}, id="choice-without-message"),
         pytest.param({"choices": "not-a-list"}, id="choices-not-a-list"),
         pytest.param({"choices": [None]}, id="null-choice"),
+        # Indexing succeeds on each of these, so the ``except`` around it never
+        # saw them: the ``.get`` calls after it raised AttributeError, which is
+        # not an LLMError, so the chain did not move on to the next provider.
+        pytest.param({"choices": [{"message": None}]}, id="null-message"),
+        pytest.param({"choices": [{"message": "text"}]}, id="message-is-a-string"),
+        pytest.param({"choices": [{"message": ["x"]}]}, id="message-is-a-list"),
+        pytest.param({"choices": ["text"]}, id="choice-is-a-string"),
     ],
 )
 def test_a_choices_key_that_does_not_hold_a_choice_is_an_unexpected_payload(
