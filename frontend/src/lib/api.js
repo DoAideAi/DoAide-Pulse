@@ -17,6 +17,18 @@ export function setToken(token) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+// What a status means when Pulse did not write the answer — Caddy's page while
+// the API restarts, or its timeout on a slow request. Over HTTP/2 there is no
+// reason phrase to fall back on, so these reached the toast as "HTTP 502" on
+// every deploy, and a 504 on a slow write invited an immediate retry of
+// something that may well have finished. Pulse's own JSON detail still wins.
+const GATEWAY_WORDING = {
+  413: "That was too large to send. Try a smaller file or a shorter text.",
+  502: "Pulse is restarting or briefly unreachable. Try again in a moment.",
+  503: "Pulse is restarting or briefly unreachable. Try again in a moment.",
+  504: "Pulse took too long to answer, and it may still have finished. Reload to check before trying again.",
+};
+
 async function request(
   path,
   { method = "GET", body, form, auth = true, headers: extra, total = false, page = false } = {},
@@ -104,7 +116,7 @@ async function request(
     // as `""`, and HTTP/2 has no reason phrase at all, so an empty string is
     // the common case rather than the odd one — and "Error: " with nothing
     // after it tells the user less than the bare status code does.
-    const detail = data?.detail ?? (res.statusText || `HTTP ${res.status}`);
+    const detail = data?.detail ?? (GATEWAY_WORDING[res.status] || res.statusText || `HTTP ${res.status}`);
     // FastAPI validation errors arrive as a list of {loc, msg} objects.
     const message = Array.isArray(detail)
       ? detail.map(describeValidationError).join(", ")

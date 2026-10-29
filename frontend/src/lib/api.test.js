@@ -40,32 +40,52 @@ describe("request", () => {
     expect(error.status).toBe(0);
   });
 
-  it("surfaces the status when an error body is not JSON at all", async () => {
+  // Over HTTP/2 there is no reason phrase, so these used to reach the toast as
+  // a bare "HTTP 502" — during every deploy's restart — and a 504 on a slow
+  // write invited an immediate retry of something that may have finished.
+  it("explains a gateway error that is not Pulse's, and keeps the status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      respondWith({ status: 502, body: "<html><body>502 Bad Gateway</body></html>" }),
+    );
+
+    const error = await api.listProjects().catch((e) => e);
+    expect(error.message).toMatch(/restarting or briefly unreachable/i);
+    expect(error.message).not.toMatch(/^HTTP 502$/);
+    expect(error.status).toBe(502);
+  });
+
+  it("says a timed-out request may still have gone through", async () => {
+    vi.stubGlobal("fetch", respondWith({ status: 504, statusText: "Gateway Timeout", body: "timeout" }));
+
+    const error = await api.listProjects().catch((e) => e);
+    expect(error.message).toMatch(/may still have finished/i);
+    expect(error.message).not.toMatch(/unexpected token/i);
+    expect(error.status).toBe(504);
+  });
+
+  it("says what a proxy's too-large refusal means", async () => {
+    vi.stubGlobal("fetch", respondWith({ status: 413, statusText: "", body: "too big" }));
+
+    await expect(api.listProjects()).rejects.toThrow(/too large/i);
+  });
+
+  it("falls back to the status code for anything else with no detail", async () => {
+    vi.stubGlobal("fetch", respondWith({ status: 418, statusText: "", body: "teapot" }));
+
+    await expect(api.listProjects()).rejects.toThrow("HTTP 418");
+  });
+
+  it("still prefers Pulse's own 503 detail over the generic wording", async () => {
     vi.stubGlobal(
       "fetch",
       respondWith({
-        status: 502,
-        statusText: "Bad Gateway",
-        body: "<html><body>502 Bad Gateway</body></html>",
+        status: 503,
+        body: JSON.stringify({ detail: "The database is unavailable for a moment" }),
       }),
     );
 
-    await expect(api.listProjects()).rejects.toThrow("Bad Gateway");
-  });
-
-  it("never leaks a JSON parse error into the message", async () => {
-    vi.stubGlobal(
-      "fetch",
-      respondWith({ status: 504, statusText: "Gateway Timeout", body: "timeout" }),
-    );
-
-    await expect(api.listProjects()).rejects.toThrow(/^Gateway Timeout$/);
-  });
-
-  it("falls back to the status code when there is no status text either", async () => {
-    vi.stubGlobal("fetch", respondWith({ status: 413, statusText: "", body: "too big" }));
-
-    await expect(api.listProjects()).rejects.toThrow("HTTP 413");
+    await expect(api.listProjects()).rejects.toThrow("The database is unavailable for a moment");
   });
 
   it("still prefers FastAPI's own detail when there is one", async () => {
