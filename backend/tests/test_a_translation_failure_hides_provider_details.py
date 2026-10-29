@@ -65,4 +65,7 @@ def test_provider_error_is_sanitised_before_storage(db, content, monkeypatch):
     )
     assert row.status == TranslationStatus.FAILED
     assert api_key not in row.error
-    assert "Internal error" in row.error
+    # Fixed words rather than anything the provider said — and the words the
+    # caller is answered with, not "Internal error (AIError)".
+    assert "No provider could translate this piece into French" in row.error
+    assert "OpenRouter" not in row.error

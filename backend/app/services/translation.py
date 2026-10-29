@@ -474,13 +474,20 @@ def translate(db: Session, content: Content, language: str) -> ContentTranslatio
             raise TranslationSourceGone(
                 "This piece was deleted while it was being translated."
             ) from exc
+        # The same sentence the caller is answered with, stored where the
+        # language list shows it. It used to be ``sanitize_unexpected_error``,
+        # which is for exceptions nobody expected — so a provider out of quota,
+        # the most ordinary failure there is, sat in the list as "Internal
+        # error (AIError)" next to the French that never came.
+        unavailable = (
+            f"No provider could translate this piece into {entry.name} right now. "
+            "Try again shortly."
+        )
         row.status = TranslationStatus.FAILED
-        row.error = sanitize_unexpected_error(exc)
+        row.error = unavailable
         db.commit()
         logger.warning("translation of content %s into %s failed: %s", content.id, code, exc)
-        raise TranslationUnavailable(
-            f"No provider could translate this piece into {entry.name} right now."
-        ) from exc
+        raise TranslationUnavailable(unavailable) from exc
 
     # Everything from here to the commit is local work on an answer that has
     # already arrived, and none of it is expected to fail. If it does, the row
