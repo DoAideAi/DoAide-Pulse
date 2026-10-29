@@ -31,7 +31,7 @@ from app.models.user import User
 from app.ratelimit import limiter
 from app.schemas.errors import AUTHENTICATED, errors
 from app.schemas.metrics import MetricsOut
-from app.services import ops_metrics
+from app.services import accounts, ops_metrics
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
@@ -74,4 +74,6 @@ def metrics(
     ``ops_metrics.build`` are the most expensive single-endpoint reads in the
     tree.
     """
-    return ops_metrics.build(db, user.id, hours=hours)
+    return ops_metrics.build(
+        db, user.id, hours=hours, operator=accounts.is_operator(user)
+    )

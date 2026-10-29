@@ -399,8 +399,51 @@ def breaker_section() -> dict[str, Any]:
     }
 
 
-def build(db: Session, user_id: int, *, hours: int) -> dict[str, Any]:
-    """The whole payload. One call per section, no section reading another."""
+def _belongs_to_someone_else(name: str, user_id: int) -> bool:
+    """Whether a provider or breaker name carries another account's id.
+
+    Two kinds of name do: a personal LLM key's provider, ``own:<id>:<provider>``
+    (:func:`app.services.user_llm.provider_name`), and the publishing breaker,
+    ``<platform>:<id>`` (:func:`app.services.publishers.breaker.key`). Shared
+    providers name no account.
+    """
+    if name.startswith("own:"):
+        return not name.startswith(f"own:{user_id}:")
+    head, sep, tail = name.rpartition(":")
+    return bool(sep) and tail.isdigit() and int(tail) != user_id and bool(head)
+
+
+def _scoped_to(user_id: int, llm: dict[str, Any], breakers: dict[str, Any]) -> None:
+    """Drop every entry naming another account, in place."""
+    if isinstance(llm.get("by_provider"), list):
+        llm["by_provider"] = [
+            p for p in llm["by_provider"]
+            if not _belongs_to_someone_else(str(p.get("provider", "")), user_id)
+        ]
+    for kind in ("llm", "publish"):
+        snapshot = breakers.get(kind)
+        if isinstance(snapshot, dict):
+            breakers[kind] = {
+                name: state for name, state in snapshot.items()
+                if not _belongs_to_someone_else(name, user_id)
+            }
+
+
+def build(
+    db: Session, user_id: int, *, hours: int, operator: bool = True
+) -> dict[str, Any]:
+    """The whole payload. One call per section, no section reading another.
+
+    The ``llm`` and ``breakers`` sections describe the deployment, and names in
+    both carry account ids — a personal key's provider, a per-account publishing
+    breaker. Anyone but the operator gets them with every other account's
+    entries taken out: with registration open, they read off which accounts
+    exist, where each publishes and whose connection was failing.
+    """
+    llm = llm_section(db, hours=hours)
+    breakers = breaker_section()
+    if not operator:
+        _scoped_to(user_id, llm, breakers)
     return {
         "window_hours": hours,
         "content": content_counts(db, user_id),
@@ -408,8 +451,8 @@ def build(db: Session, user_id: int, *, hours: int) -> dict[str, Any]:
         "publishing": publish_rates(db, user_id),
         "webhooks": webhook_section(db, user_id, hours=hours),
         "triggers": trigger_section(db, user_id),
-        "llm": llm_section(db, hours=hours),
-        "breakers": breaker_section(),
+        "llm": llm,
+        "breakers": breakers,
     }
 
 
