@@ -73,7 +73,10 @@ jobs:
       - name: Test
         # No env on purpose: tests/conftest.py assigns its own (in-memory
         # SQLite, no broker), so what runs here is what runs locally.
-        run: pytest -q -p no:cacheprovider
+        # --cov runs the gate pyproject.toml configures (source, branch mode,
+        # fail_under). Without it pytest-cov was installed on every run and
+        # the floor it guards was never checked anywhere.
+        run: pytest -q -p no:cacheprovider --cov
 
       - name: Migrate a fresh Postgres to head
         # The suite builds its schema with create_all on SQLite; this is the
