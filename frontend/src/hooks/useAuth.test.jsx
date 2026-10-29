@@ -24,6 +24,7 @@ vi.mock("../lib/api", () => ({
   getToken: vi.fn(),
   setToken: vi.fn(),
   SESSION_ENDED: "pulse:session-ended",
+  TOKEN_KEY: "pulse_token",
 }));
 
 const ME = { id: 1, email: "writer@example.com", connected_platforms: [] };
@@ -211,5 +212,88 @@ describe("outside the provider", () => {
     await whileCaught(() => {
       expect(() => renderHook(() => useAuth())).toThrow(/within AuthProvider/);
     });
+  });
+});
+
+
+// The token is in localStorage, shared by every tab; `user` was not. Signing out
+// in one tab left the others showing the account — and once somebody else
+// signed in on that browser, a stale tab went on showing the first account's
+// pages while its requests carried the second account's token.
+describe("another tab changes the session", () => {
+  async function signedIn() {
+    getToken.mockReturnValue("token-1");
+    api.me.mockResolvedValue(ME);
+    const view = draw();
+    await waitFor(() => expect(view.result.current.user).toEqual(ME));
+    return view;
+  }
+
+  function storage(key, newValue) {
+    act(() => {
+      window.dispatchEvent(new StorageEvent("storage", { key, newValue }));
+    });
+  }
+
+  it("signs this tab out when that one signs out", async () => {
+    const { result } = await signedIn();
+
+    getToken.mockReturnValue(null);
+    storage("pulse_token", null);
+
+    expect(result.current.user).toBeNull();
+  });
+
+  it("signs this tab out when the whole storage is cleared", async () => {
+    const { result } = await signedIn();
+
+    getToken.mockReturnValue(null);
+    storage(null, null);
+
+    expect(result.current.user).toBeNull();
+  });
+
+  it("does not carry on as one account under another account's token", async () => {
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    try {
+      const { result } = await signedIn();
+
+      getToken.mockReturnValue("token-2");
+      api.me.mockResolvedValue({ ...ME, id: 2, email: "someone@example.com" });
+      storage("pulse_token", "token-2");
+
+      await waitFor(() => expect(reload).toHaveBeenCalled());
+      expect(result.current.user?.id).not.toBe(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("takes the same account's new token without a reload", async () => {
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    try {
+      const { result } = await signedIn();
+
+      getToken.mockReturnValue("token-1b");
+      api.me.mockResolvedValue({ ...ME, full_name: "Renamed" });
+      storage("pulse_token", "token-1b");
+
+      await waitFor(() => expect(result.current.user?.full_name).toBe("Renamed"));
+      expect(reload).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ignores every other key", async () => {
+    const { result } = await signedIn();
+    api.me.mockClear();
+
+    storage("pulse:theme", "dark");
+
+    expect(api.me).not.toHaveBeenCalled();
+    expect(result.current.user).toEqual(ME);
   });
 });

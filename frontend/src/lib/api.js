@@ -5,7 +5,7 @@ import { routePattern, trackAction } from "./activity";
 import { browserZone } from "./seo";
 
 const BASE = "/api/v1";
-const TOKEN_KEY = "pulse_token";
+export const TOKEN_KEY = "pulse_token";
 /** Dispatched on `window` when a request that carried the session is refused. */
 export const SESSION_ENDED = "pulse:session-ended";
 
