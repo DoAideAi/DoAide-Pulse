@@ -9,7 +9,7 @@ import logging
 from functools import lru_cache
 from urllib.parse import urlsplit
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 #: Shortest ``JWT_SECRET`` production will start with, in bytes. 256 bits, the
@@ -1146,6 +1146,34 @@ class Settings(BaseSettings):
                 f"(an HMAC algorithm for the shared JWT_SECRET), got {v!r}"
             )
         return cleaned
+
+    @model_validator(mode="after")
+    def _rate_limits_parse(self) -> Settings:
+        """Every ``RATE_LIMIT_*`` string is one slowapi can read, or startup fails.
+
+        slowapi parses these when a request reaches the route, and drops one it
+        cannot parse: ``60/minut`` left the route with no limit at all, silently
+        — no error, no log, and the endpoint answering as fast as anyone asked.
+        Parsed here, a typo is a startup error naming the setting, which the
+        deploy's config gate refuses before any service restarts.
+        """
+        from limits import parse_many
+
+        for name in type(self).model_fields:
+            if not name.startswith("rate_limit_") or name == "rate_limit_storage_uri":
+                continue
+            value = getattr(self, name)
+            if not isinstance(value, str):
+                continue
+            try:
+                if not parse_many(value):
+                    raise ValueError("no limit in it")
+            except ValueError as exc:
+                raise ValueError(
+                    f"{name.upper()}={value!r} is not a rate limit (write it like "
+                    f"'60/minute' or '10/minute;100/hour'): {exc}"
+                ) from None
+        return self
 
     @field_validator("jwt_secret")
     @classmethod
