@@ -41,7 +41,7 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.api_key import ApiKey, ApiKeyScope
@@ -306,6 +306,23 @@ def touch(db: Session, key: ApiKey, *, now: datetime | None = None) -> bool:
     return True
 
 
+def live(now: datetime | None = None) -> ColumnElement[bool]:
+    """The SQL for :meth:`ApiKey.is_usable`: neither revoked nor expired.
+
+    What the per-project cap counts. It used to count ``revoked_at IS NULL``
+    alone, which takes an expired key for a live one — and a rotation with a
+    grace window retires the old key by *expiring* it, never by revoking it.
+    So every grace rotation left a dead key holding one of the project's
+    twenty places for good, until the project could neither mint a key nor
+    rotate one with grace, and was told to "revoke one you no longer use"
+    while every key it could see had already stopped working.
+    """
+    moment = now or utcnow()
+    return ApiKey.revoked_at.is_(None) & or_(
+        ApiKey.expires_at.is_(None), ApiKey.expires_at > moment
+    )
+
+
 def revoke(db: Session, key: ApiKey, *, now: datetime | None = None) -> ApiKey:
     """Stop *key* working, now and permanently. Idempotent.
 
@@ -435,6 +452,7 @@ __all__ = [
     "expiry_from_days",
     "fingerprint",
     "generate",
+    "live",
     "mint",
     "normalize_scopes",
     "revoke",

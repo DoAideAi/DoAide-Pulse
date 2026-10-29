@@ -162,7 +162,7 @@ def create_api_key(
     live = (
         db.scalar(
             select(func.count(ApiKey.id)).where(
-                ApiKey.project_id == project.id, ApiKey.revoked_at.is_(None)
+                ApiKey.project_id == project.id, api_keys.live()
             )
         )
         or 0
@@ -235,7 +235,7 @@ def rotate_api_key(
             db.scalar(
                 select(func.count(ApiKey.id)).where(
                     ApiKey.project_id == key.project_id,
-                    ApiKey.revoked_at.is_(None),
+                    api_keys.live(),
                 )
             )
             or 0
