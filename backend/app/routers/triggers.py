@@ -724,7 +724,9 @@ def _verified_signature(trigger: Trigger, raw: bytes, headers: _InboundHeaders) 
     if headers.pulse_signature and webhooks.verify(
         secret, headers.pulse_signature, raw.decode("utf-8", errors="replace")
     ):
-        return headers.pulse_signature
+        # Canonical, not as sent: the header verifies under many spellings, and
+        # each spelling of one captured request used to be a fresh nonce.
+        return webhooks.canonical_signature(headers.pulse_signature)
     if headers.github_signature and webhooks.verify_github(
         secret, headers.github_signature, raw
     ):

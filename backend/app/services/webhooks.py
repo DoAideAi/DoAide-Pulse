@@ -151,6 +151,39 @@ def sign(secret: str, timestamp: int, body: str) -> str:
     return f"t={timestamp},{SIGNATURE_VERSION}={digest}"
 
 
+def _parse_signature(header: str) -> tuple[int, str] | None:
+    """``(timestamp, hex digest)`` from a :data:`SIGNATURE_HEADER` value, or ``None``."""
+    parts = dict(
+        piece.split("=", 1) for piece in (header or "").split(",") if "=" in piece
+    )
+    signature = parts.get(SIGNATURE_VERSION, "").strip()
+    # A real signature is SHA-256 hex and nothing else. Anything that is not
+    # cannot match, and comparing it is what breaks.
+    if not signature or not _HEX.fullmatch(signature):
+        return None
+    try:
+        timestamp = int(parts.get("t", "").strip())
+    except ValueError:
+        return None
+    return timestamp, signature
+
+
+def canonical_signature(header: str) -> str:
+    """One spelling for every header :func:`verify` reads as the same signature.
+
+    ``verify`` is lenient about the header — unknown pieces, any order, a
+    timestamp ``int()`` will parse — and it has to stay so, but a replay nonce
+    built from the header as sent inherited all of that: ``t=…,v1=…,x=1``,
+    ``x=2``, … each verified and each was a "new" delivery. This is what was
+    actually checked, so it is what a nonce is made of.
+    """
+    parsed = _parse_signature(header)
+    if parsed is None:
+        return ""
+    timestamp, signature = parsed
+    return f"t={timestamp},{SIGNATURE_VERSION}={signature.lower()}"
+
+
 def verify(secret: str, header: str, body: str, *, tolerance_seconds: int = 300) -> bool:
     """Whether *header* is a valid, recent signature for *body*.
 
@@ -168,18 +201,10 @@ def verify(secret: str, header: str, body: str, *, tolerance_seconds: int = 300)
     would otherwise take a 401 and turn it into a 500 — an unauthenticated
     request choosing which error the server returns.
     """
-    parts = dict(
-        piece.split("=", 1) for piece in (header or "").split(",") if "=" in piece
-    )
-    signature = parts.get(SIGNATURE_VERSION, "").strip()
-    # A real signature is SHA-256 hex and nothing else. Anything that is not
-    # cannot match, and comparing it is what breaks.
-    if not signature or not _HEX.fullmatch(signature):
+    parsed = _parse_signature(header)
+    if parsed is None:
         return False
-    try:
-        timestamp = int(parts.get("t", "").strip())
-    except ValueError:
-        return False
+    timestamp, signature = parsed
     if abs(int(utcnow().timestamp()) - timestamp) > tolerance_seconds:
         return False
     expected = sign(secret, timestamp, body).split(f"{SIGNATURE_VERSION}=", 1)[1]
