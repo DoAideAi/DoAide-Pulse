@@ -96,6 +96,9 @@ export default function ContentList() {
     });
   }, []);
 
+  const reviewCount = data ? data.filter((i) => i.status === "review").length : 0;
+  const allSelected = reviewCount > 0 && selected.size === reviewCount;
+
   const selectAll = useCallback(() => {
     if (!data) return;
     const reviewIds = data.filter((i) => i.status === "review").map((i) => i.id);
@@ -285,26 +288,42 @@ export default function ContentList() {
         />
       ) : isReviewView ? (
         <>
-          {selected.size > 0 && (
-            <div className="flex items-center gap-3 rounded-lg border border-brand-500/30 bg-brand-50 px-4 py-2.5">
-              <span className="text-sm text-brand-600">{selected.size} selected</span>
-              <button
-                className="btn-quiet text-good"
-                onClick={bulkApprove}
-                disabled={approvingBulk || rejectingBulk}
-              >
-                Approve selected
-              </button>
-              <button
-                className="btn-quiet text-bad"
-                onClick={bulkReject}
-                disabled={rejectingBulk || approvingBulk}
-              >
-                {rejectingBulk ? "Rejecting…" : "Reject selected"}
-              </button>
-              <button className="btn-quiet" onClick={() => setSelected(new Set())}>
-                Clear
-              </button>
+          {/* Shown once there are two pieces to choose between, not only after
+              one is ticked: ``selectAll`` existed with nothing wired to it, so
+              approving twenty drafts from the keyboard meant tabbing to twenty
+              checkboxes. The count is a live region, so a screen reader hears
+              each tick land instead of a silent checkbox. */}
+          {(reviewCount > 1 || selected.size > 0) && (
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand-500/30 bg-brand-50 px-4 py-2.5">
+              {reviewCount > 1 && (
+                <button className="btn-quiet" onClick={selectAll}>
+                  {allSelected ? "Clear selection" : `Select all ${reviewCount}`}
+                </button>
+              )}
+              <span className="text-sm text-brand-600" role="status" aria-live="polite">
+                {selected.size > 0 ? `${selected.size} selected` : ""}
+              </span>
+              {selected.size > 0 && (
+                <>
+                  <button
+                    className="btn-quiet text-good"
+                    onClick={bulkApprove}
+                    disabled={approvingBulk || rejectingBulk}
+                  >
+                    Approve selected
+                  </button>
+                  <button
+                    className="btn-quiet text-bad"
+                    onClick={bulkReject}
+                    disabled={rejectingBulk || approvingBulk}
+                  >
+                    {rejectingBulk ? "Rejecting…" : "Reject selected"}
+                  </button>
+                  <button className="btn-quiet" onClick={() => setSelected(new Set())}>
+                    Clear
+                  </button>
+                </>
+              )}
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

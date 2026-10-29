@@ -477,6 +477,38 @@ describe("review mode", () => {
       expect(api.bulkReject).toHaveBeenCalledWith([1, 2]);
     });
   });
+
+  // ``selectAll`` existed with nothing wired to it: picking every draft from
+  // the keyboard meant tabbing to each checkbox in turn.
+  it("selects every draft from the keyboard and says how many are selected", async () => {
+    api.listContent.mockResolvedValue([
+      item({ id: 1, status: "review" }),
+      item({ id: 2, title: "Second", status: "review" }),
+      item({ id: 3, title: "Third", status: "review" }),
+    ]);
+    api.bulkReject.mockResolvedValue({ archived: [1, 2, 3], failed: [] });
+    const user = userEvent.setup();
+    drawReview();
+
+    const selectAll = await screen.findByRole("button", { name: "Select all 3" });
+    selectAll.focus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByRole("status")).toHaveTextContent("3 selected");
+    expect(screen.getAllByRole("checkbox").every((box) => box.checked)).toBe(true);
+    expect(screen.getByRole("button", { name: "Clear selection" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Reject selected" }));
+    await vi.waitFor(() => expect(api.bulkReject).toHaveBeenCalledWith([1, 2, 3]));
+  });
+
+  it("offers no select-all for a single draft", async () => {
+    api.listContent.mockResolvedValue([item({ id: 1, status: "review" })]);
+    drawReview();
+
+    await screen.findByRole("checkbox");
+    expect(screen.queryByRole("button", { name: /^Select all/ })).not.toBeInTheDocument();
+  });
 });
 
 describe("searching by title", () => {
