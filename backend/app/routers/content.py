@@ -1,6 +1,7 @@
 """Content: generate, edit, review, approve, publish."""
 from __future__ import annotations
 
+import copy
 import logging
 import secrets
 import unicodedata
@@ -30,6 +31,7 @@ from app.models.mixins import utcnow
 from app.models.preview_link import PreviewLink
 from app.models.project import Project
 from app.models.publication import Platform, Publication, PublicationStatus
+from app.models.revision import RevisionSource
 from app.models.user import User
 from app.ratelimit import account_key, limiter
 from app.routers._content_views import to_detail, to_out
@@ -404,6 +406,36 @@ def _seo_preflight(content: Content) -> list[str]:
     return issues
 
 
+def _autofix_with_history(db: Session, content: Content) -> None:
+    """Run the SEO autofix, banking the text it is about to replace.
+
+    The autofix rewrites the title, the meta description and the body, and on
+    the way to APPROVED it runs over a piece somebody has been editing. Every
+    other writer of those columns snapshots first (the PATCH, a restore); this
+    one did not, and the UPDATE that carried its changes moved ``version`` on.
+    So the text the reviewer actually approved was never stored under any
+    version: the history went from their last autosave straight to Pulse's
+    rewrite, and "Restore" could not bring their own words back.
+
+    Recorded as ``system`` — Pulse changed it — and only when something moved.
+    Under ``no_autoflush`` because the snapshot reads the piece back to check
+    for an existing revision, and a flush in the middle would write the
+    half-restored row and bump the version the snapshot is filed under.
+    """
+    fields = revisions.TRACKED_FIELDS
+    before = {f: copy.deepcopy(getattr(content, f)) for f in fields}
+    seo_autofix.apply(db, content)
+    moved = {f: getattr(content, f) for f in fields if getattr(content, f) != before[f]}
+    if not moved:
+        return
+    with db.no_autoflush:
+        for field in moved:
+            setattr(content, field, before[field])
+        revisions.snapshot_if_changing(db, content, moved, source=RevisionSource.SYSTEM)
+        for field, value in moved.items():
+            setattr(content, field, value)
+
+
 def _assert_seo_ready(
     db: Session, content: Content, previous_status: ContentStatus
 ) -> None:
@@ -423,7 +455,7 @@ def _assert_seo_ready(
     if previous_status not in (ContentStatus.DRAFT, ContentStatus.REVIEW):
         return
 
-    seo_autofix.apply(db, content)
+    _autofix_with_history(db, content)
     issues = _seo_preflight(content)
     if issues:
         logger.info(
@@ -726,7 +758,7 @@ def bulk_approve_content(
             # rollback below discards it — but judges the repaired piece.
             # SEO findings are advisory (see ``_assert_seo_ready``): repair
             # what is mechanical and approve regardless.
-            seo_autofix.apply(db, content)
+            _autofix_with_history(db, content)
         succeeded.append(content_id)
         if payload.dry_run:
             continue
@@ -2241,7 +2273,7 @@ def approve_content(
         # Still repaired: "approve anyway" overrides what could not be fixed,
         # not what could.
         if previous_status in (ContentStatus.DRAFT, ContentStatus.REVIEW):
-            seo_autofix.apply(db, content)
+            _autofix_with_history(db, content)
     else:
         _assert_seo_ready(db, content, previous_status)
     _assert_release_has_body(content)
