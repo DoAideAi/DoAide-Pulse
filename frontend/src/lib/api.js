@@ -60,7 +60,19 @@ async function request(
     }
   }
 
-  const text = await res.text();
+  let text;
+  try {
+    text = await res.text();
+  } catch {
+    // The headers arrived and the body did not: the connection dropped part
+    // way, or a streamed answer (the account export) failed on the server
+    // after its 200 had gone out. This sat outside the try above, so the
+    // browser's own "network error" / "Load failed" reached the toast.
+    throw Object.assign(
+      new Error("Pulse stopped answering part-way through — check your connection and try again."),
+      { status: 0 },
+    );
+  }
   // Not everything that answers this fetch is Pulse. A gateway timeout, a
   // proxy's request-too-large page and a stray HTML error page all arrive here
   // as text, and `JSON.parse` on them throws a SyntaxError whose message is
@@ -68,12 +80,24 @@ async function request(
   // instead of the status that would tell them what happened. Parse failure is
   // "no structured body", not an error in its own right.
   let data = null;
+  let unreadable = false;
   if (text) {
     try {
       data = JSON.parse(text);
     } catch {
       data = null;
+      unreadable = true;
     }
+  }
+  // A success whose body will not parse is not a success with no data: every
+  // 2xx Pulse sends with a body is JSON, so this is an answer cut short. It
+  // used to come back as `null` — and the account export then saved a file
+  // containing `null` before failing on `data.content`.
+  if (res.ok && unreadable) {
+    throw Object.assign(
+      new Error("Pulse's answer arrived cut off, so nothing was used. Try again."),
+      { status: res.status },
+    );
   }
   if (!res.ok) {
     // `||` on the status text, not `??`: fetch reports an absent reason phrase

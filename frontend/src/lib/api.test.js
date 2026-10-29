@@ -144,6 +144,33 @@ describe("request", () => {
     await expect(api.deleteProject(1)).resolves.toBeNull();
   });
 
+  it("says so when a body is cut off mid-read, not the browser's 'network error'", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        text: async () => {
+          throw new TypeError("network error");
+        },
+      }),
+    );
+
+    const error = await api.exportAccount().catch((e) => e);
+
+    expect(error.message).toMatch(/stopped answering part-way through/);
+    expect(error.message).not.toMatch(/network error/);
+    expect(error.status).toBe(0);
+  });
+
+  it("refuses a success whose body is cut short instead of returning null", async () => {
+    // The account export saved a file containing `null` from exactly this.
+    vi.stubGlobal("fetch", respondWith({ status: 200, body: '{"account": {"email": "a@' }));
+
+    await expect(api.exportAccount()).rejects.toThrow(/arrived cut off/);
+  });
+
   it("clears a token the server has stopped accepting", async () => {
     setToken("stale");
     vi.stubGlobal("fetch", respondWith({ status: 401, statusText: "Unauthorized" }));
