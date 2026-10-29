@@ -1,0 +1,51 @@
+name: Dependency audit
+
+# The push CI tests the code; it does not ask whether a pinned version has
+# become a known vulnerability since. Pins are what keep an old version
+# installed, so an advisory published after the last manual audit sat on the
+# box with every run green. This asks weekly, and on demand. Its own workflow,
+# so a fresh advisory cannot turn a push red in the middle of another change.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python (every pin)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pip-audit
+        run: python -m pip install --upgrade pip pip-audit
+      - name: Audit requirements and constraints
+        # Both files, every pin — the transitive closure is in constraints.txt
+        # (tests/test_every_runtime_dependency_is_pinned.py keeps it complete).
+        # --no-deps: the pins are the whole set, nothing to resolve.
+        run: pip-audit -r requirements.txt -r constraints.txt --no-deps --disable-pip --progress-spinner off
+
+  frontend:
+    name: Frontend (what ships)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=moderate
