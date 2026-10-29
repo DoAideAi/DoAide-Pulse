@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 
+from sqlalchemy.exc import OperationalError
+
 from app.database import SessionLocal
 from app.services import meta_audit, seo_history, sitemaps
 from app.tasks.celery_app import task
@@ -14,6 +16,11 @@ logger = logging.getLogger(__name__)
     name="app.tasks.seo_tasks.submit_sitemaps",
     soft_time_limit=300,
     time_limit=360,
+    autoretry_for=(OperationalError, ConnectionError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=2,
 )
 def submit_sitemaps() -> dict:
     """Fetch, resubmit and read back every site's sitemap.
@@ -40,6 +47,11 @@ def submit_sitemaps() -> dict:
     name="app.tasks.seo_tasks.audit_meta_tags",
     soft_time_limit=900,
     time_limit=960,
+    autoretry_for=(OperationalError, ConnectionError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=2,
 )
 def audit_meta_tags() -> dict:
     """Audit every site's meta tags. Sequential by site, a few pages at a time
@@ -68,6 +80,11 @@ def audit_meta_tags() -> dict:
     name="app.tasks.seo_tasks.record_seo_snapshot",
     soft_time_limit=60,
     time_limit=90,
+    autoretry_for=(OperationalError, ConnectionError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=2,
 )
 def record_seo_snapshot() -> dict:
     """The nightly backstop for the health-over-time chart.

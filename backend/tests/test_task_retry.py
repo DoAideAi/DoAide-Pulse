@@ -43,6 +43,9 @@ _NO_AUTORETRY = {
     "app.tasks.maintenance_tasks.purge_old_trigger_events": "daily idempotent purge",
     "app.tasks.maintenance_tasks.purge_old_preview_links": "daily idempotent purge",
     "app.tasks.maintenance_tasks.purge_old_llm_usage": "daily idempotent purge",
+    "app.tasks.maintenance_tasks.purge_old_activity": "daily idempotent purge",
+    "app.tasks.maintenance_tasks.purge_old_product_events": "daily idempotent purge",
+    "app.tasks.maintenance_tasks.purge_old_feedback": "daily idempotent purge",
     "app.tasks.maintenance_tasks.rewrap_credentials": (
         "daily idempotent sweep; re-reads what it did not finish"
     ),

@@ -8,6 +8,7 @@ import logging
 from datetime import timedelta
 
 from sqlalchemy import delete, func, or_
+from sqlalchemy.exc import OperationalError
 
 from app.config import settings
 from app.database import SessionLocal
@@ -292,6 +293,11 @@ def purge_old_feedback() -> dict:
     name="app.tasks.maintenance_tasks.verify_all_connections",
     soft_time_limit=300,
     time_limit=360,
+    autoretry_for=(OperationalError, ConnectionError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    retry_jitter=True,
+    max_retries=2,
 )
 def verify_all_connections() -> dict:
     """Re-verify every stored platform connection.
