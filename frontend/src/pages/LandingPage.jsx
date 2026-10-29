@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { SESSION_ENDED } from "../lib/api";
 import { useAuth } from "../hooks/useAuth";
 import AnalyticsMockup from "../components/AnalyticsMockup";
 import CrossProductLinks from "../components/CrossProductLinks";
@@ -515,6 +516,17 @@ export default function LandingPage() {
     return code;
   });
   const [mode, setMode] = useState(() => (invite ? "signup" : "signin"));
+  // Set by useAuth when the API refused the session mid-use. Read once and
+  // cleared, so the notice is about this visit and not every later one.
+  const [sessionEnded] = useState(() => {
+    try {
+      const ended = window.sessionStorage.getItem(SESSION_ENDED) === "1";
+      if (ended) window.sessionStorage.removeItem(SESSION_ENDED);
+      return ended;
+    } catch {
+      return false;
+    }
+  });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -652,6 +664,13 @@ export default function LandingPage() {
                 Create account
               </button>
             </div>
+
+            {sessionEnded && (
+              <p className="landing-label-hint landing-session-ended" role="status">
+                Your session has ended. Sign in again to carry on — unsaved edits are kept
+                on this browser and offered back when you return to the piece.
+              </p>
+            )}
 
             <form onSubmit={onSubmit} className="landing-auth-form">
               {isSignUp && (

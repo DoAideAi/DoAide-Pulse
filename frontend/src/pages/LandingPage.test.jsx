@@ -177,4 +177,20 @@ describe("LandingPage", () => {
       );
     });
   });
+
+  describe("after a session ends mid-use", () => {
+    afterEach(() => window.sessionStorage.clear());
+
+    it("says why the user is back at sign-in, once", () => {
+      window.sessionStorage.setItem("pulse:session-ended", "1");
+      const { unmount } = wrap();
+
+      expect(screen.getByRole("status")).toHaveTextContent("Your session has ended");
+      expect(window.sessionStorage.getItem("pulse:session-ended")).toBeNull();
+      unmount();
+
+      wrap();
+      expect(screen.queryByText(/Your session has ended/)).not.toBeInTheDocument();
+    });
+  });
 });

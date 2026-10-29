@@ -1470,3 +1470,14 @@
 .landing-forgot:hover {
   text-decoration: underline;
 }
+
+/* "Your session has ended" above the sign-in form. */
+.landing-session-ended {
+  display: block;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(13, 148, 136, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+}

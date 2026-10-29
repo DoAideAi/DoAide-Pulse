@@ -152,6 +152,30 @@ describe("request", () => {
     expect(getToken()).toBeNull();
   });
 
+  it("announces a refused session, so the app can sign the user out", async () => {
+    setToken("stale");
+    vi.stubGlobal("fetch", respondWith({ status: 401, statusText: "Unauthorized" }));
+    const heard = vi.fn();
+    window.addEventListener("pulse:session-ended", heard);
+
+    await expect(api.me()).rejects.toThrow();
+
+    window.removeEventListener("pulse:session-ended", heard);
+    expect(heard).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not announce one for a failed sign-in, which carried no session", async () => {
+    setToken(null);
+    vi.stubGlobal("fetch", respondWith({ status: 401, statusText: "Unauthorized" }));
+    const heard = vi.fn();
+    window.addEventListener("pulse:session-ended", heard);
+
+    await expect(api.login("a@example.com", "wrong")).rejects.toThrow();
+
+    window.removeEventListener("pulse:session-ended", heard);
+    expect(heard).not.toHaveBeenCalled();
+  });
+
   it("stringifies a detail that is neither a string nor a validation list", async () => {
     vi.stubGlobal(
       "fetch",

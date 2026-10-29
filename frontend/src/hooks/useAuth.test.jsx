@@ -23,6 +23,7 @@ vi.mock("../lib/api", () => ({
   },
   getToken: vi.fn(),
   setToken: vi.fn(),
+  SESSION_ENDED: "pulse:session-ended",
 }));
 
 const ME = { id: 1, email: "writer@example.com", connected_platforms: [] };
@@ -75,6 +76,26 @@ describe("starting up with a stored token", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(setToken).toHaveBeenCalledWith(null);
     expect(result.current.user).toBeNull();
+  });
+});
+
+describe("a session the server stops accepting", () => {
+  // api.js clears the token on a 401 and announces it; until this the app
+  // kept its user, and every later action failed on a page that still looked
+  // signed in.
+  it("signs the app out, so the route guard can take the user to sign in", async () => {
+    getToken.mockReturnValue("token");
+    api.me.mockResolvedValue(ME);
+    const { result } = draw();
+    await waitFor(() => expect(result.current.user).toEqual(ME));
+
+    act(() => {
+      window.dispatchEvent(new Event("pulse:session-ended"));
+    });
+
+    expect(result.current.user).toBeNull();
+    expect(window.sessionStorage.getItem("pulse:session-ended")).toBe("1");
+    window.sessionStorage.clear();
   });
 });
 

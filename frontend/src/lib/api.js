@@ -6,6 +6,8 @@ import { browserZone } from "./seo";
 
 const BASE = "/api/v1";
 const TOKEN_KEY = "pulse_token";
+/** Dispatched on `window` when a request that carried the session is refused. */
+export const SESSION_ENDED = "pulse:session-ended";
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
@@ -46,7 +48,17 @@ async function request(
     );
   }
 
-  if (res.status === 401) setToken(null);
+  if (res.status === 401) {
+    setToken(null);
+    // Only a request that sent the session can say the session is over — a
+    // failed sign-in is a 401 too. Clearing the token used to be all this
+    // did: the app kept its signed-in user, so every later click and every
+    // autosave failed with "Token is invalid, expired…" on a page that still
+    // looked signed in, with no way back to the sign-in form short of a reload.
+    if (headers.Authorization && typeof window !== "undefined") {
+      window.dispatchEvent(new Event(SESSION_ENDED));
+    }
+  }
 
   const text = await res.text();
   // Not everything that answers this fetch is Pulse. A gateway timeout, a

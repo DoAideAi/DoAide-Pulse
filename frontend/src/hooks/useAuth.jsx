@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, getToken, setToken } from "../lib/api";
+import { api, getToken, SESSION_ENDED, setToken } from "../lib/api";
 import trackEvent from "../lib/trackEvent";
 
 const AuthContext = createContext(null);
@@ -7,6 +7,23 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // The API refused the session (expired, revoked by a password reset, or the
+  // account switched off). Signed out here too, so the route guard takes the
+  // user to the sign-in form — which says why — instead of leaving them on a
+  // page where every action fails.
+  useEffect(() => {
+    function ended() {
+      try {
+        window.sessionStorage.setItem(SESSION_ENDED, "1");
+      } catch {
+        // Private mode: the redirect still happens, just without the notice.
+      }
+      setUser(null);
+    }
+    window.addEventListener(SESSION_ENDED, ended);
+    return () => window.removeEventListener(SESSION_ENDED, ended);
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
