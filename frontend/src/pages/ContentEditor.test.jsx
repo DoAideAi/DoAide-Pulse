@@ -784,6 +784,10 @@ describe("editing one passage", () => {
         "First paragraph here.\n\nSecond, shorter.",
       ),
     );
+    // The splice is followed by its own state updates (the undo offer, the
+    // save it triggers). Let them land inside the test: on a slow CI runner
+    // they arrived after the assertion and failed it as an unwrapped act().
+    await act(async () => {});
   });
 
   it("saves before asking, because the server checks against the stored body", async () => {
