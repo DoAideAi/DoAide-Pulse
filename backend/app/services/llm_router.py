@@ -75,7 +75,7 @@ import httpx
 from app.config import settings
 from app.services import llm_usage
 from app.services.breaker import CircuitBreaker
-from app.services.errors import friendly_network_error
+from app.services.errors import friendly_network_error, redact
 
 logger = logging.getLogger(__name__)
 
@@ -474,7 +474,12 @@ def _status_error(provider: Provider, resp: httpx.Response) -> LLMError:
     on a second attempt, and retrying a bad key across four providers is how one
     misconfiguration becomes sixteen requests.
     """
-    body = _short(getattr(resp, "text", "") or "")
+    # Redacted before it is quoted anywhere. The body is the provider's, and a
+    # 401 can validate by echoing ("invalid api_key: sk-…"): quoted bare, the
+    # key went into the journal on every failure and — for a personal key —
+    # into the key check's answer and ``UserLLMKey.last_error``, beside the
+    # encrypted copy. The same fix ``errors.redact`` is to the publishers.
+    body = redact(_short(getattr(resp, "text", "") or ""), [provider.api_key])
     status = resp.status_code
 
     if status == 429 or (status in _RETRYABLE_STATUSES and _looks_rate_limited(body)):
@@ -507,7 +512,7 @@ def _body_error(provider: Provider, data: dict) -> LLMError:
     """
     error = data.get("error")
     error = error if isinstance(error, dict) else {}
-    detail = str(error.get("message") or "no choices returned")
+    detail = redact(str(error.get("message") or "no choices returned"), [provider.api_key])
     code = error.get("code")
 
     metadata = error.get("metadata")
