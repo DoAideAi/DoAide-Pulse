@@ -112,3 +112,19 @@ def test_jwt_algorithm_must_be_hmac(value):
 @pytest.mark.parametrize("value,expected", [("HS256", "HS256"), ("hs512", "HS512")])
 def test_an_hmac_algorithm_is_accepted(value, expected):
     assert _settings(jwt_algorithm=value).jwt_algorithm == expected
+
+
+# A worker replaced after every task would be a worker that never finishes a
+# sweep's second item warm; zero is a typo, not a setting.
+@pytest.mark.parametrize("value", [0, -1])
+def test_the_worker_memory_ceiling_must_be_positive(value):
+    with pytest.raises(ValidationError):
+        _settings(celery_worker_max_memory_kb=value)
+
+
+def test_the_worker_memory_ceiling_reaches_celery():
+    from app.config import settings
+    from app.tasks.celery_app import celery_app
+
+    assert celery_app.conf.worker_max_memory_per_child == settings.celery_worker_max_memory_kb
+    assert celery_app.conf.worker_max_tasks_per_child == 200

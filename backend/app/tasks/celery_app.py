@@ -107,6 +107,9 @@ celery_app.conf.update(
     # The box has 7.5 GB shared with five other apps; a worker whose resident
     # set grows without bound eventually triggers the OOM killer.
     worker_max_tasks_per_child=200,
+    # And after any task that leaves the process above this resident size —
+    # the single ballooning task the count above does nothing about.
+    worker_max_memory_per_child=settings.celery_worker_max_memory_kb,
     # Ceiling on stale results: tasks ignore results (task_ignore_result=True),
     # but if that ever changes, uncollected results should not accumulate.
     result_expires=3600,

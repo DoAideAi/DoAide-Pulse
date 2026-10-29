@@ -310,6 +310,12 @@ class Settings(BaseSettings):
     # being handed to a worker. Intended for single-process deployments and
     # tests; production runs workers and leaves this on.
     celery_enabled: bool = True
+    # A worker process is replaced after the task during which its resident
+    # memory passed this many kilobytes. ``worker_max_tasks_per_child`` bounds a
+    # slow leak; this bounds the one task that balloons, which otherwise kept
+    # the process at that size for the next 199 tasks on a box shared with
+    # other products.
+    celery_worker_max_memory_kb: int = 400_000
     # Per-dependency budget for the /health probes. Short on purpose: Caddy polls
     # this every 30s and a health check that hangs is itself an outage.
     health_check_timeout_seconds: float = 2.0
@@ -806,6 +812,8 @@ class Settings(BaseSettings):
         # which deletes the rows the metrics endpoint is about the moment they
         # are written.
         "llm_usage_retention_days",
+        # Zero would recycle the worker after every task.
+        "celery_worker_max_memory_kb",
         # Zero would refuse every completion before the first call.
         "llm_total_timeout_seconds",
         "activity_retention_days",
