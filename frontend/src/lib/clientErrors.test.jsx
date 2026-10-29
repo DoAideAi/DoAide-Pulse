@@ -169,7 +169,14 @@ describe("an error outside rendering", () => {
 
   it("stops listening when asked", () => {
     stop();
-    window.dispatchEvent(new ErrorEvent("error", { error: new Error("late"), message: "late" }));
+    // With no listener left, jsdom reports the event as a real uncaught
+    // exception and vitest fails the run on it; this one swallows it.
+    const swallow = (event) => event.preventDefault();
+    window.addEventListener("error", swallow);
+    window.dispatchEvent(
+      new ErrorEvent("error", { error: new Error("late"), message: "late", cancelable: true }),
+    );
+    window.removeEventListener("error", swallow);
     expect(fetchMock).not.toHaveBeenCalled();
     stop = () => {};
   });
