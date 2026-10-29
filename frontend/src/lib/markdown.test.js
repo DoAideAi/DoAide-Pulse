@@ -142,3 +142,31 @@ describe("renderMarkdown", () => {
     expect(html).toContain("\tindented");
   });
 });
+
+describe("a link whose address has parentheses in it", () => {
+  // The link pattern stopped at the first ")", so a Wikipedia link — the most
+  // common URL with parentheses in it — went to ".../Python_(programming_language"
+  // and left a stray ")" in the sentence. Python's Markdown, which the
+  // publishers use, gets these right; the preview and public page did not.
+  it("keeps a balanced pair inside the address", () => {
+    const html = renderMarkdown(
+      "See [Python](https://en.wikipedia.org/wiki/Python_(programming_language)) here.",
+    );
+    expect(html).toContain(
+      '<a href="https://en.wikipedia.org/wiki/Python_(programming_language)" target="_blank" rel="noopener noreferrer">Python</a> here.',
+    );
+  });
+
+  it("still ends the link at the parenthesis that closes it", () => {
+    const html = renderMarkdown("([docs](https://example.com/docs)) and more");
+    expect(html).toContain('<a href="https://example.com/docs"');
+    expect(html).toContain("</a>) and more");
+  });
+
+  it("does not let an unbalanced parenthesis swallow the rest of the line", () => {
+    const html = renderMarkdown("[a](https://example.com/a) then (aside) [b](https://example.com/b)");
+    expect(html).toContain('<a href="https://example.com/a"');
+    expect(html).toContain('<a href="https://example.com/b"');
+    expect(html).toContain("then (aside)");
+  });
+});

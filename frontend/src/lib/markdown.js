@@ -67,9 +67,11 @@ function inline(text) {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*]+)\*/g, "$1<em>$2</em>")
     // Only http(s) links become anchors — a `javascript:` URL in generated
-    // text should render as the text it is.
+    // text should render as the text it is. The address may hold one level of
+    // balanced parentheses: stopping at the first ")" cut every Wikipedia
+    // link at "…Python_(programming_language" and left the ")" in the text.
     .replace(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      /\[([^\]]+)\]\((https?:\/\/(?:[^()\s]|\([^()\s]*\))+)\)/g,
       '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
     );
 

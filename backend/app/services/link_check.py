@@ -56,12 +56,33 @@ _INLINE_CODE = re.compile(r"`[^`\n]*`")
 #: whitespace or the closing paren, so a title never lands in the URL.
 # No class admits the character that opens it — see ``seo._LINK`` for the
 # quadratic backtracking that a run of ``[`` or ``](`` caused otherwise.
-_MD_LINK = re.compile(r"!?\[[^\[\]]*\]\(\s*<?([^()\s>]+)>?[^()]*\)")
+#
+# The URL may hold one level of balanced parentheses. Without that a Wikipedia
+# link, ``…/wiki/Python_(programming_language)``, failed this pattern, fell to
+# the bare-URL one below, was cut at its first ")", checked as a page that does
+# not exist — and the publish was refused over a link that works. The two
+# alternatives are disjoint (one admits no paren, the other starts with one),
+# so this adds no backtracking.
+_MD_LINK = re.compile(r"!?\[[^\[\]]*\]\(\s*<?((?:[^()\s>]|\([^()\s>]*\))+)>?[^()]*\)")
 _AUTOLINK = re.compile(r"<(https?://[^>\s]+)>")
-_BARE_URL = re.compile(r"https?://[^\s<>\]\)\"'`]+")
+_BARE_URL = re.compile(r"https?://(?:[^\s<>\]()\"'`]|\([^\s<>\]()\"'`]*\))+")
 
 #: Punctuation that is far more likely to be the sentence's than the URL's.
 _TRAILING_JUNK = ".,;:!?'\"”’)]}>"
+
+
+def _trim(url: str) -> str:
+    """*url* without the sentence's trailing punctuation.
+
+    A ``)`` is the sentence's only when it closes nothing in the URL: in
+    ``…_(programming_language)`` it is the URL's own, and stripping it is the
+    same truncation the patterns above exist to avoid.
+    """
+    while url and url[-1] in _TRAILING_JUNK:
+        if url[-1] == ")" and url.count("(") >= url.count(")"):
+            break
+        url = url[:-1]
+    return url
 
 
 @dataclass(frozen=True)
@@ -98,7 +119,7 @@ def extract_urls(body_markdown: str, *, limit: int | None = None) -> list[str]:
     for pattern in (_MD_LINK, _AUTOLINK, _BARE_URL):
         for match in pattern.finditer(text):
             url = (match.group(1) if pattern is not _BARE_URL else match.group(0)).strip()
-            url = url.rstrip(_TRAILING_JUNK)
+            url = _trim(url)
             if not url.lower().startswith(("http://", "https://")):
                 continue
             if url in seen:
