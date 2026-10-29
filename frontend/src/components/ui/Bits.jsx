@@ -45,18 +45,30 @@ export function Stat({ label, value, hint }) {
   );
 }
 
-/** Skeleton rows, sized to the list they stand in for. */
-export function Skeleton({ rows = 3, className = "" }) {
+/**
+ * Skeleton rows, sized to the list they stand in for.
+ *
+ * The boxes are hidden from assistive technology, and *label* is said in their
+ * place. Hidden boxes alone were silence: the word "Loading…" the skeletons
+ * replaced had been the announcement, so a screen reader found an empty
+ * region on every page that was still fetching.
+ */
+export function Skeleton({ rows = 3, className = "", label = "Loading…" }) {
   return (
-    <div className={`space-y-2 ${className}`} aria-hidden="true">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div
-          key={i}
-          className="relative h-14 overflow-hidden rounded-lg border border-line bg-paper"
-        >
-          <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-canvas to-transparent" />
-        </div>
-      ))}
+    <div className={className}>
+      <p role="status" className="sr-only">
+        {label}
+      </p>
+      <div className="space-y-2" aria-hidden="true">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            className="relative h-14 overflow-hidden rounded-lg border border-line bg-paper"
+          >
+            <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-canvas to-transparent" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

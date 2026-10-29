@@ -111,12 +111,27 @@ describe("Skeleton", () => {
     expect(container.querySelectorAll(".animate-shimmer")).toHaveLength(5);
   });
 
-  it("is hidden from assistive technology", () => {
+  it("hides its boxes from assistive technology", () => {
     // It stands in for content that is not there yet. Announcing five empty
-    // boxes is worse than announcing nothing; a caller that needs the wait
-    // announced says so itself, as PreviewPage does.
+    // boxes is worse than announcing nothing.
     const { container } = render(<Skeleton rows={2} />);
-    expect(container.firstChild).toHaveAttribute("aria-hidden", "true");
+    expect(container.querySelector(".animate-shimmer").closest("[aria-hidden]")).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
+  });
+
+  it("says that something is loading, which the boxes cannot", () => {
+    // Hidden boxes and nothing else was silence: the word "Loading…" the
+    // skeletons replaced had been the announcement, and only PreviewPage put
+    // one back. On the other 38 a screen reader found an empty region.
+    render(<Skeleton rows={2} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading…");
+  });
+
+  it("names what is loading when the caller says", () => {
+    render(<Skeleton label="Loading preview…" />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading preview…");
   });
 });
 

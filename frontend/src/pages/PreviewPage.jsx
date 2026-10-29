@@ -42,20 +42,16 @@ export default function PreviewPage() {
         </div>
 
         {/* The shape the article arrives in: a line of meta, then the body in
-            its panel. `Skeleton` is `aria-hidden`, so the announcement that
-            used to come free with the word "Loading…" is made explicit. */}
+            its panel. `Skeleton` announces the wait. */}
         {loading && (
           <div>
-            <p role="status" className="sr-only">
-              Loading preview…
-            </p>
             <div
               aria-hidden="true"
               className="relative mb-3 h-3 w-48 overflow-hidden rounded border border-line bg-paper"
             >
               <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-canvas to-transparent" />
             </div>
-            <Skeleton rows={5} />
+            <Skeleton rows={5} label="Loading preview…" />
           </div>
         )}
 

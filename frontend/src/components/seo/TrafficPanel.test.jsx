@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -105,7 +105,8 @@ describe("TrafficPanel", () => {
       traffic({ umami_configured: false, umami_error: "Umami is not configured (set UMAMI_USERNAME and UMAMI_PASSWORD).", sites: [], top_content: [] }),
     );
     draw();
-    expect(await screen.findByRole("status")).toHaveTextContent("UMAMI_USERNAME");
+    // The loading announcement is a status too; this waits for the one meant.
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("UMAMI_USERNAME"));
     expect(screen.queryByRole("region", { name: "Content driving traffic" })).not.toBeInTheDocument();
   });
 });

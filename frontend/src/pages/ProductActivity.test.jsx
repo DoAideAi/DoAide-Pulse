@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -140,7 +140,8 @@ describe("ProductActivity", () => {
       payload({ umami_configured: false, umami_error: "Umami is not configured." }),
     );
     draw();
-    expect(await screen.findByRole("status")).toHaveTextContent("Umami is not configured.");
+    // The loading announcement is a status too; this waits for the one meant.
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Umami is not configured."));
     expect(screen.getByRole("article", { name: "GST" })).toBeInTheDocument();
   });
 

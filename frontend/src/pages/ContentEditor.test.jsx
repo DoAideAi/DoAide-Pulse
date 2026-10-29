@@ -120,7 +120,8 @@ describe("recovering unsaved work", () => {
   it("offers a buffer that says something the server does not", async () => {
     storeBuffer({ body_markdown: "A morning of writing" });
     draw();
-    expect(await screen.findByRole("status")).toHaveTextContent(/Unsaved edits/);
+    // The loading announcement is a status too; this waits for the one meant.
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/Unsaved edits/));
   });
 
   it("does not apply it on its own — the server's copy is what was committed to", async () => {
