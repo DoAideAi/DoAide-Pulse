@@ -10,10 +10,15 @@ on:
   pull_request:
     branches: [main]
 
-# A second push to the same branch makes the first run's answer irrelevant.
+# For a pull request a second push makes the first run's answer irrelevant,
+# so it is cancelled. Not on main: there every commit needs its own verdict.
+# Cancelling there left most of a burst of pushes "cancelled", so a red run
+# could not say which commit broke it and the last green commit — what a
+# rollback wants — could not be looked up. Each main commit gets its own group,
+# because a shared group still drops all but the newest pending run.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
