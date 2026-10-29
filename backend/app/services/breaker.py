@@ -78,6 +78,20 @@ class CircuitBreaker:
             state.probe_until = now + self.cooldown
             return True
 
+    def release(self, name: str) -> None:
+        """Hand back a probe claimed by :meth:`allow` that never reached the upstream.
+
+        No verdict either way: nothing was learned, so the route is neither
+        reopened nor closed. Without this a caller that took the probe and then
+        stopped short — out of time, no connection, credentials that will not
+        decrypt — held the route shut for a full cool-down over a call that
+        never happened. The next caller probes instead.
+        """
+        with self._lock:
+            state = self._state.get(name)
+            if state is not None:
+                state.probe_until = 0.0
+
     def seconds_remaining(self, name: str, *, now: float | None = None) -> float:
         """How long *name* stays shut, in seconds. ``0.0`` when it is not open.
 

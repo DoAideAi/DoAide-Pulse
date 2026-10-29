@@ -935,6 +935,12 @@ def execute(db: Session, publication: Publication) -> Publication:
         # platform would state the same way every time, and a breaker that
         # counted them would open on a platform with nothing wrong with it and
         # then park the rows that would have gone out.
+        #
+        # Not told — but given back its probe. If the route was half-open this
+        # attempt took the one probe ``allow`` hands out, and holding it would
+        # park every other row for this account for a cool-down over a request
+        # that never reached the platform.
+        breaker.release(publication.platform, user_id)
         _fail(db, publication, str(exc), terminal=True)
         return publication
     except CredentialError as exc:
@@ -944,6 +950,7 @@ def execute(db: Session, publication: Publication) -> Publication:
         _mark_connection_invalid(
             db, user_id, publication.platform, str(exc), ciphertext=used_ciphertext
         )
+        breaker.release(publication.platform, user_id)  # see the branch above
         _fail(db, publication, str(exc), terminal=True)
         return publication
     except RateLimited as exc:
@@ -1008,6 +1015,7 @@ def execute(db: Session, publication: Publication) -> Publication:
         return publication
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("unexpected error publishing %s", publication.id)
+        breaker.release(publication.platform, user_id)
         _fail(db, publication, sanitize_unexpected_error(exc), terminal=True)
         return publication
 

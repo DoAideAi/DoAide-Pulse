@@ -877,6 +877,12 @@ def _sweep(
                     "completion was spent"
                 )
                 outcome.other_failure = True
+                # This provider was let through — possibly as a half-open
+                # probe — and is not being asked. Hand the claim back, or the
+                # provider stays shut to every request for a cool-down because
+                # this one ran out of time. See ``CircuitBreaker.release``.
+                if not tried:
+                    breaker.release(provider.name)
                 return outcome
             tried += 1
             started = time.monotonic()
