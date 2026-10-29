@@ -90,6 +90,8 @@ def test_a_machine_key_from_issue_to_revocation(client, auth):
         assert gone.status_code == 401
         assert set(gone.json()) == {"detail"}
         assert "API key" in gone.json()["detail"]
+        # And names the credential it wants, as every 401 does (93f6297).
+        assert gone.headers["WWW-Authenticate"] == "ApiKey"
     assert client.get(f"{API}/machine/whoami", headers=reader).status_code == 200
 
     # 6. A revoked key cannot be rotated back to life either.
