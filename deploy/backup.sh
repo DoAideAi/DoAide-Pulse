@@ -90,6 +90,15 @@ eval "$connection"
 [ -d "$DEST" ] || die "$DEST does not exist; see 'Backups' in deploy/DEPLOYMENT.md"
 [ -w "$DEST" ] || die "$DEST is not writable by $(id -un)"
 
+# A part file the EXIT trap below never got to remove: the run was killed (OOM,
+# SIGKILL past the unit's stop timeout, the box going down), and no trap runs
+# for that. Retention matches only *.dump, so each one — a whole database dump
+# — used to be kept for good. Swept here, before the free-space check it would
+# otherwise count against. A day old, because no run takes that long and a
+# younger one may be another run still writing.
+find "$DEST" -maxdepth 1 -type f -name '*.dump.partial' -mmin +1440 -print -delete \
+    | sed 's/^/Removed abandoned /'
+
 free_mb="$(df -Pm "$DEST" | awk 'NR == 2 { print $4 }')"
 [ "${free_mb:-0}" -ge "$MIN_FREE_MB" ] \
     || die "only ${free_mb}MiB free on $DEST, below the ${MIN_FREE_MB}MiB floor"

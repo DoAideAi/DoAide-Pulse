@@ -290,8 +290,11 @@ def test_retention_can_never_delete_the_last_copy():
     body = _SCRIPT.read_text()
 
     assert '[ "$RETENTION_DAYS" -ge 1 ]' in body
-    # The guard has to precede the delete, not merely exist.
-    assert body.index('"$RETENTION_DAYS" -ge 1') < body.index("-delete")
+    # The guard has to precede the retention delete, not merely exist. (The
+    # earlier ``-delete`` is the sweep of abandoned ``*.dump.partial`` files,
+    # which never touches a finished dump.)
+    retention = body.index("-name '*.dump' -mtime")
+    assert body.index('"$RETENTION_DAYS" -ge 1') < retention
 
 
 def test_the_password_is_never_passed_on_the_command_line():
@@ -376,3 +379,64 @@ def test_it_reads_the_database_url_out_of_the_env_file_without_sourcing_it(tmp_p
     # It got past the URL parse — whatever happened next was Postgres refusing
     # the connection, not the script failing to read its configuration.
     assert "is not a URL this can dump" not in result.stderr
+
+
+# --------------------------------------------------------------------------- #
+# A dump the job never finished is swept, not kept                             #
+# --------------------------------------------------------------------------- #
+
+
+def _stub_tools(tmp_path: Path) -> Path:
+    """``pg_dump`` and ``pg_restore`` that succeed without a database."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    dump = bin_dir / "pg_dump"
+    dump.write_text(
+        "#!/bin/sh\n"
+        'for a in "$@"; do case "$a" in --file=*) echo dump > "${a#--file=}";; esac; done\n'
+    )
+    restore = bin_dir / "pg_restore"
+    restore.write_text("#!/bin/sh\nexit 0\n")
+    for tool in (dump, restore):
+        tool.chmod(0o755)
+    return bin_dir
+
+
+def _age(path: Path, days: float) -> None:
+    import os
+    import time
+
+    then = time.time() - days * 86400
+    os.utime(path, (then, then))
+
+
+def test_a_partial_left_by_a_killed_run_is_swept(tmp_path):
+    """The ``EXIT`` trap removes the part file — unless the run is killed.
+
+    OOM, a ``SIGKILL`` past the unit's stop timeout, the box going down: none
+    of them runs a trap, so the ``*.dump.partial`` stayed. Retention matched
+    only ``*.dump``, so each one — a whole database dump — was kept for good,
+    on a disk whose free space this script checks before every run.
+    """
+    dest = tmp_path / "dumps"
+    dest.mkdir()
+    stale = dest / "pulse-20261001T033000Z.dump.partial"
+    stale.write_text("half a dump")
+    _age(stale, 2)
+    fresh = dest / "pulse-20261029T033000Z.dump.partial"
+    fresh.write_text("another run, still writing")
+
+    bin_dir = _stub_tools(tmp_path)
+    result = _run(
+        tmp_path,
+        PULSE_BACKUP_DIR=str(dest),
+        PULSE_BACKUP_MIN_FREE_MB="0",
+        DATABASE_URL="postgresql://pulse:pw@localhost:5432/pulse",
+        PATH=f"{bin_dir}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not stale.exists()
+    # A part file from today may be another run's, mid-dump: left alone.
+    assert fresh.exists()
+    assert len(list(dest.glob("*.dump"))) == 1
