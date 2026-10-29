@@ -201,7 +201,7 @@ def test_a_wrong_invite_token_is_distinguishable_in_the_log(client, monkeypatch,
             },
         )
     assert resp.status_code == 403
-    assert "Invalid invite token." in _lines(caplog, logging.WARNING)[0]
+    assert "invite code is not right" in _lines(caplog, logging.WARNING)[0]
 
 
 def test_an_account_that_is_created_says_so(client, db, monkeypatch, caplog):

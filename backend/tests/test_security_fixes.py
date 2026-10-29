@@ -20,6 +20,7 @@ import pytest
 from app.config import settings
 from app.models.publication import Platform
 from app.routers import misc
+from app.routers.auth import WRONG_CREDENTIALS
 from app.security import hash_password
 from app.services import cadence
 
@@ -58,7 +59,7 @@ def test_login_nonexistent_email_returns_401(client):
         data={"username": "nobody@nowhere.example", "password": "longpassword123"},
     )
     assert resp.status_code == 401
-    assert resp.json()["detail"] == "Incorrect email or password."
+    assert resp.json()["detail"] == WRONG_CREDENTIALS
 
 
 # --------------------------------------------------------------------------- #

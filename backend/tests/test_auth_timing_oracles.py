@@ -24,6 +24,7 @@ import pytest
 from fastapi import BackgroundTasks
 
 from app.config import settings
+from app.routers.auth import WRONG_CREDENTIALS
 from app.security import _DUMMY_HASHES, dummy_hash, hash_password, verify_password
 from app.services import mailer
 
@@ -101,7 +102,7 @@ def test_login_still_rejects_both_the_same_way(client, user):
     wrong = client.post(LOGIN, data={"username": user.email, "password": "wrongwrong1"})
 
     assert unknown.status_code == wrong.status_code == 401
-    assert unknown.json()["detail"] == wrong.json()["detail"] == "Incorrect email or password."
+    assert unknown.json()["detail"] == wrong.json()["detail"] == WRONG_CREDENTIALS
 
 
 # --------------------------------------------------------------------------- #

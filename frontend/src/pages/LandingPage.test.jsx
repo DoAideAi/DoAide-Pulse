@@ -150,7 +150,7 @@ describe("LandingPage", () => {
 
     it("asks for the code once the server says it wants one, instead of a dead end", async () => {
       auth.register.mockRejectedValueOnce(
-        new Error("Invalid invite token. Check the token and try again."),
+        new Error("That invite code is not right. Check it against the one you were sent."),
       );
       wrap();
       fireEvent.click(screen.getByRole("tab", { name: "Create account" }));

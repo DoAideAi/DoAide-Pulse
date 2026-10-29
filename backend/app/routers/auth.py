@@ -104,7 +104,8 @@ def _assert_registration_allowed(invite_token: str | None) -> None:
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid invite token. Check the token and try again, or ask the administrator for a new one.",
+            detail="That invite code is not right. Check it against the one you were sent, "
+            "or ask the administrator for a new one.",
         )
 
 
@@ -112,6 +113,15 @@ def _assert_registration_allowed(invite_token: str | None) -> None:
 #: the same. It names the way on, because "Email already registered" left the
 #: person who had forgotten they had an account with nothing to try next.
 EMAIL_TAKEN = "An account with this email already exists. Sign in instead."
+
+#: Both refusals say this — unknown address and wrong password alike — so the
+#: answer cannot be used to find out who has an account. It names the way on
+#: now that there is one: until the reset page existed, "Incorrect email or
+#: password." was the end of the road for anyone who had forgotten theirs.
+WRONG_CREDENTIALS = (
+    "Incorrect email or password. Forgotten it? Use \"Forgot your password?\" "
+    "under the sign-in form to set a new one."
+)
 
 
 @router.post(
@@ -247,7 +257,7 @@ def login(
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
+            detail=WRONG_CREDENTIALS,
             headers={"WWW-Authenticate": "Bearer"},
         )
     if user is None:
@@ -256,7 +266,7 @@ def login(
         _refused(request, "no such account")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password.",
+            detail=WRONG_CREDENTIALS,
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.is_active:
