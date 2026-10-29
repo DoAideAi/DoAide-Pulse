@@ -345,12 +345,19 @@ def update_trigger(
     if payload.name is not None:
         trigger.name = payload.name.strip()
     if payload.config is not None:
+        before = trigger_service.source_of(kind, trigger.config)
         try:
             trigger.config = validate_config(kind, payload.config)
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
             ) from exc
+        # The watermark in ``state`` is the old source's. Kept, a feed moved to
+        # another feed wrote about the newest of its entries however old, and a
+        # repo moved to another asked it for commits since a sha it never had
+        # and wrote up a page of its history. A new source is baselined.
+        if trigger_service.source_of(kind, trigger.config) != before:
+            trigger.state = {}
     if payload.is_active is not None:
         trigger.is_active = payload.is_active
         if payload.is_active:

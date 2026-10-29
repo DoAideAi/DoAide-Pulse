@@ -867,6 +867,38 @@ def reclaim_stuck_events(db: Session, *, now: Any = None) -> int:
 # --------------------------------------------------------------------------- #
 
 
+#: The config key that names what a polled trigger watches. Its watermark in
+#: ``state`` belongs to that source and to no other.
+SOURCE_KEYS = {TriggerKind.RSS: "feed_url", TriggerKind.GITHUB: "repo"}
+
+
+def source_of(kind: TriggerKind, config: dict | None) -> str:
+    """What a trigger of *kind* with *config* is watching, or ``""``."""
+    key = SOURCE_KEYS.get(kind)
+    return str((config or {}).get(key) or "").strip() if key else ""
+
+
+def _still_watching(db: Session, trigger: Trigger, kind: TriggerKind, source: str) -> bool:
+    """Whether *trigger* still watches *source*, read under a lock on its row.
+
+    A poll fetches first and writes its watermark after, and an edit pointing
+    the trigger somewhere else can land in between: it resets ``state`` (see
+    :func:`app.routers.triggers.update_trigger`), and the poll then wrote the
+    old source's watermark over that, and fired about the old source, under a
+    config that no longer named it. Read fresh, not from *trigger*, whose
+    config is whatever this session loaded before the fetch. The lock holds
+    until the caller's commit, so the edit waits for the write it decides on.
+    """
+    config = db.execute(
+        select(Trigger.config).where(Trigger.id == trigger.id).with_for_update()
+    ).scalar()
+    return source_of(kind, config) == source
+
+
+#: What a poll answers when the trigger was pointed elsewhere while it ran.
+SOURCE_CHANGED = {"status": "source_changed"}
+
+
 def _mark_checked(db: Session, trigger: Trigger, error: str | None = None) -> None:
     trigger.last_checked_at = utcnow()
     # A feed or repo that answers with a wall of HTML instead of what it
@@ -934,7 +966,7 @@ def check(db: Session, trigger: Trigger) -> dict[str, Any]:
 
 
 def _check_rss(db: Session, trigger: Trigger) -> dict[str, Any]:
-    url = str(trigger.setting("feed_url") or "").strip()
+    url = source_of(TriggerKind.RSS, trigger.config)
     if not url:
         raise TriggerError("This trigger has no feed URL.")
 
@@ -952,6 +984,9 @@ def _check_rss(db: Session, trigger: Trigger) -> dict[str, Any]:
     # below still records every id so the rest are never revisited.
     capped = fresh[: settings.feed_max_new_entries]
 
+    if not _still_watching(db, trigger, TriggerKind.RSS, url):
+        db.rollback()
+        return SOURCE_CHANGED
     state["seen_ids"] = feeds.remember(seen if isinstance(seen, list) else [], feed)
     state["feed_title"] = feed.title
     trigger.state = state
@@ -971,7 +1006,9 @@ def _check_github(db: Session, trigger: Trigger) -> dict[str, Any]:
     from app.services import github_client
 
     project = db.get(Project, trigger.project_id)
-    repo = str(trigger.setting("repo") or "").strip()
+    # The configured repo, not the project fallback: it is what an edit changes.
+    configured = source_of(TriggerKind.GITHUB, trigger.config)
+    repo = configured
     if not repo and project is not None:
         repo = project.repo_full_name or ""
     if not repo:
@@ -1011,6 +1048,9 @@ def _check_github(db: Session, trigger: Trigger) -> dict[str, Any]:
     # rate is refused every hour and never accumulates. Same bug, same fix, as
     # app.tasks.autopilot_tasks — this is the other place a GitHub watermark
     # advances.
+    if not _still_watching(db, trigger, TriggerKind.GITHUB, configured):
+        db.rollback()
+        return SOURCE_CHANGED
     if not below_threshold:
         state["last_sha"] = activity.head_sha
         state["last_tag"] = activity.latest_tag
@@ -1057,6 +1097,8 @@ def _fired(event: TriggerEvent | None, *, extra: dict[str, Any] | None = None) -
 
 __all__ = [
     "GENERATION_ATTEMPTS",
+    "SOURCE_CHANGED",
+    "source_of",
     "ABANDONED_DETAIL",
     "ADOPTED_DETAIL",
     "TriggerError",
