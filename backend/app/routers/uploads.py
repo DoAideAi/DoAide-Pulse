@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 import uuid
 from pathlib import Path as FilePath
 
@@ -45,6 +46,34 @@ def _upload_dir() -> FilePath:
 
 
 _CHUNK = 256 * 1024
+
+#: The name an upload has while it is still arriving. ``_store`` renames it to
+#: its final name, or removes it, in a ``finally`` — which does not run when
+#: the process itself dies: an OOM kill, a ``SIGKILL`` after the stop timeout,
+#: the host going away. Those part files were never removed by anything, each
+#: up to ``max_upload_bytes``, in the directory every image is served from.
+_PART_PREFIX = ".upload-"
+_PART_SUFFIX = ".part"
+#: Older than any upload can still be in progress. The body is capped at
+#: ``max_upload_bytes`` and the request at the proxy's timeout, so a part file
+#: an hour old belongs to a request that is not coming back.
+PART_FILE_MAX_AGE_SECONDS = 3600
+
+
+def sweep_partial_uploads(*, max_age_seconds: int = PART_FILE_MAX_AGE_SECONDS) -> int:
+    """Remove part files abandoned by an upload whose process died. Returns how many."""
+    base = _upload_dir()
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    for path in base.glob(f"{_PART_PREFIX}*{_PART_SUFFIX}"):
+        try:
+            if path.is_file() and path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+        except FileNotFoundError:
+            # Finished or swept by someone else between the glob and here.
+            continue
+    return removed
 _SNIFF_BYTES = 12
 
 
@@ -125,7 +154,7 @@ async def upload_image(
 async def _store(file: UploadFile, limit: int) -> UploadOut:
     """Stream *file* to disk under a content-addressed name, or raise."""
     base = _upload_dir()
-    tmp = base / f".upload-{uuid.uuid4().hex}.part"
+    tmp = base / f"{_PART_PREFIX}{uuid.uuid4().hex}{_PART_SUFFIX}"
     digest = hashlib.sha256()
     size = 0
     head = b""

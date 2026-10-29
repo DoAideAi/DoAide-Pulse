@@ -328,3 +328,22 @@ def verify_all_connections() -> dict:
         return result
     finally:
         db.close()
+
+
+@task(
+    name="app.tasks.maintenance_tasks.sweep_partial_uploads",
+    soft_time_limit=60,
+    time_limit=120,
+)
+def sweep_partial_uploads() -> dict:
+    """Delete upload part files left behind by a process that died mid-upload.
+
+    See :func:`app.routers.uploads.sweep_partial_uploads`. The worker runs on
+    the same host and reads the same ``UPLOAD_DIR`` as the API.
+    """
+    from app.routers import uploads
+
+    count = uploads.sweep_partial_uploads()
+    if count:
+        logger.info("removed %d abandoned upload part file(s)", count)
+    return {"removed": count}

@@ -229,6 +229,10 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.maintenance_tasks.purge_old_feedback",
         "schedule": 86400.0,  # once a day
     },
+    "sweep-partial-uploads": {
+        "task": "app.tasks.maintenance_tasks.sweep_partial_uploads",
+        "schedule": 86400.0,  # once a day
+    },
     "rewrap-credentials": {
         # Re-encrypts stored secrets under the head of TOKEN_ENCRYPTION_KEY.
         # Daily because it does nothing at all until the key is rotated, and
