@@ -327,7 +327,7 @@ def _client() -> httpx.Client:
         # Connects only to the addresses it vets: see link_check.guarded_transport.
         transport=link_check.guarded_transport(),
         headers={
-            "User-Agent": f"Pulse/0.1 feeds (+{settings.openrouter_app_url})",
+            "User-Agent": f"Pulse/0.1 feeds (+{settings.identity_url})",
             "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml",
         },
     )

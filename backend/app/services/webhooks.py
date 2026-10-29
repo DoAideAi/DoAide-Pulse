@@ -515,7 +515,7 @@ def deliver(db: Session, delivery: WebhookDelivery) -> WebhookDelivery:
         timestamp = int(utcnow().timestamp())
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": f"Pulse/0.1 webhooks (+{settings.openrouter_app_url})",
+            "User-Agent": f"Pulse/0.1 webhooks (+{settings.identity_url})",
             EVENT_HEADER: delivery.event.value,
             DELIVERY_HEADER: str(delivery.id),
             CORRELATION_HEADER: request_id_var.get(),

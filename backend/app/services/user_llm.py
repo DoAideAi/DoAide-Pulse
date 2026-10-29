@@ -116,7 +116,7 @@ def build_provider(
     extra = {}
     if provider == "openrouter":
         extra = {
-            "HTTP-Referer": settings.openrouter_app_url,
+            "HTTP-Referer": settings.identity_url,
             "X-Title": settings.openrouter_app_title,
         }
     return Provider(

@@ -348,7 +348,10 @@ class Settings(BaseSettings):
     # long-form tutorials and comparisons rather than a 280-character tweet.
     # Previously ``openai/gpt-oss-120b:free`` (also removed from free tier).
     openrouter_long_form_model: str = "nvidia/nemotron-3-ultra-550b-a55b:free"
-    openrouter_app_url: str = "https://pulse.local"
+    #: The URL this install names itself by to other systems. Blank (or the old
+    #: ``https://pulse.local`` placeholder) means ``frontend_url`` — see
+    #: :attr:`identity_url`, which is what every caller reads.
+    openrouter_app_url: str = ""
     openrouter_app_title: str = "Pulse"
 
     # ---- AI fallback providers ---------------------------------------------
@@ -1260,6 +1263,24 @@ class Settings(BaseSettings):
         if not 0.0 <= v <= 1.0:
             raise ValueError("must be between 0 and 1")
         return v
+
+    @property
+    def identity_url(self) -> str:
+        """The address Pulse gives as *who is asking* on outbound requests.
+
+        The ``+URL`` in the User-Agent of every RSS fetch and webhook delivery,
+        and OpenRouter's ``HTTP-Referer``. It defaulted to
+        ``https://pulse.local``, so a feed operator looking up unfamiliar
+        traffic, or a webhook receiver checking a sender, followed a link to
+        nowhere — on every install that did not set it, and the example env
+        file set it to exactly that. ``frontend_url``, which production already
+        holds to a real https address, is the honest answer when nothing more
+        specific is given.
+        """
+        configured = (self.openrouter_app_url or "").strip()
+        if configured and urlsplit(configured).hostname != "pulse.local":
+            return configured.rstrip("/")
+        return self.frontend_url.rstrip("/")
 
     @property
     def api_base_url(self) -> str:

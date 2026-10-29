@@ -298,7 +298,7 @@ def _providers() -> list[Provider]:
             base_url=settings.openrouter_base_url,
             model=settings.openrouter_model,
             extra_headers={
-                "HTTP-Referer": settings.openrouter_app_url,
+                "HTTP-Referer": settings.identity_url,
                 "X-Title": settings.openrouter_app_title,
             },
             fallback_models=_configured_models(settings.openrouter_fallback_models),
