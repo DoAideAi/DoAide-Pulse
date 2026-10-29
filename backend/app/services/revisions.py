@@ -245,7 +245,7 @@ def snapshot_if_changing(
 
 
 def history(
-    db: Session, content: Content, *, limit: int = 20, offset: int = 0
+    db: Session, content_id: int, *, limit: int = 20, offset: int = 0
 ) -> list[ContentRevision]:
     """This piece's past versions, newest first — without their text.
 
@@ -271,7 +271,7 @@ def history(
             ),
             raiseload("*"),
         )
-        .where(ContentRevision.content_id == content.id)
+        .where(ContentRevision.content_id == content_id)
         .order_by(ContentRevision.revision.desc())
         .offset(offset)
         .limit(limit)
@@ -279,12 +279,16 @@ def history(
     return list(db.scalars(stmt))
 
 
-def count(db: Session, content: Content) -> int:
-    """How many past versions this piece has, for the list's total."""
+def count(db: Session, content_id: int) -> int:
+    """How many past versions this piece has, for the list's total.
+
+    Both this and :func:`history` take the id: the listing proves ownership
+    with ``deps.owned_content_id`` and never loads the piece itself.
+    """
     return (
         db.scalar(
             select(func.count(ContentRevision.id)).where(
-                ContentRevision.content_id == content.id
+                ContentRevision.content_id == content_id
             )
         )
         or 0

@@ -148,6 +148,30 @@ def owned_project(project_id: int, db: Session, user: User) -> Project:
     return project
 
 
+def owned_content_id(content_id: int, db: Session, user: User) -> int:
+    """*content_id* if it is one of the user's pieces, else the same 404 as ever.
+
+    For the endpoints that need to know the piece is the caller's and nothing
+    more about it — a sidebar listing whose own query takes it from there.
+    ``db.get(Content, …)`` answered the same question with the whole row (the
+    body is up to 200,000 characters), then the ``lazy="selectin"``
+    publications, then the project for its owner: three queries and the body,
+    on every sidebar open. This is the id joined to its owner, and nothing else.
+    """
+    from app.models.content import Content
+
+    found = db.scalar(
+        select(Content.id)
+        .join(Project, Project.id == Content.project_id)
+        .where(Content.id == content_id, Project.user_id == user.id)
+    )
+    if found is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Content not found."
+        )
+    return found
+
+
 def lock_for_count(db: Session, model: type[User] | type[Project], row_id: int) -> None:
     """Hold *row_id* until this transaction ends, so a count under it is true.
 

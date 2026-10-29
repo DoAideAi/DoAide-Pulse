@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import ROW_ID_MAX, ListOffset, RowId, get_current_user
+from app.deps import ROW_ID_MAX, ListOffset, RowId, get_current_user, owned_content_id
 from app.models.content import Content
 from app.models.revision import ContentRevision
 from app.models.user import User
@@ -100,9 +100,10 @@ def list_revisions(
     say "12 versions". ``retained`` is the ceiling, so it can also say why
     version 3 is gone.
     """
-    content = _owned(content_id, db, user)
-    total = revisions.count(db, content)
-    items = revisions.history(db, content, limit=limit, offset=offset)
+    # The id, not the row: see ``deps.owned_content_id``.
+    owned = owned_content_id(content_id, db, user)
+    total = revisions.count(db, owned)
+    items = revisions.history(db, owned, limit=limit, offset=offset)
     response.headers["X-Total-Count"] = str(total)
     return RevisionListOut(
         items=[RevisionOut.model_validate(item) for item in items],

@@ -25,7 +25,14 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from app.config import settings
 from app.database import get_db, refresh_all, release_for_slow_work
-from app.deps import ListOffset, QueryRowId, RowId, get_current_user, owned_project
+from app.deps import (
+    ListOffset,
+    QueryRowId,
+    RowId,
+    get_current_user,
+    owned_content_id,
+    owned_project,
+)
 from app.models.content import Content, ContentIdea, ContentStatus, ContentType, unique_content_slug
 from app.models.mixins import utcnow
 from app.models.preview_link import PreviewLink
@@ -1771,14 +1778,15 @@ def list_preview_links(
     link exists and let it be revoked, not what it is. The total before paging
     is in ``X-Total-Count``.
     """
-    content = _owned_content(content_id, db, user)
+    # The id, not the row: see ``deps.owned_content_id``.
+    owned = owned_content_id(content_id, db, user)
     response.headers["X-Total-Count"] = str(
-        preview_links.count_for_content(db, content.id)
+        preview_links.count_for_content(db, owned)
     )
     return [
         _to_preview_link(link)
         for link in preview_links.list_for_content(
-            db, content.id, limit=limit, offset=offset
+            db, owned, limit=limit, offset=offset
         )
     ]
 
