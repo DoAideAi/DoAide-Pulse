@@ -52,6 +52,31 @@ function cacheControl(pathname) {
     : "no-cache";
 }
 
+// `no-cache` means "keep it, but check before using it", and checking needs a
+// validator. Without one every load re-downloaded the shell, sw.js and the
+// icons in full, so no-cache behaved as no caching at all. The tag is the
+// file's size and modification time: a deploy rewrites the files, so their
+// tags change and the next load fetches them, which is what no-cache is for.
+function validators(stats) {
+  return {
+    etag: `W/"${stats.size.toString(16)}-${Math.floor(stats.mtimeMs).toString(16)}"`,
+    lastModified: new Date(stats.mtimeMs).toUTCString(),
+  };
+}
+
+// RFC 9110 §13.2.2: If-None-Match decides when present; If-Modified-Since only
+// otherwise. Weak comparison, which is what a GET revalidation uses.
+function notModified(req, stats, etag) {
+  const inm = req.headers["if-none-match"];
+  if (inm) {
+    const strip = (tag) => tag.trim().replace(/^W\//, "");
+    return inm.trim() === "*" || inm.split(",").some((tag) => strip(tag) === strip(etag));
+  }
+  const ims = Date.parse(req.headers["if-modified-since"] ?? "");
+  // HTTP dates have whole seconds; the file's time is compared at that grain.
+  return !Number.isNaN(ims) && Math.floor(stats.mtimeMs / 1000) * 1000 <= ims;
+}
+
 // The SPA is the document an XSS would actually execute in — the API only ever
 // returns JSON — so the Content-Security-Policy that matters is this one, and
 // until now nothing set it: Caddy's shared header block covers nosniff, frame
@@ -156,11 +181,31 @@ const server = createServer(async (req, res) => {
     status = 200;
   }
 
-  res.writeHead(status, {
+  let stats;
+  try {
+    stats = await stat(file);
+  } catch {
+    // Gone between the lookup and here — a deploy swapping dist mid-request.
+    res.writeHead(503, { "Content-Type": "text/plain; charset=utf-8", ...SECURITY_HEADERS });
+    res.end("Try again");
+    return;
+  }
+  const { etag, lastModified } = validators(stats);
+  const headers = {
     "Content-Type": TYPES[extname(file).toLowerCase()] ?? "application/octet-stream",
     "Cache-Control": cacheControl(pathname),
+    ETag: etag,
+    "Last-Modified": lastModified,
     ...SECURITY_HEADERS,
-  });
+  };
+  if (notModified(req, stats, etag)) {
+    // No Content-Type on a 304; everything else is the 200's, so the stored
+    // copy keeps its policy and caching rule.
+    delete headers["Content-Type"];
+    res.writeHead(304, headers).end();
+    return;
+  }
+  res.writeHead(status, headers);
   if (req.method === "HEAD") {
     res.end();
     return;
