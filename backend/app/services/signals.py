@@ -100,6 +100,32 @@ class TriggerSignal:
 
         return "\n".join(lines)
 
+    @classmethod
+    def from_payload(cls, payload: dict) -> TriggerSignal:
+        """The signal back from what :meth:`event_payload` stored.
+
+        What a retry writes from: the event row keeps the signal as it fired,
+        and the source that produced it will not offer it again. Read
+        leniently — a row is data from an older release as often as not.
+        """
+        kind = payload.get("kind")
+        try:
+            suggested = ContentType(payload.get("suggested_type"))
+        except ValueError:
+            suggested = ContentType.FEATURE_SPOTLIGHT
+        return cls(
+            kind=TriggerKind(kind),
+            source=str(payload.get("source") or ""),
+            headline=str(payload.get("headline") or ""),
+            summary=str(payload.get("summary") or ""),
+            items=tuple(str(i) for i in payload.get("items") or ()),
+            item_noun=str(payload.get("item_noun") or "item"),
+            url=payload.get("url") or None,
+            dedupe_key=payload.get("dedupe_key"),
+            suggested_type=suggested,
+            raw=dict(payload.get("raw") or {}),
+        )
+
     def event_payload(self) -> dict:
         """The signal as it is stored on a :class:`TriggerEvent` row."""
         return {

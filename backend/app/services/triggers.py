@@ -17,6 +17,7 @@ four identical press releases.
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 from dataclasses import replace
 from datetime import timedelta
@@ -441,7 +442,43 @@ def fire(db: Session, trigger: Trigger, signal: TriggerSignal) -> TriggerEvent |
         trigger.last_fired_at = utcnow()
         trigger.fire_count = Trigger.fire_count + 1
         db.commit()
+        return _act(db, trigger, event, signal)
 
+    except Exception as exc:
+        db.rollback()
+        logger.exception("trigger %s: firing crashed", trigger.id)
+        try:
+            ev = event
+        except UnboundLocalError:
+            return None
+        try:
+            ev.status = TriggerEventStatus.FAILED
+            ev.detail = f"Firing crashed: {sanitize_unexpected_error(exc)}"
+            db.commit()
+        except Exception:
+            logger.exception(
+                "trigger %s: could not mark event %s as failed either",
+                trigger.id,
+                ev.id,
+            )
+        return ev
+
+
+def _act(
+    db: Session,
+    trigger: Trigger,
+    event: TriggerEvent,
+    signal: TriggerSignal,
+    *,
+    attempt: int = 1,
+) -> TriggerEvent:
+    """Write the piece one recorded firing asks for, and settle its event.
+
+    The half of :func:`fire` after the event row exists — shared with
+    :func:`retry_event`, which runs it again over a firing whose write failed.
+    Never raises, for :func:`fire`'s reason.
+    """
+    try:
         project = db.get(Project, trigger.project_id)
         if project is None or not project.is_active:
             return _skip(db, event, "The project is paused.")
@@ -512,7 +549,7 @@ def fire(db: Session, trigger: Trigger, signal: TriggerSignal) -> TriggerEvent |
             db.rollback()
             logger.exception("trigger %s failed while writing: %s", trigger.id, exc)
             event.status = TriggerEventStatus.FAILED
-            event.detail = f"Generation failed: {sanitize_unexpected_error(exc)}"
+            event.detail = generation_failure_detail(attempt, exc)
             db.commit()
             db.refresh(event)
             return event
@@ -535,10 +572,7 @@ def fire(db: Session, trigger: Trigger, signal: TriggerSignal) -> TriggerEvent |
     except Exception as exc:
         db.rollback()
         logger.exception("trigger %s: firing crashed", trigger.id)
-        try:
-            ev = event
-        except UnboundLocalError:
-            return None
+        ev = event
         try:
             ev.status = TriggerEventStatus.FAILED
             ev.detail = f"Firing crashed: {sanitize_unexpected_error(exc)}"
@@ -550,6 +584,117 @@ def fire(db: Session, trigger: Trigger, signal: TriggerSignal) -> TriggerEvent |
                 ev.id,
             )
         return ev
+
+
+#: How many times a firing's write is attempted before it is left failed.
+GENERATION_ATTEMPTS = 3
+#: The wait before the first retry; each later one waits twice the last.
+GENERATION_RETRY_BACKOFF = timedelta(minutes=30)
+#: How old a firing can be and still be worth writing about. A release note
+#: written a day late is still news; one written a week late is noise.
+GENERATION_RETRY_WINDOW = timedelta(hours=24)
+
+_GENERATION_FAILED = "Generation failed"
+_ATTEMPT = re.compile(r"^Generation failed \(attempt (\d+) of \d+\)")
+
+
+def generation_failure_detail(attempt: int, exc: BaseException) -> str:
+    """What a failed write says on its event — including which attempt it was.
+
+    The attempt number lives in the text because it is the one place it is
+    shown, and the retry sweep reads it back from there (:func:`_attempts`).
+    """
+    return (
+        f"{_GENERATION_FAILED} (attempt {attempt} of {GENERATION_ATTEMPTS}): "
+        f"{sanitize_unexpected_error(exc)}"
+    )
+
+
+def _attempts(detail: str) -> int | None:
+    """How many writes a failed event has had, or ``None`` if it did not fail writing."""
+    if not detail.startswith(_GENERATION_FAILED):
+        return None
+    match = _ATTEMPT.match(detail)
+    # A row from before the count was written failed once.
+    return int(match.group(1)) if match else 1
+
+
+def _retry_due(event: TriggerEvent, now: Any) -> bool:
+    attempts = _attempts(event.detail or "")
+    if attempts is None or attempts >= GENERATION_ATTEMPTS:
+        return False
+    wait = GENERATION_RETRY_BACKOFF * (2 ** (attempts - 1))
+    return as_aware(event.updated_at) <= now - wait
+
+
+def retryable_event_ids(db: Session, *, now: Any = None, limit: int = 20) -> list[int]:
+    """Firings whose write failed and is due another try, oldest first.
+
+    Why they are retried at all: every kind of trigger spends its signal before
+    it writes — a poll moves its watermark, a schedule stamps ``last_fired_at``,
+    an inbound webhook has answered its sender — so a write that failed on a
+    provider outage was otherwise lost for good. The event keeps the signal it
+    fired with, which is all a second attempt needs.
+
+    Only live triggers on live projects of live accounts, for the reason
+    :func:`due_triggers` gives.
+    """
+    moment = now or utcnow()
+    rows = db.scalars(
+        select(TriggerEvent)
+        .join(Trigger, Trigger.id == TriggerEvent.trigger_id)
+        .join(Project, Project.id == Trigger.project_id)
+        .join(User, User.id == Project.user_id)
+        .where(
+            TriggerEvent.status == TriggerEventStatus.FAILED,
+            TriggerEvent.detail.startswith(_GENERATION_FAILED),
+            TriggerEvent.created_at >= moment - GENERATION_RETRY_WINDOW,
+            Trigger.is_active.is_(True),
+            Project.is_active.is_(True),
+            User.is_active.is_(True),
+        )
+        .order_by(TriggerEvent.updated_at, TriggerEvent.id)
+        .limit(limit * 5)
+    )
+    return [event.id for event in rows if _retry_due(event, moment)][:limit]
+
+
+def retry_event(db: Session, event_id: int, *, now: Any = None) -> TriggerEvent | None:
+    """Write a failed firing again from its frozen signal. ``None`` if it was not ours to take.
+
+    Claimed by a conditional UPDATE on the exact failure it is retrying, so the
+    sweep handing the same id to two workers — or handing it again next tick —
+    writes once. The claim moves it back to ``received``, which is what
+    :func:`reclaim_stuck_events` watches, so a worker that dies mid-retry is
+    settled like any other interrupted firing.
+    """
+    moment = now or utcnow()
+    event = db.get(TriggerEvent, event_id)
+    if event is None or event.status != TriggerEventStatus.FAILED:
+        return None
+    if not _retry_due(event, moment):
+        return None
+    attempt = (_attempts(event.detail) or 0) + 1
+    claimed = db.execute(
+        update(TriggerEvent)
+        .where(
+            TriggerEvent.id == event.id,
+            TriggerEvent.status == TriggerEventStatus.FAILED,
+            TriggerEvent.detail == event.detail,
+        )
+        .values(status=TriggerEventStatus.RECEIVED, updated_at=moment)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    db.commit()
+    if not claimed:
+        return None
+    db.refresh(event)
+    trigger = event.trigger
+    logger.info(
+        "trigger %s: retrying event %s (attempt %d of %d)",
+        trigger.id, event.id, attempt, GENERATION_ATTEMPTS,
+    )
+    return _act(db, trigger, event, TriggerSignal.from_payload(event.payload), attempt=attempt)
 
 
 # --------------------------------------------------------------------------- #
@@ -887,6 +1032,7 @@ def _fired(event: TriggerEvent | None, *, extra: dict[str, Any] | None = None) -
 
 
 __all__ = [
+    "GENERATION_ATTEMPTS",
     "ABANDONED_DETAIL",
     "ADOPTED_DETAIL",
     "TriggerError",
@@ -900,6 +1046,8 @@ __all__ = [
     "is_due",
     "read_secret",
     "reclaim_stuck_events",
+    "retry_event",
+    "retryable_event_ids",
     "record",
     "signal_from_entries",
     "signal_from_schedule",

@@ -18,7 +18,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from sqlalchemy.exc import OperationalError
 
 from app.database import SessionLocal
-from app.models.trigger import Trigger
+from app.models.trigger import Trigger, TriggerEvent
 from app.services import llm_router
 from app.services import triggers as trigger_service
 from app.services.errors import sanitize_unexpected_error
@@ -90,6 +90,10 @@ def check_due_triggers() -> dict:
         # it, nothing does. See ``triggers.reclaim_stuck_events``.
         reclaimed = trigger_service.reclaim_stuck_events(db)
         ids = [t.id for t in trigger_service.due_triggers(db)]
+        # Firings whose write failed on a provider outage. Handed to the worker
+        # rather than run here: a write is a model call, and this sweep has two
+        # minutes for everything.
+        retry_ids = trigger_service.retryable_event_ids(db)
     finally:
         db.close()
 
@@ -173,12 +177,56 @@ def check_due_triggers() -> dict:
             inline,
             failed,
         )
+    # Not inline when the broker is down, unlike the checks above: a retry is
+    # a model call, and the failed firing waits just as well for the next tick.
+    retried = 0
+    for event_id in retry_ids:
+        try:
+            retry_trigger_event.delay(event_id)
+        except Exception as exc:  # noqa: BLE001 - the next tick tries again
+            logger.warning("could not queue trigger event retries: %s", exc)
+            break
+        retried += 1
+    if retried:
+        logger.info("queued %d failed trigger firing(s) for another attempt", retried)
     return {
         "due": len(ids),
         "dispatched": dispatched,
         "failed": failed,
         "reclaimed": reclaimed,
+        "retried": retried,
     }
 
 
-__all__ = ["check_due_triggers", "check_trigger"]
+@task(
+    name="app.tasks.trigger_tasks.retry_trigger_event",
+    soft_time_limit=180,
+    time_limit=210,
+)
+def retry_trigger_event(event_id: int) -> dict:
+    """Write one failed firing again from its frozen signal. Never raises.
+
+    No ``autoretry_for``: the retry sweep is the retry, on its own backoff, and
+    a Celery retry stacked on top of it would multiply the attempts against a
+    provider that is already failing.
+    """
+    db = SessionLocal()
+    try:
+        event = db.get(TriggerEvent, event_id)
+        project = event.trigger.project if event is not None and event.trigger else None
+        with llm_router.acting_for(project.user_id if project else None):
+            result = trigger_service.retry_event(db, event_id)
+        if result is None:
+            return {"event_id": event_id, "status": "not_taken"}
+        return {"event_id": event_id, "status": result.status.value}
+    except SoftTimeLimitExceeded:
+        logger.warning("retry of trigger event %s timed out", event_id)
+        return {"event_id": event_id, "status": "timeout"}
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("retry of trigger event %s crashed", event_id)
+        return {"event_id": event_id, "status": "error", "error": sanitize_unexpected_error(exc)}
+    finally:
+        db.close()
+
+
+__all__ = ["check_due_triggers", "check_trigger", "retry_trigger_event"]

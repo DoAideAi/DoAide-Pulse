@@ -50,6 +50,9 @@ _NO_AUTORETRY = {
     "app.tasks.maintenance_tasks.rewrap_credentials": (
         "daily idempotent sweep; re-reads what it did not finish"
     ),
+    "app.tasks.trigger_tasks.retry_trigger_event": (
+        "the retry sweep is the retry, on its own backoff"
+    ),
     "app.tasks.publish_tasks.cancel_publication": (
         "one row, dispatched from a request that reports its own failure"
     ),

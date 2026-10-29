@@ -155,7 +155,7 @@ def test_checking_a_due_schedule_trigger_fires_it(db, schedule_trigger):
 
 def test_the_sweep_dispatches_every_due_trigger(db, schedule_trigger):
     result = trigger_tasks.check_due_triggers()
-    assert result == {"due": 1, "dispatched": 1, "failed": 0, "reclaimed": 0}
+    assert result == {"due": 1, "dispatched": 1, "failed": 0, "reclaimed": 0, "retried": 0}
 
 
 def test_the_sweep_skips_a_trigger_on_a_deactivated_account(
@@ -175,6 +175,7 @@ def test_the_sweep_skips_a_trigger_on_a_deactivated_account(
         "dispatched": 0,
         "failed": 0,
         "reclaimed": 0,
+        "retried": 0,
     }
 
 
@@ -187,6 +188,7 @@ def test_the_sweep_skips_a_paused_project(db, schedule_trigger, project):
         "dispatched": 0,
         "failed": 0,
         "reclaimed": 0,
+        "retried": 0,
     }
 
 
@@ -211,6 +213,7 @@ def test_the_sweep_ignores_inbound_webhook_triggers(db, project):
         "dispatched": 0,
         "failed": 0,
         "reclaimed": 0,
+        "retried": 0,
     }
 
 
@@ -239,6 +242,7 @@ def test_a_broker_that_refuses_the_dispatch_falls_back_to_running_inline(
         "dispatched": 1,
         "failed": 0,
         "reclaimed": 0,
+        "retried": 0,
     }
     assert ran == [schedule_trigger.id]
 
@@ -270,6 +274,7 @@ def test_a_dispatch_that_runs_out_of_time_does_not_fall_back_to_inline(
         "dispatched": 0,
         "failed": 0,
         "reclaimed": 0,
+        "retried": 0,
     }
     assert ran == [], "the timeout must not trigger the broker-down fallback"
 
@@ -550,7 +555,7 @@ def test_a_dead_broker_is_logged_when_the_trigger_sweep_falls_back(
     with caplog.at_level("WARNING"):
         result = trigger_tasks.check_due_triggers()
 
-    assert result == {"due": 1, "dispatched": 1, "failed": 0, "reclaimed": 0}
+    assert result == {"due": 1, "dispatched": 1, "failed": 0, "reclaimed": 0, "retried": 0}
     assert "redis is not listening" in caplog.text
     assert "inline" in caplog.text
 
