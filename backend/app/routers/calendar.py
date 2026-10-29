@@ -413,6 +413,18 @@ def reschedule(
 
     if payload.publication_id is None:
         content.scheduled_for = when
+    else:
+        # One row moved, and the piece's own date has to follow: for a piece
+        # with one publication that row *is* its schedule, and leaving the
+        # column alone sent it out on Friday under an editor that said Tuesday.
+        # The piece goes out when its first waiting row does.
+        waiting = [
+            p.scheduled_for
+            for p in content.publications
+            if p.status in (PublicationStatus.PENDING, PublicationStatus.SCHEDULED)
+            and p.scheduled_for is not None
+        ]
+        content.scheduled_for = min(waiting, key=as_aware) if waiting else when
 
     # Dragging a piece onto a date arms it, and arming a draft approves it —
     # see :func:`app.services.publishing_service.arming_approves`. Without this
