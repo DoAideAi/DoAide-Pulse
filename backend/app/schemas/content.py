@@ -21,6 +21,7 @@ from app.schemas.text import clean_tags, visible_label
 from app.schemas.urls import check_http_url
 from app.services import inline_edit
 from app.services.publishers.base import is_outcome_unknown
+from app.services.seo import KEYWORD_MAX
 
 #: The description every ``timezone`` field on a scheduling request carries.
 #:
@@ -208,7 +209,10 @@ class ContentCreate(BaseModel):
     body_markdown: str = Field(default="", max_length=BODY_MARKDOWN_MAX_LENGTH)
     excerpt: str = Field(default="", max_length=1000)
     meta_description: str = Field(default="", max_length=META_DESCRIPTION_MAX_LENGTH)
-    keywords: list[Keyword] = Field(default=[], max_length=30)
+    # The router keeps the first ``seo.KEYWORD_MAX``; allowing 30 here meant a
+    # list of twelve came back as eight with a 200 and nothing said. The bound
+    # is the number that is kept, so a longer list is a 422 naming it.
+    keywords: list[Keyword] = Field(default=[], max_length=KEYWORD_MAX)
     tags: list[Tag] = Field(default=[], max_length=30)
     canonical_url: str | None = Field(default=None, max_length=CANONICAL_URL_MAX_LENGTH)
     cover_image_url: str | None = Field(default=None, max_length=700)
@@ -253,7 +257,7 @@ class ContentUpdate(BaseModel):
     meta_description: str | None = Field(
         default=None, max_length=META_DESCRIPTION_MAX_LENGTH
     )
-    keywords: list[Keyword] | None = Field(default=None, max_length=30)
+    keywords: list[Keyword] | None = Field(default=None, max_length=KEYWORD_MAX)
     tags: list[Tag] | None = Field(default=None, max_length=30)
     canonical_url: str | None = Field(default=None, max_length=CANONICAL_URL_MAX_LENGTH)
     cover_image_url: str | None = Field(default=None, max_length=700)
