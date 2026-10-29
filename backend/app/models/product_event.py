@@ -37,6 +37,10 @@ class ProductEvent(Base):
     __tablename__ = "product_events"
     __table_args__ = (
         Index("ix_product_events_product_occurred", "product", "occurred_at"),
+        # ``product_activity.recent`` wants the newest signups and logins, and
+        # actions are most of the table: on ``occurred_at`` alone it walked
+        # back through every action to find twenty of the rare kinds.
+        Index("ix_product_events_kind_occurred", "kind", "occurred_at"),
         CheckConstraint(
             "kind IN (" + ", ".join(f"'{k}'" for k in KINDS) + ")",
             name="ck_product_event_kind",
