@@ -90,6 +90,24 @@ def sniff_image_type(head: bytes) -> str | None:
     return None
 
 
+#: Labels that say nothing about what a file is. A browser takes the type from
+#: the operating system's extension table, and a WebP picked where that table
+#: has no entry arrives as one of these.
+_GENERIC_TYPES = {"", "application/octet-stream", "binary/octet-stream"}
+
+
+def _may_be_an_image(content_type: str | None) -> bool:
+    """Whether the client's label leaves room for the bytes to be an image.
+
+    Only a label naming some *other* kind of file is refused before the body is
+    read. Requiring one of four exact labels refused real images labelled
+    generically, or ``image/jpg`` and ``image/pjpeg`` by older clients, and
+    protected nothing: the bytes are sniffed whatever the label says.
+    """
+    label = (content_type or "").split(";")[0].strip().lower()
+    return label in _GENERIC_TYPES or label.startswith("image/")
+
+
 def _ext_from_content_type(ct: str) -> str:
     return {
         "image/jpeg": ".jpg",
@@ -128,7 +146,7 @@ async def upload_image(
     chunks and refused as soon as it passes the size limit, instead of being
     read whole into memory first.
     """
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
+    if not _may_be_an_image(file.content_type):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported file type: {file.content_type}. "
