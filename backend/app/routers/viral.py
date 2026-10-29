@@ -39,8 +39,9 @@ router = APIRouter(tags=["viral"])
 #: thread — and sync routes share one pool, so a few IPs inside their own rate
 #: limit were enough to queue up the whole API behind a provider that was down.
 #: Counts transport and HTTP failures only: an unparseable answer comes back
-#: fast and holds nothing. Tuned by the LLM chain's own settings, so one knob (``LLM_BREAKER_THRESHOLD`` /
-#: ``LLM_BREAKER_COOLDOWN_SECONDS``) tunes every breaker in front of a model.
+#: fast and holds nothing. Tuned by the LLM chain's own settings, so one
+#: knob (``LLM_BREAKER_THRESHOLD`` / ``LLM_BREAKER_COOLDOWN_SECONDS``) tunes
+#: every breaker in front of a model.
 idea_breaker = CircuitBreaker(
     threshold=settings.llm_breaker_threshold,
     cooldown_seconds=float(settings.llm_breaker_cooldown_seconds),
