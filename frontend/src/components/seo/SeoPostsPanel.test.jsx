@@ -134,4 +134,27 @@ describe("SeoPostsPanel", () => {
     expect(screen.getByText("Published")).toBeInTheDocument();
     await act(async () => {});
   });
+
+  // The hints under the fields — "Comma separated.", and the meta description's
+  // live length verdict — were plain text beside the input. Sighted users read
+  // them as they type; a screen reader announced the field and nothing else,
+  // so "Google will cut it off" never reached the people it was for.
+  it("ties each hint to its field, so it is read with it", async () => {
+    const user = userEvent.setup();
+    draw();
+
+    const keywords = await screen.findByLabelText("Target keywords");
+    expect(keywords).toHaveAccessibleDescription("Comma separated.");
+
+    const meta = screen.getByLabelText("Meta description");
+    expect(meta).toHaveAccessibleDescription(/Aim for \d+–\d+ characters/);
+    await user.type(meta, "x".repeat(170));
+    expect(meta).toHaveAccessibleDescription(/170 characters — Google will cut it off/);
+  });
+
+  it("leaves a field without a hint without a description", async () => {
+    draw();
+    expect(await screen.findByLabelText("Title")).not.toHaveAttribute("aria-describedby");
+  });
 });
+

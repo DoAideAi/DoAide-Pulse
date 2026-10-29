@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../../hooks/useApi";
 import { api } from "../../lib/api";
@@ -223,14 +223,29 @@ export default function SeoPostsPanel() {
   );
 }
 
+/**
+ * A labelled field, with its hint tied to the control by `aria-describedby`.
+ *
+ * The hint used to be a plain paragraph beside the input: read by anyone who
+ * could see it, and announced to nobody using a screen reader — so the meta
+ * description's "Google will cut it off" reached exactly the users who could
+ * already see the colour change.
+ */
 function Field({ label, id, hint, children }) {
+  const hintId = hint ? `${id}-hint` : undefined;
   return (
     <div>
       <label className="label" htmlFor={id}>
         {label}
       </label>
-      {children}
-      {hint && <p className="mt-1 text-xs text-ink-400">{hint}</p>}
+      {hintId && isValidElement(children)
+        ? cloneElement(children, { "aria-describedby": hintId })
+        : children}
+      {hint && (
+        <p id={hintId} className="mt-1 text-xs text-ink-400">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }
