@@ -193,6 +193,9 @@ describe("the SEO panel", () => {
       const [message] = toast.error.mock.calls[0];
       expect(message).toMatch(/^2 of 3 images added/);
       expect(message).toContain("two.txt");
+      // The batch's last state updates (the button, the progress) land after the
+      // draft; wait for them so they cannot spill into the next test.
+      expect(await screen.findByRole("button", { name: "+ Add images" })).toBeEnabled();
     });
 
     it("says which file it is on while a batch uploads", async () => {
@@ -231,6 +234,12 @@ describe("the SEO panel", () => {
 
     it("reorders by dragging one tile onto another", async () => {
       await open({ marketing_images: urls });
+      // ``open`` waits for the title; the editor's other loads (platforms,
+      // preview links) can still be resolving. Every other test here awaits a
+      // user-event action that flushes them inside act — this one only fires
+      // synchronous events, so on a slow CI box they landed outside act and the
+      // warning failed the test. Let them settle first.
+      await act(async () => {});
       const tiles = [...document.querySelectorAll("aside img[alt^='Marketing image']")].map(
         (i) => i.parentElement,
       );
