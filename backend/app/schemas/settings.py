@@ -146,6 +146,10 @@ class HealthDetailOut(HealthOut):
     #: ``health_queue_backlog_warn``, or ``disabled`` when tasks run inline.
     #: Not required, for the reason ``workers`` is not.
     queue: DependencyOut = DependencyOut(status="unknown", required=False)
+    #: The newest database dump's age: ``ok``, ``stale`` past
+    #: ``backup_max_age_hours`` (or none at all), ``unknown`` when the directory
+    #: cannot be read. Not required: a late backup is no reason to stop serving.
+    backups: DependencyOut = DependencyOut(status="unknown", required=False)
     llm_providers: list[str] = []
     llm_breakers_open: dict = {}
     #: The publishing breakers, keyed ``platform:user_id``. Beside the LLM ones

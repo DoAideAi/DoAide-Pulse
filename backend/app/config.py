@@ -341,6 +341,11 @@ class Settings(BaseSettings):
     # growing with every probe green; a sweep fans out a few dozen tasks at
     # most, so a few hundred waiting is work arriving faster than it drains.
     health_queue_backlog_warn: int = 200
+    # Where pulse-backup.service writes its dumps, and how old the newest may be
+    # before /health/detail calls the backup stale. A day plus the timer's
+    # randomised delay and some slack: one missed night shows, a late one does not.
+    backup_dir: str = "/var/backups/pulse"
+    backup_max_age_hours: int = 36
 
     # ---- AI (OpenRouter — free models only) ----
     openrouter_api_key: str = ""
@@ -1066,6 +1071,7 @@ class Settings(BaseSettings):
         "headline_min_window_hours",
         "link_check_max_urls",
         "health_queue_backlog_warn",
+        "backup_max_age_hours",
     )
     @classmethod
     def _non_negative_operational(cls, v: float) -> float:

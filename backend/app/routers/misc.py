@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy import text
@@ -184,6 +186,39 @@ def _queue() -> DependencyOut:
     return DependencyOut(status="behind", required=False, detail=detail)
 
 
+def _backups() -> DependencyOut:
+    """How old the newest database dump is.
+
+    Nothing in Pulse said whether a backup existed. The timer was installed by
+    every deploy and enabled by none, and for as long as that lasted the box
+    had no backup at all — found by reading systemd, not by anything Pulse
+    showed. A dump that stops being written looks like nothing until the day a
+    restore is needed, so its age is on the page somebody checks when things
+    look wrong, and in the journal when it is late. Only ``*.dump`` counts: an
+    uploads archive is half a backup.
+    """
+    directory = Path(settings.backup_dir)
+    try:
+        dumps = [entry.stat().st_mtime for entry in directory.glob("*.dump")]
+    except OSError as exc:
+        return DependencyOut(status="unknown", required=False, detail=_short(exc))
+    if not directory.is_dir():
+        return DependencyOut(
+            status="unknown", required=False, detail=f"{directory} is not readable here"
+        )
+    if not dumps:
+        detail = f"no database dump in {directory}"
+        logger.warning("backup is stale: %s", detail)
+        return DependencyOut(status="stale", required=False, detail=detail)
+    hours = (time.time() - max(dumps)) / 3600
+    detail = f"newest dump is {round(hours)} h old ({len(dumps)} kept)"
+    if hours <= settings.backup_max_age_hours:
+        return DependencyOut(status="ok", required=False, detail=detail)
+    detail += f", past the {settings.backup_max_age_hours} h limit — check pulse-backup.timer"
+    logger.warning("backup is stale: %s", detail)
+    return DependencyOut(status="stale", required=False, detail=detail)
+
+
 def _short(exc: BaseException, *, public: bool = True) -> str:
     """One line of cause, truncated.
 
@@ -346,6 +381,7 @@ def health_detail(
         workers=workers_out,
         scheduler=scheduler_out,
         queue=_queue(),
+        backups=_backups(),
         llm_providers=llm_router.configured_providers(),
         llm_breakers_open=llm_router.breaker.snapshot(),
         publish_breakers_open=publishers_breaker.snapshot(),
