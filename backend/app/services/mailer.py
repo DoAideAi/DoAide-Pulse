@@ -20,6 +20,7 @@ from __future__ import annotations
 import logging
 import smtplib
 import ssl
+import time
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid, parseaddr
 
@@ -94,6 +95,57 @@ def send(
         logger.error("refusing to send %r to %s: %s", subject, mask_email(to), exc)
         return False
 
+    for attempt in (1, 2):
+        try:
+            _deliver(message)
+            break
+        except (OSError, smtplib.SMTPException, UnicodeError) as exc:
+            # Includes auth failures, DNS, TLS and timeouts. The caller cannot
+            # act on any of them and must not leak which one happened to the
+            # requester. ``UnicodeError`` is the operator's: smtplib encodes the
+            # login as ASCII, so a password with an accent in it raised out of
+            # here on every send instead of failing like any other bad credential.
+            if attempt == 1 and _is_transient(exc):
+                logger.warning(
+                    "SMTP send to=%s subject=%r refused for now (%s); trying once more",
+                    mask_email(to), subject, exc,
+                )
+                time.sleep(RETRY_PAUSE_SECONDS)
+                continue
+            logger.error("SMTP send to=%s subject=%r failed: %s", mask_email(to), subject, exc)
+            return False
+
+    logger.info("sent %r to %s", subject, mask_email(to))
+    return True
+
+
+#: How long to wait before the one retry a temporary refusal earns.
+RETRY_PAUSE_SECONDS = 2.0
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Whether the server said "later" rather than "no".
+
+    A 4xx reply is SMTP's own word for a temporary failure — ``421`` busy or
+    rate-limited, ``450``/``451`` greylisting, routine at providers — and a
+    session the server dropped mid-way is the same kind of thing. Sent once and
+    given up on, a reset email was lost to them: the person was told to check
+    their inbox and nothing came. A 5xx is a refusal and is not repeated.
+    Connection refused and timeouts are an outage, which the digest sweep hands
+    to Celery's own retry; repeating each per message would only stack timeouts.
+    """
+    if isinstance(exc, smtplib.SMTPServerDisconnected):
+        return True
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        codes = [code for code, _ in exc.recipients.values()]
+        return bool(codes) and all(400 <= code < 500 for code in codes)
+    if isinstance(exc, smtplib.SMTPResponseException):
+        return 400 <= exc.smtp_code < 500
+    return False
+
+
+def _deliver(message: EmailMessage) -> None:
+    """One SMTP session that sends *message*, or raises."""
     timeout = settings.smtp_timeout_seconds
     # Passed explicitly to both. Left out, ``smtplib`` builds its own with
     # ``ssl._create_stdlib_context()`` — no certificate check and no hostname
@@ -103,30 +155,18 @@ def send(
     # that only the owner's mailbox would see it. Encryption that accepts
     # every certificate protects against nobody who is actually listening.
     tls = ssl.create_default_context()
-    try:
-        if settings.smtp_use_ssl:
-            client: smtplib.SMTP = smtplib.SMTP_SSL(
-                settings.smtp_host, settings.smtp_port, timeout=timeout, context=tls
-            )
-        else:
-            client = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout)
-        with client:
-            if settings.smtp_starttls and not settings.smtp_use_ssl:
-                client.starttls(context=tls)
-            if settings.smtp_user:
-                client.login(settings.smtp_user, settings.smtp_password)
-            client.send_message(message)
-    except (OSError, smtplib.SMTPException, UnicodeError) as exc:
-        # Includes auth failures, DNS, TLS and timeouts. The caller cannot act
-        # on any of them and must not leak which one happened to the requester.
-        # ``UnicodeError`` is the operator's: smtplib encodes the login as
-        # ASCII, so a password with an accent in it raised out of here on every
-        # send instead of failing like any other bad credential.
-        logger.error("SMTP send to=%s subject=%r failed: %s", mask_email(to), subject, exc)
-        return False
-
-    logger.info("sent %r to %s", subject, mask_email(to))
-    return True
+    if settings.smtp_use_ssl:
+        client: smtplib.SMTP = smtplib.SMTP_SSL(
+            settings.smtp_host, settings.smtp_port, timeout=timeout, context=tls
+        )
+    else:
+        client = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout)
+    with client:
+        if settings.smtp_starttls and not settings.smtp_use_ssl:
+            client.starttls(context=tls)
+        if settings.smtp_user:
+            client.login(settings.smtp_user, settings.smtp_password)
+        client.send_message(message)
 
 
 __all__ = ["configured", "send"]
