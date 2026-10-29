@@ -21,6 +21,7 @@ import logging
 import smtplib
 import ssl
 from email.message import EmailMessage
+from email.utils import formatdate, make_msgid, parseaddr
 
 from app.config import settings
 from app.logging_config import mask_email
@@ -35,6 +36,13 @@ def configured() -> bool:
 
 def _from_address() -> str:
     return settings.smtp_from.strip() or f"pulse@{settings.smtp_host.strip()}"
+
+
+def _message_id_domain(from_address: str) -> str:
+    """The domain a Message-ID is named for: the sender's own, else the relay's."""
+    _, address = parseaddr(from_address)
+    domain = address.rpartition("@")[2].strip()
+    return domain or settings.smtp_host.strip()
 
 
 def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
@@ -54,9 +62,17 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
 
     try:
         message = EmailMessage()
-        message["From"] = _from_address()
+        sender = _from_address()
+        message["From"] = sender
         message["To"] = to
         message["Subject"] = subject
+        # Neither ``EmailMessage`` nor ``smtplib.send_message`` adds these, and
+        # both are the message's own business under RFC 5322: Date is required,
+        # and Gmail refuses mail without a Message-ID ("not RFC 5322
+        # compliant"). Whether a relay fills them in was left to the relay —
+        # and a reset link that bounces is a lockout.
+        message["Date"] = formatdate(usegmt=True)
+        message["Message-ID"] = make_msgid(domain=_message_id_domain(sender))
         message.set_content(body)
         if html:
             # Added second, so it becomes the preferred alternative while the

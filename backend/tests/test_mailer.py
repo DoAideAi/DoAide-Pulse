@@ -175,3 +175,26 @@ def test_implicit_tls_checks_the_servers_certificate(smtp, monkeypatch):
     assert mailer.send(to="dev@example.com", subject="Reset", body="link") is True
 
     assert _verifies(smtp.instances[0].context)
+
+
+# The two headers RFC 5322 makes a message's own business. ``EmailMessage``
+# adds neither and ``smtplib.send_message`` does not either; whether the relay
+# fills them in is the relay's choice, and Gmail refuses mail without a
+# Message-ID outright ("not RFC 5322 compliant"). A reset link that bounces is
+# a lockout.
+def test_every_message_carries_a_date_and_a_message_id(smtp):
+    assert mailer.send(to="dev@example.com", subject="Reset", body="link") is True
+
+    message = smtp.instances[0].message
+    assert message["Date"]
+    message_id = message["Message-ID"]
+    assert message_id and message_id.startswith("<") and message_id.endswith(">")
+    # Named for the sending domain, so it is unique and attributable.
+    assert message_id.rstrip(">").endswith("@example.com")
+
+
+def test_message_ids_are_unique(smtp):
+    mailer.send(to="a@example.com", subject="One", body="x")
+    mailer.send(to="b@example.com", subject="Two", body="y")
+    ids = {s.message["Message-ID"] for s in smtp.instances}
+    assert len(ids) == 2
