@@ -39,8 +39,12 @@ router = APIRouter(tags=["viral"])
 #: thread — and sync routes share one pool, so a few IPs inside their own rate
 #: limit were enough to queue up the whole API behind a provider that was down.
 #: Counts transport and HTTP failures only: an unparseable answer comes back
-#: fast and holds nothing.
-idea_breaker = CircuitBreaker(threshold=3, cooldown_seconds=60.0)
+#: fast and holds nothing. Tuned by the LLM chain's own settings, so one knob (``LLM_BREAKER_THRESHOLD`` /
+#: ``LLM_BREAKER_COOLDOWN_SECONDS``) tunes every breaker in front of a model.
+idea_breaker = CircuitBreaker(
+    threshold=settings.llm_breaker_threshold,
+    cooldown_seconds=float(settings.llm_breaker_cooldown_seconds),
+)
 _IDEA_BREAKER_KEY = "gemini"
 
 
@@ -304,7 +308,10 @@ def generate_content_ideas(
         idea_breaker.record_success(_IDEA_BREAKER_KEY)
     except httpx.HTTPError as exc:
         if idea_breaker.record_failure(_IDEA_BREAKER_KEY):
-            logger.warning("Gemini is failing; idea generation paused for 60s")
+            logger.warning(
+                "Gemini is failing; idea generation paused for %ss",
+                settings.llm_breaker_cooldown_seconds,
+            )
         logger.exception("Gemini API call failed for content ideas")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

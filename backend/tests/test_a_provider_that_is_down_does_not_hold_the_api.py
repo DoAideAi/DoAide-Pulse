@@ -52,7 +52,9 @@ def test_three_timeouts_shut_the_door_and_the_fourth_caller_is_not_made_to_wait(
 
         assert fourth.status_code == 503
         assert post.call_count == 3, "the open breaker still called Gemini"
-        assert 1 <= int(fourth.headers["Retry-After"]) <= 60
+        from app.config import settings as real
+
+        assert 1 <= int(fourth.headers["Retry-After"]) <= real.llm_breaker_cooldown_seconds
 
 
 def test_a_success_clears_the_count(client, gemini_configured):
