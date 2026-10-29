@@ -125,7 +125,10 @@ jobs:
       - run: npm ci
 
       - name: Test
-        run: npm test
+        # With coverage, which is what runs vitest.config.js's thresholds.
+        # `npm test` (plain `vitest run`) measured nothing, so the floor that
+        # file calls the gate was checked nowhere and could rot to any number.
+        run: npm run test:coverage
 
       - name: Build
         # Also runs the prerender (vite.config.js), so a page whose head cannot

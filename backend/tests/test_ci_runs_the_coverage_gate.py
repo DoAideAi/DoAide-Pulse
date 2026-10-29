@@ -34,3 +34,50 @@ def test_there_is_a_floor_for_it_to_enforce():
 def test_the_plugin_it_needs_is_installed_in_ci():
     dev = (_ROOT / "backend" / "requirements-dev.txt").read_text()
     assert re.search(r"^pytest-cov==", dev, re.M)
+
+
+# ---- the frontend's gate --------------------------------------------------- #
+# vitest.config.js sets thresholds (99 statements, lines and functions; 98
+# branches) under a comment calling them the gate that stops an untested
+# component arriving quietly. CI ran ``npm test`` — ``vitest run``, no
+# ``--coverage`` — so vitest never measured anything and the thresholds were
+# checked nowhere: the same gap the backend half above had.
+
+
+def _frontend_steps() -> list[dict]:
+    import yaml
+
+    workflow = yaml.safe_load((_ROOT / ".github" / "workflows" / "ci.yml").read_text())
+    return workflow["jobs"]["frontend"]["steps"]
+
+
+def _npm_script(name: str) -> str:
+    import json
+
+    return json.loads((_ROOT / "frontend" / "package.json").read_text())["scripts"][name]
+
+
+def test_the_frontend_test_step_measures_coverage():
+    runs = [str(step.get("run", "")) for step in _frontend_steps()]
+    commands = []
+    for run in runs:
+        for script in re.findall(r"npm (?:run )?(\S+)", run):
+            if script in ("ci",):
+                continue
+            commands.append(_npm_script(script))
+        commands.append(run)
+    assert any("vitest run" in c and "--coverage" in c for c in commands), runs
+
+
+def test_the_frontend_has_thresholds_for_it_to_enforce():
+    config = (_ROOT / "frontend" / "vitest.config.js").read_text()
+    thresholds = re.search(r"thresholds:\s*\{([^}]*)\}", config)
+    assert thresholds, "vitest.config.js no longer sets coverage thresholds"
+    assert re.search(r"lines:\s*\d+", thresholds.group(1))
+
+
+def test_the_frontend_coverage_provider_is_installed():
+    import json
+
+    dev = json.loads((_ROOT / "frontend" / "package.json").read_text())["devDependencies"]
+    assert "@vitest/coverage-v8" in dev
