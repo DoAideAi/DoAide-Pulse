@@ -278,6 +278,31 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, futu
 install_slow_query_logging(engine, settings.db_slow_query_ms)
 
 
+_WROTE = "pulse.wrote_since_commit"
+
+
+@event.listens_for(Session, "after_flush")
+def _mark_written(session: Session, _flush_context: object) -> None:
+    """Remember that this transaction has sent a write, even once it is flushed.
+
+    ``session.new``/``dirty``/``deleted`` empty out at flush, so "nothing is
+    pending" does not mean "this transaction has written nothing" — and ending
+    a transaction on that reading commits whatever the caller had flushed.
+    """
+    session.info[_WROTE] = True
+
+
+@event.listens_for(Session, "after_commit")
+@event.listens_for(Session, "after_rollback")
+def _clear_written(session: Session) -> None:
+    session.info.pop(_WROTE, None)
+
+
+def has_written(db: Session) -> bool:
+    """Whether the current transaction holds any write, pending or flushed."""
+    return bool(db.new or db.dirty or db.deleted or db.info.get(_WROTE))
+
+
 def release_for_slow_work(db: Session, *instances: object) -> None:
     """End a read-only transaction before slow work, keeping *instances* usable.
 

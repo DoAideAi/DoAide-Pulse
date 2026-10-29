@@ -36,6 +36,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import has_written
 from app.models.content import Content, ContentStatus, ContentType, unique_content_slug
 from app.models.mixins import as_aware, utcnow
 from app.models.project import AutopilotMode, Project
@@ -197,11 +198,14 @@ def _release_connection_for_the_model(db: Session) -> None:
     project stays readable rather than reloading — and taking a connection back
     — on the first attribute the generator reads.
 
-    Only when nothing is pending: a caller's unwritten change is not this
-    function's to commit early, so with one staged the transaction is left as
-    it was.
+    Only when the transaction has written nothing, flushed or not: a caller's
+    change is not this function's to commit early, so with one in hand the
+    transaction is left as it was.
     """
-    if db.new or db.dirty or db.deleted or not db.in_transaction():
+    # ``has_written``, not ``db.new or db.dirty``: a flushed write is no longer
+    # pending, and committing it here is how a repo scan's watermark moved
+    # past commits that a provider outage then left unwritten.
+    if has_written(db) or not db.in_transaction():
         return
     expire, db.expire_on_commit = db.expire_on_commit, False
     try:
