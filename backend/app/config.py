@@ -34,6 +34,10 @@ _KNOWN_ENVIRONMENTS = frozenset(
 )
 
 
+#: The lowest ``CELERY_WORKER_MAX_MEMORY_KB`` that is still a ceiling: half again
+#: the ~100 MB a worker process uses at rest.
+WORKER_MEMORY_FLOOR_KB = 150_000
+
 #: The algorithms ``JWT_SECRET`` — a shared secret — can sign with.
 _JWT_ALGORITHMS = frozenset({"HS256", "HS384", "HS512"})
 
@@ -812,8 +816,6 @@ class Settings(BaseSettings):
         # which deletes the rows the metrics endpoint is about the moment they
         # are written.
         "llm_usage_retention_days",
-        # Zero would recycle the worker after every task.
-        "celery_worker_max_memory_kb",
         # Zero would refuse every completion before the first call.
         "llm_total_timeout_seconds",
         "activity_retention_days",
@@ -845,6 +847,33 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError("must be positive")
         return v
+
+    @field_validator("celery_worker_max_memory_kb", mode="before")
+    @classmethod
+    def _worker_memory_floor(cls, v: object) -> object:
+        """At least 150 MB, in kilobytes, and said so when it is not.
+
+        A worker process at rest uses about 100 MB. A ceiling below that is
+        not a ceiling, it is "replace the process after every task": no error,
+        no log line, every task paying for a fresh import and new connections.
+        ``10`` (someone thinking in megabytes) or ``400MB`` (a unit Celery does
+        not read) are the likely ways to get there, so both are refused with
+        the unit spelled out.
+        """
+        try:
+            kb = int(v)  # type: ignore[call-overload]
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"CELERY_WORKER_MAX_MEMORY_KB must be a whole number of kilobytes "
+                f"(e.g. 400000 for 400 MB), got {v!r}"
+            ) from None
+        if kb < WORKER_MEMORY_FLOOR_KB:
+            raise ValueError(
+                f"CELERY_WORKER_MAX_MEMORY_KB is in kilobytes and must be at least "
+                f"{WORKER_MEMORY_FLOOR_KB} ({WORKER_MEMORY_FLOOR_KB // 1000} MB): a worker "
+                f"at rest uses about 100 MB, so {kb} would replace it after every task"
+            )
+        return kb
 
     @field_validator("db_pool_timeout_seconds")
     @classmethod

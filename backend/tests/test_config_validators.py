@@ -114,12 +114,18 @@ def test_an_hmac_algorithm_is_accepted(value, expected):
     assert _settings(jwt_algorithm=value).jwt_algorithm == expected
 
 
-# A worker replaced after every task would be a worker that never finishes a
-# sweep's second item warm; zero is a typo, not a setting.
-@pytest.mark.parametrize("value", [0, -1])
-def test_the_worker_memory_ceiling_must_be_positive(value):
-    with pytest.raises(ValidationError):
+# Below a worker's ~100 MB resting size the ceiling replaces the process after
+# every task, silently. 10 (megabytes, typed as kilobytes) and "400MB" (a unit
+# Celery does not read) are the realistic ways to get there.
+@pytest.mark.parametrize("value", [0, -1, 10, 400, 99_999, 149_999, "400MB", "lots"])
+def test_the_worker_memory_ceiling_must_be_a_real_ceiling_in_kilobytes(value):
+    with pytest.raises(ValidationError, match="CELERY_WORKER_MAX_MEMORY_KB"):
         _settings(celery_worker_max_memory_kb=value)
+
+
+@pytest.mark.parametrize("value", [150_000, "400000", 2_000_000])
+def test_a_sensible_worker_memory_ceiling_is_accepted(value):
+    assert _settings(celery_worker_max_memory_kb=value).celery_worker_max_memory_kb == int(value)
 
 
 def test_the_worker_memory_ceiling_reaches_celery():
