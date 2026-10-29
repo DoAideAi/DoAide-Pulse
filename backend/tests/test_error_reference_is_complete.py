@@ -53,3 +53,41 @@ def test_the_outcome_unknown_wordings_are_explained():
     text = REFERENCE.read_text()
     assert "may already have gone out" in text
     assert "has probably gone out" in text
+
+
+def _source_text() -> str:
+    """Every literal in app/, with implicit string concatenation joined."""
+    root = Path(__file__).resolve().parents[1] / "app"
+    text = "\n".join(p.read_text() for p in root.rglob("*.py"))
+    text = re.sub(r'"\s*\n\s*f?"', "", text)
+    return re.sub(r"\s+", " ", text)
+
+
+def _quoted_messages() -> list[str]:
+    """The messages the reference quotes in a table's first column."""
+    rows = re.findall(r"^\|\s*(?:\d{3}\s*\|\s*)?`([^`]+)`", REFERENCE.read_text(), re.M)
+    return [row for row in rows if not row.startswith("/")]
+
+
+def _pattern(quoted: str) -> re.Pattern[str] | None:
+    """A message as a search pattern: up to its first ``…``, with the doc's
+    illustrative fillings (``{platform}``, ``366``, ``N``) as wildcards."""
+    head = quoted.split("…")[0].strip().rstrip(".").strip()
+    if len(head) < 8:
+        return None
+    parts = re.split(r"\{[^}]*\}|\b\d+\b|\bN\b", head)
+    return re.compile(".+?".join(re.escape(part) for part in parts))
+
+
+@pytest.mark.parametrize("quoted", _quoted_messages())
+def test_every_quoted_message_is_one_the_code_can_say(quoted):
+    """The other half of completeness. The reference said ``Invalid invite
+    token.`` long after the code said ``That invite code is not right``, and
+    ``Cross-product activity is limited to …`` for a message that had changed:
+    a quoted sentence nobody will ever see sends a reader searching for it."""
+    pattern = _pattern(quoted)
+    if pattern is None:
+        pytest.skip("too short to look for")
+    assert pattern.search(_source_text()), (
+        f"ERRORS.md quotes a message the code no longer has: {quoted!r}"
+    )

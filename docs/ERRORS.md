@@ -57,7 +57,7 @@ that isn't possible as stated.
 | Message | Cause | What to do |
 |---|---|---|
 | `Token is invalid, expired, or was revoked by a password reset.` | Tokens last `ACCESS_TOKEN_EXPIRE_MINUTES` (24 h). A password reset ends every earlier one. A deactivated account's token is refused too. | Sign in again. |
-| `Incorrect email or password.` | Deliberately the same answer for an unknown address, so it can't be used to find accounts. | Check both, or reset the password. |
+| `Incorrect email or password. Forgotten it? …` | Deliberately the same answer for an unknown address, so it can't be used to find accounts. | Check both, or use **Forgot your password?** under the sign-in form to set a new one. |
 | `Invalid or expired API key.` | A `/machine` call with a key that's wrong, revoked, rotated out, expired, or belongs to a deactivated account. The log line records which, by key prefix. | Mint or rotate a key in Settings. |
 | `This trigger requires a valid signature …` | An inbound trigger with `require_signature` got no valid `X-Pulse-Signature` or `X-Hub-Signature-256`. | Sign the body with the trigger's secret, or turn the requirement off. |
 | `Invalid ingest token.` | `POST /products/events` with the wrong `X-Pulse-Ingest-Token`. | Use the value of `PRODUCT_INGEST_TOKEN`. |
@@ -67,10 +67,10 @@ that isn't possible as stated.
 | Message | Cause | What to do |
 |---|---|---|
 | `Registration is currently closed.` | `REGISTRATION_ENABLED` is off (the default; the account comes from `python -m app.seed`). | Ask the operator. |
-| `Invalid invite token.` | Registration is open but needs `REGISTRATION_INVITE_TOKEN`. | Ask the operator for the current token. |
+| `That invite code is not right. …` | Registration is open but needs the code in `REGISTRATION_INVITE_TOKEN`, and none or the wrong one was sent. | Enter the code in the sign-up form's **Invite code** field (it appears once the server asks for one), or open the `/?invite=<code>` link the operator shared. |
 | `This account has been deactivated.` | The password was right; the account is switched off. | Only the operator can reactivate it. |
 | `This key is missing the … scope.` | The API key exists but wasn't granted that scope. | Mint a key with the scope. Scopes can't be added to an existing key. |
-| `Cross-product activity is limited to …` / `Feedback is readable by this install's operator only.` | Operator-only views. The operator is anyone listed in `PRODUCT_ACTIVITY_ADMIN_EMAILS`, or, with that list empty, every account while registration is closed. | Add the email to `PRODUCT_ACTIVITY_ADMIN_EMAILS`. |
+| `Cross-product activity is for this install's administrators. …` / `Feedback is readable by this install's operator only.` | Operator-only views. The operator is anyone listed in `PRODUCT_ACTIVITY_ADMIN_EMAILS`, or, with that list empty, every account while registration is closed. | Add the email to `PRODUCT_ACTIVITY_ADMIN_EMAILS`. |
 
 ### 404: no such thing, or not yours
 
@@ -136,6 +136,11 @@ sentence instead. The common route-level ones:
   `POST /templates/{id}/preview` renders anyway and lists what's missing.
 - `This template renders more than a piece can hold …`: placeholders can
   repeat, so a template can expand past the title or body limit.
+- `This piece has no body, and approving it would publish it to …`: the
+  project's autopilot would send an empty piece to a destination that posts the
+  article itself (Medium, Dev.to, Hashnode, WordPress, Git, Buttondown). Write
+  the body first. A manual project, or one that only posts to social, can still
+  approve it.
 - `These fields cannot be null: …`: in a PATCH, omit a field to keep it; send
   `""` or `[]` to clear it.
 - `That passage is not in the saved draft.`: the passage edit works on the saved
@@ -174,7 +179,7 @@ Operator-only 500s that do say more:
 | 501 | `{Platform} publishing is not available yet.` | A scaffolded adapter (LinkedIn, Twitter/X). | See the README's Platform support table. |
 | 502 | `{Platform} is not responding — the credentials may be fine …` | The platform failed while Pulse verified a connection. | Try again later. The credentials weren't judged. |
 | 502 | `Could not reach GitHub to scan this repository.` | GitHub didn't answer. | Check the repo URL; try again. |
-| 503 | `The database is unavailable for a moment, so nothing was saved.` | PostgreSQL unreachable, or every pooled connection busy for `DB_POOL_TIMEOUT_SECONDS`. Sent with `Retry-After: 5`. | Retry. If it persists, check `GET /api/v1/health`. |
+| 503 | `The database is unavailable for a moment, so nothing was saved.` | PostgreSQL unreachable, every pooled connection busy for `DB_POOL_TIMEOUT_SECONDS`, out of disk, or read-only (a standby after failover, or writes switched off during maintenance). Sent with `Retry-After: 5`. | Retry. If it persists, check `GET /api/v1/health`. |
 | 503 | `No provider could translate …` / `AI generation is temporarily unavailable …` | Every LLM provider in the chain failed or returned nothing usable. A failed re-translation **keeps the previous translation**. | Retry shortly. Configure fallback providers (`GEMINI_API_KEY`, `GROQ_API_KEY`) so one spent quota isn't an outage. |
 | 503 | `Product event ingest is not enabled …` | `PRODUCT_INGEST_TOKEN` is unset. | Set it on the server and in the reporting product. |
 | 503 | (health) | `GET /api/v1/health` answers 503 when a required dependency (database, Redis) is down. Caddy uses it to take the API out of rotation. | See `deploy/DEPLOYMENT.md`. |
