@@ -155,6 +155,34 @@ def resolve_level(name: str) -> int:
     return level if isinstance(level, int) else logging.INFO
 
 
+class OneLineFormatter(logging.Formatter):
+    """:data:`LOG_FORMAT`, with line breaks in the message written as ``\\n``.
+
+    The journal splits on newlines, so a message that carries one becomes two
+    entries, and the second has no timestamp, level or request id of ours —
+    it looks like whatever its text says it is. Messages quote things Pulse
+    does not control: a publish failure is logged with the platform's own
+    error text, and while most adapters flatten what they quote, Hashnode's
+    GraphQL ``errors[].message`` reached the log verbatim. A platform (or
+    anyone answering in its place) could write
+    ``x\\n2026-10-29 03:00:00,000 ERROR [-] app.main: ...`` into Pulse's log.
+
+    Escaped here, where every line passes, rather than at each call site that
+    might quote something. Only the message: a traceback is appended after
+    :meth:`formatMessage` and keeps its lines, which is the one multi-line
+    record that is ours.
+    """
+
+    def formatMessage(self, record: logging.LogRecord) -> str:  # noqa: N802 - stdlib name
+        """The formatted line, with CR and LF in the message escaped."""
+        message = record.message
+        record.message = message.replace("\r", "\\r").replace("\n", "\\n")
+        try:
+            return super().formatMessage(record)
+        finally:
+            record.message = message
+
+
 def configure_logging(*, level: str | None = None) -> None:
     """Install Pulse's handler on the root logger. Idempotent.
 
@@ -176,7 +204,7 @@ def configure_logging(*, level: str | None = None) -> None:
     # every log line is stderr makes `systemctl status` look like a fire.
     handler = logging.StreamHandler(sys.stdout)
     handler.name = _HANDLER_NAME
-    handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    handler.setFormatter(OneLineFormatter(LOG_FORMAT))
     handler.addFilter(RequestIDFilter())
     root.addHandler(handler)
     root.setLevel(resolved)
