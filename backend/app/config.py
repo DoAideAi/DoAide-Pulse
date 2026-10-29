@@ -979,6 +979,77 @@ class Settings(BaseSettings):
             raise ValueError("must be zero or positive")
         return v
 
+    @field_validator(
+        # Every outbound call's timeout. Zero is not "no timeout" to httpx or
+        # smtplib — it is a deadline already passed, so every call to that
+        # service fails at once, and a negative one fails at the first call
+        # rather than at boot.
+        "feed_timeout_seconds",
+        "github_timeout_seconds",
+        "gsc_timeout_seconds",
+        "health_check_timeout_seconds",
+        "link_check_timeout_seconds",
+        "publish_timeout_seconds",
+        "rate_limit_storage_timeout_seconds",
+        "seo_audit_timeout_seconds",
+        "smtp_timeout_seconds",
+        "umami_timeout_seconds",
+        "webhook_timeout_seconds",
+        # Beat intervals. Zero schedules the task back to back — a sweep of the
+        # database as fast as the worker can take it — and a negative interval
+        # stops beat from starting. ``trigger_scan_interval_seconds`` was
+        # already held to this; its neighbours were not.
+        "autopilot_scan_interval_seconds",
+        "connection_verify_interval_seconds",
+        "headline_auto_select_interval_seconds",
+        "metrics_scan_interval_seconds",
+        "publish_scan_interval_seconds",
+        "trigger_default_interval_hours",
+        "webhook_scan_interval_seconds",
+        # A cutoff of ``utcnow()`` minus zero days deletes the rows as they are
+        # written, as for the retention settings in ``_positive``.
+        "trigger_event_retention_days",
+        "webhook_delivery_retention_days",
+        # Zero would refuse every upload, open the LLM breaker on no failures,
+        # start the autopilot on no commits, pick a headline on no data, and
+        # let a second worker take a delivery the first is still sending.
+        "max_upload_bytes",
+        "llm_breaker_threshold",
+        "llm_max_attempts",
+        "autopilot_commit_threshold",
+        "headline_min_snapshots",
+        "webhook_claim_lease_seconds",
+        "smtp_port",
+    )
+    @classmethod
+    def _positive_operational(cls, v: float) -> float:
+        """The same rule as :meth:`_positive`, for settings it did not list."""
+        if v <= 0:
+            raise ValueError("must be positive")
+        return v
+
+    @field_validator(
+        # Zero means something for each — no wait, no delay, no cap on the
+        # check, no backlog warning — but a negative value does not.
+        "llm_breaker_cooldown_seconds",
+        "llm_breaker_max_cooldown_seconds",
+        "llm_retry_max_backoff_seconds",
+        "publish_retry_backoff_seconds",
+        "publish_retry_max_backoff_seconds",
+        "webhook_retry_backoff_seconds",
+        "webhook_retry_max_backoff_seconds",
+        "syndication_delay_seconds",
+        "headline_min_window_hours",
+        "link_check_max_urls",
+        "health_queue_backlog_warn",
+    )
+    @classmethod
+    def _non_negative_operational(cls, v: float) -> float:
+        """The same rule as :meth:`_non_negative`, for settings it did not list."""
+        if v < 0:
+            raise ValueError("must be zero or positive")
+        return v
+
     @field_validator("environment")
     @classmethod
     def _environment_is_a_known_name(cls, v: str) -> str:
