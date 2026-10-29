@@ -188,6 +188,11 @@ class Settings(BaseSettings):
     rate_limit_login_failures_per_account: str = "20/hour"
     rate_limit_register: str = "5/hour"
     rate_limit_password_reset: str = "5/hour"
+    # Reset emails to one address, whoever asks. The per-IP limit above let a
+    # few addresses fill an owner's inbox from Pulse's domain and keep revoking
+    # the link they were trying to use; past this the 202 is unchanged and
+    # nothing is sent.
+    rate_limit_password_reset_per_account: str = "3/hour;6/day"
     rate_limit_auth_read: str = "60/minute"
     # The public RSS feed. Two database queries and an XML render for anyone who
     # can guess a project id, so it is the most expensive thing an anonymous

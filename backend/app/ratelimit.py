@@ -256,6 +256,32 @@ def _account_bucket(email: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+#: Reset emails per address — see ``reset_request_allowed``.
+_RESET_REQUESTS = parse_many(settings.rate_limit_password_reset_per_account)
+
+
+def reset_request_allowed(email: str) -> bool:
+    """Spend one of *email*'s reset requests; ``False`` once they are spent.
+
+    The per-IP limit on the endpoint did nothing for the address being asked
+    about: a handful of callers could send its owner reset email after reset
+    email, each revoking the link before. Spent for every request, known
+    address or not, so a refusal says nothing about who has an account. Fails
+    open like the rest of the limiter: a Redis outage must not stop resets.
+    """
+    if not limiter.enabled:
+        return True
+    key = _account_bucket(email)
+    try:
+        within = [
+            limiter._limiter.hit(item, "reset-requests", key) for item in _RESET_REQUESTS
+        ]
+    except Exception:  # noqa: BLE001 - storage errors fail open
+        logger.warning("reset request counter unavailable; not enforcing", exc_info=True)
+        return True
+    return all(within)
+
+
 def login_locked(email: str) -> bool:
     """Whether *email* has spent its failed-sign-in budget for now.
 

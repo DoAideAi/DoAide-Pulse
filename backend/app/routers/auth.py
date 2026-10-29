@@ -45,6 +45,7 @@ from app.ratelimit import (
     login_lock_detail,
     login_locked,
     record_login_failure,
+    reset_request_allowed,
 )
 from app.routers._patch import reject_nulls
 from app.schemas.auth import (
@@ -368,6 +369,14 @@ def request_password_reset(
     # already failed to sign in, and matching their address only in the case it
     # happens to be stored in makes this endpoint a second dead end rather than
     # the way out of the first.
+    # The address's own budget, spent before the lookup so it is spent for an
+    # unknown address too: see ``ratelimit.reset_request_allowed``.
+    if not reset_request_allowed(payload.email):
+        logger.warning(
+            "password reset refused from %s: too many requests for one address",
+            client_key(request),
+        )
+        return MessageOut(detail=_RESET_REQUESTED)
     user = accounts.find_by_email(db, payload.email)
     if user is not None and user.is_active:
         raw_token = password_reset.issue(db, user)
