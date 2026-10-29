@@ -33,6 +33,7 @@ their own writing — this module answers questions.
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -74,7 +75,25 @@ SEGMENT_MAX_LENGTH = 24
 #: vocabulary: two words run together are unreadable in a facet list, and the
 #: adapter still gets its stripped form because it still calls its own
 #: normaliser on whatever is stored.
-_UNSAFE = re.compile(r"[^a-z0-9]+")
+_RUNS_OF_HYPHENS = re.compile(r"-{2,}")
+
+
+def _clean_segment(segment: str) -> str:
+    """One segment kept to letters, marks and digits — in any script — and hyphens.
+
+    This was ``[^a-z0-9]+ → "-"``, ASCII only: ``café`` became ``caf`` and a
+    Hindi tag such as ``हिंदी`` became nothing at all, so it vanished from the
+    tag tree of a product written for Indian-language newsletters. Kept by
+    Unicode category instead (L, M, N) after NFC, so the vowel signs that are
+    combining marks in Devanagari stay attached to their letters — ``\\w``
+    would have split them off — while spaces and punctuation still become one
+    hyphen, as before.
+    """
+    composed = unicodedata.normalize("NFC", segment)
+    kept = "".join(
+        ch if unicodedata.category(ch)[0] in "LMN" else "-" for ch in composed
+    )
+    return _RUNS_OF_HYPHENS.sub("-", kept).strip("-")
 
 #: How many pieces the tree walks before it stops and says so.
 #:
@@ -108,7 +127,8 @@ def normalize(raw: str) -> str:
     """One tag in its canonical form, or ``""`` if nothing survives.
 
     Lowercased, split on :data:`SEPARATOR`, each segment reduced to
-    ``[a-z0-9-]`` and clipped to :data:`SEGMENT_MAX_LENGTH`, empty segments
+    letters, marks and digits in any script plus hyphens, and clipped to
+    :data:`SEGMENT_MAX_LENGTH`, empty segments
     dropped, and the whole thing cut to :data:`MAX_DEPTH` levels.
 
     Empty segments are dropped rather than refused because they are almost
@@ -120,7 +140,7 @@ def normalize(raw: str) -> str:
     """
     parts: list[str] = []
     for segment in str(raw).lower().split(SEPARATOR):
-        cleaned = _UNSAFE.sub("-", segment).strip("-")
+        cleaned = _clean_segment(segment)
         if cleaned:
             parts.append(cleaned[:SEGMENT_MAX_LENGTH].strip("-"))
         if len(parts) == MAX_DEPTH:

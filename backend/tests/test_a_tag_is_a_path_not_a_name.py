@@ -260,3 +260,48 @@ def test_a_node_knows_its_own_depth():
     assert node.tag == "a/b/c"
     assert node.depth == 3
     assert node.as_dict()["label"] == "c"
+
+
+# Tags in other scripts. The cleaner was ASCII-only, ``[^a-z0-9] → "-"``:
+# "café" came out as "caf" and a Hindi tag came out empty, so it disappeared
+# from the tag tree of a product written for Indian-language newsletters.
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("café", "café"),
+        ("café", "café"),  # the same word, decomposed — one spelling
+        ("Résumé Tips", "résumé-tips"),
+        ("हिंदी", "हिंदी"),  # vowel signs are combining marks; they stay put
+        ("हिंदी समाचार / राजनीति", "हिंदी-समाचार/राजनीति"),
+        ("தமிழ்", "தமிழ்"),
+        ("日本語", "日本語"),
+        ("Release Notes", "release-notes"),
+    ],
+)
+def test_a_tag_in_any_script_keeps_its_letters(raw, expected):
+    assert tags.normalize(raw) == expected
+
+
+def test_emoji_and_punctuation_alone_are_still_not_a_tag():
+    assert tags.normalize("🚀✨ — !!") == ""
+
+
+def test_the_tag_tree_shows_hindi_and_accented_tags_whole(client, auth, project):
+    for title, tag_list in (("One", ["हिंदी", "café"]), ("Two", ["हिंदी/राजनीति"])):
+        resp = client.post(
+            "/api/v1/content",
+            headers=auth,
+            json={
+                "project_id": project.id,
+                "title": title,
+                "body_markdown": "Words. " * 40,
+                "tags": tag_list,
+            },
+        )
+        assert resp.status_code == 201, resp.text
+
+    roots = {node["tag"]: node for node in client.get("/api/v1/tags", headers=auth).json()["roots"]}
+
+    assert set(roots) == {"हिंदी", "café"}
+    assert roots["हिंदी"]["total"] == 2
+    assert [child["tag"] for child in roots["हिंदी"]["children"]] == ["हिंदी/राजनीति"]
