@@ -6,6 +6,7 @@ is the only way to assert on STARTTLS and login ordering without one.
 from __future__ import annotations
 
 import smtplib
+import ssl
 
 import pytest
 
@@ -18,8 +19,10 @@ class _FakeSMTP:
 
     instances: list[_FakeSMTP] = []
 
-    def __init__(self, host, port, timeout=None):
+    def __init__(self, host, port, timeout=None, **kwargs):
         self.host, self.port, self.timeout = host, port, timeout
+        self.context = kwargs.get("context")
+        self.starttls_context = None
         self.calls: list[str] = []
         self.message = None
         _FakeSMTP.instances.append(self)
@@ -31,8 +34,9 @@ class _FakeSMTP:
         self.calls.append("quit")
         return False
 
-    def starttls(self):
+    def starttls(self, **kwargs):
         self.calls.append("starttls")
+        self.starttls_context = kwargs.get("context")
 
     def login(self, user, password):
         self.calls.append(f"login:{user}:{password}")
@@ -140,3 +144,34 @@ def test_a_password_smtplib_cannot_encode_fails_like_a_bad_password(smtp, monkey
 def test_a_subject_that_would_inject_a_header_is_refused_not_raised(smtp, subject):
     assert mailer.send(to="dev@example.com", subject=subject, body="b") is False
     assert smtp.instances == []  # nothing was opened
+
+
+def _verifies(context) -> bool:
+    """A context that would refuse a forged certificate for the wrong host."""
+    return (
+        context is not None
+        and context.verify_mode == ssl.CERT_REQUIRED
+        and context.check_hostname is True
+    )
+
+
+def test_starttls_checks_the_servers_certificate(smtp, monkeypatch):
+    """``starttls()`` with no context uses ``ssl._create_stdlib_context()``,
+    which accepts any certificate for any host — so the reset link, a working
+    credential, went out over TLS that anyone on the path could terminate."""
+    monkeypatch.setattr(settings, "smtp_starttls", True)
+    monkeypatch.setattr(settings, "smtp_use_ssl", False)
+
+    assert mailer.send(to="dev@example.com", subject="Reset", body="link") is True
+
+    assert _verifies(smtp.instances[0].starttls_context)
+
+
+def test_implicit_tls_checks_the_servers_certificate(smtp, monkeypatch):
+    """``SMTP_SSL`` has the same unverified default as ``starttls``."""
+    monkeypatch.setattr(settings, "smtp_use_ssl", True)
+    monkeypatch.setattr(settings, "smtp_port", 465)
+
+    assert mailer.send(to="dev@example.com", subject="Reset", body="link") is True
+
+    assert _verifies(smtp.instances[0].context)

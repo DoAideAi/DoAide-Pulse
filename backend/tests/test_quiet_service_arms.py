@@ -216,7 +216,7 @@ def test_a_run_of_stops_stays_inside_one_post():
 class _FakeSMTP:
     instances: list[_FakeSMTP] = []
 
-    def __init__(self, host, port, timeout=None):
+    def __init__(self, host, port, timeout=None, **kwargs):
         self.message = None
         _FakeSMTP.instances.append(self)
 
@@ -226,7 +226,7 @@ class _FakeSMTP:
     def __exit__(self, *exc):
         return False
 
-    def starttls(self):
+    def starttls(self, **kwargs):
         pass
 
     def login(self, user, password):

@@ -236,7 +236,7 @@ def test_a_text_only_message_carries_no_html_alternative(monkeypatch):
         def __exit__(self, *exc):
             return False
 
-        def starttls(self):
+        def starttls(self, **kwargs):
             pass
 
         def login(self, *args):

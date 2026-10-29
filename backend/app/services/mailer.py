@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from app.config import settings
@@ -69,16 +70,24 @@ def send(*, to: str, subject: str, body: str, html: str | None = None) -> bool:
         return False
 
     timeout = settings.smtp_timeout_seconds
+    # Passed explicitly to both. Left out, ``smtplib`` builds its own with
+    # ``ssl._create_stdlib_context()`` — no certificate check and no hostname
+    # check — so anything on the path between Pulse and the relay could
+    # present any certificate, take the session, and read the reset link: a
+    # working credential for the account, in a message whose whole point was
+    # that only the owner's mailbox would see it. Encryption that accepts
+    # every certificate protects against nobody who is actually listening.
+    tls = ssl.create_default_context()
     try:
         if settings.smtp_use_ssl:
             client: smtplib.SMTP = smtplib.SMTP_SSL(
-                settings.smtp_host, settings.smtp_port, timeout=timeout
+                settings.smtp_host, settings.smtp_port, timeout=timeout, context=tls
             )
         else:
             client = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout)
         with client:
             if settings.smtp_starttls and not settings.smtp_use_ssl:
-                client.starttls()
+                client.starttls(context=tls)
             if settings.smtp_user:
                 client.login(settings.smtp_user, settings.smtp_password)
             client.send_message(message)

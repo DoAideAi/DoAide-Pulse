@@ -28,7 +28,7 @@ from app.services.errors import clip_error
 class _FakeSMTP:
     """Minimal SMTP double that can be told to explode on send."""
 
-    def __init__(self, host, port, timeout=None):
+    def __init__(self, host, port, timeout=None, **kwargs):
         self.host, self.port, self.timeout = host, port, timeout
         self.message = None
 
@@ -38,7 +38,7 @@ class _FakeSMTP:
     def __exit__(self, *exc):
         return False
 
-    def starttls(self):
+    def starttls(self, **kwargs):
         pass
 
     def login(self, user, password):
