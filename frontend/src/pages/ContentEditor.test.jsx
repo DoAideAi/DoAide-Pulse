@@ -736,6 +736,14 @@ describe("editing one passage", () => {
     });
   });
 
+  // The side panels (preview links among them) load on their own requests, and
+  // a test here can finish before one of them resolves. On a slow CI runner the
+  // late update landed outside act() and the console.error guard failed the
+  // test (a4eb8dc) with every assertion met. Settle them inside act() first.
+  afterEach(async () => {
+    await act(async () => {});
+  });
+
   /** Select a span of the body, the way dragging over it would. */
   async function select(from, to) {
     const body = await screen.findByLabelText(/^Body/i);
