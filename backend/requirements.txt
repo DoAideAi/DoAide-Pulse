@@ -98,4 +98,4 @@ nh3==0.3.7
 # (app.services.project_import). Pure Python, no system libraries.
 # 6.21.2: below it pypdf has some sixty advisories, nearly all denial of
 # service from a crafted PDF — and the PDFs this parses are uploaded by users.
-pypdf==6.21.3
+pypdf==6.21.4
