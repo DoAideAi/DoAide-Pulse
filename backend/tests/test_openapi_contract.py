@@ -55,8 +55,9 @@ ROUTES = [
 
 # Success codes. 202 is a success too, and both endpoints that answer it are
 # deliberate: a password reset and an inbound trigger each accept the request
-# and answer before the work is done.
-SUCCESS = {200, 201, 202, 204}
+# and answer before the work is done. 303 is the digest unsubscribe link's GET,
+# which sends a person to Settings and deliberately changes nothing.
+SUCCESS = {200, 201, 202, 204, 303}
 
 # The status codes described in an endpoint's own words rather than the
 # catalogue's, listed so a fifth has to be added here on purpose. Each is a
@@ -93,8 +94,9 @@ def test_the_surface_is_the_size_this_file_thinks_it_is():
     ``POST /content/{id}/translations/{language}/accept`` (7830b93), which
     passes every check below and landed without raising this. 165 with
     ``POST /client-errors``, where an error boundary reports a render crash.
-    166 with ``POST /auth/logout``, which ends the session on the server."""
-    assert len(ROUTES) == 166
+    166 with ``POST /auth/logout``, which ends the session on the server; 168
+    with the digest's one-click unsubscribe, ``POST`` and its ``GET`` redirect."""
+    assert len(ROUTES) == 168
 
 
 @pytest.mark.parametrize("route", ROUTES)

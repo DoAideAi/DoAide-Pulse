@@ -754,4 +754,5 @@ def test_the_digest_says_how_to_turn_it_off(db, user, piece, publication, sent_m
     assert settings_url in mail["body"]
     assert "turn it off" in mail["body"].lower()
     assert settings_url in mail["html"]
-    assert mail["headers"].get("List-Unsubscribe") == f"<{settings_url}>"
+    # The header is the one-click link; see test_the_digest_unsubscribes_in_one_click.
+    assert mail["headers"].get("List-Unsubscribe") == f"<{digest.unsubscribe_url(user.id)}>"

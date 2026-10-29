@@ -1,7 +1,10 @@
 """Analytics dashboard endpoints."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -32,6 +35,7 @@ from app.schemas.analytics import (
     VelocityCurveDetailOut,
     VelocitySummaryOut,
 )
+from app.schemas.auth import MessageOut
 from app.schemas.errors import AUTHENTICATED, OWNED, errors
 from app.services import (
     accounts,
@@ -46,6 +50,7 @@ from app.services import (
 )
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -374,6 +379,64 @@ def digest_send(
         "reason": "" if sent else "The mail server refused the message.",
         "subject": built.subject,
     }
+
+
+_UNSUBSCRIBE_PATH = "/digest/unsubscribe/{user_id}/{token}"
+
+_NOT_A_LINK = HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND,
+    detail="This unsubscribe link is not one Pulse sent. Turn the digest off in Settings.",
+)
+
+
+@router.post(
+    _UNSUBSCRIBE_PATH,
+    response_model=MessageOut,
+    summary="Turn the weekly digest off from its email (one-click)",
+    responses=errors(status.HTTP_404_NOT_FOUND, status.HTTP_429_TOO_MANY_REQUESTS),
+)
+@limiter.limit(settings.rate_limit_public_read)
+def digest_unsubscribe(
+    request: Request,
+    response: Response,
+    user_id: RowId,
+    token: str = Path(min_length=32, max_length=32),
+    db: Session = Depends(get_db),
+) -> MessageOut:
+    """RFC 8058 one-click unsubscribe. **Unauthenticated**: the token is the credential.
+
+    What a mail provider POSTs to when its Unsubscribe button is pressed, with
+    no session and a body of ``List-Unsubscribe=One-Click`` this does not need
+    to read. The token is an HMAC of the account id (``digest.unsubscribe_token``)
+    and can do exactly one thing — switch that account's digest off. Answered
+    the same whether or not it was already off.
+    """
+    user = db.get(User, user_id)
+    if user is None or not digest.is_unsubscribe_token(user_id, token):
+        raise _NOT_A_LINK
+    if user.weekly_digest_enabled:
+        user.weekly_digest_enabled = False
+        db.commit()
+        logger.info("weekly digest turned off for user %s from its email", user_id)
+    return MessageOut(detail="You will not get the weekly digest any more.")
+
+
+@router.get(
+    _UNSUBSCRIBE_PATH,
+    status_code=status.HTTP_303_SEE_OTHER,
+    response_class=RedirectResponse,
+    summary="Open the digest setting (a GET never unsubscribes)",
+    # Nothing it does can fail; the size guard in front of every route can.
+    responses=errors(status.HTTP_413_CONTENT_TOO_LARGE),
+)
+def digest_unsubscribe_page(user_id: RowId, token: str) -> RedirectResponse:
+    """A GET to the unsubscribe link goes to Settings and changes nothing.
+
+    Link scanners, previewers and prefetchers issue GETs, and an unsubscribe
+    that fired on one would switch off digests nobody asked to stop. A person
+    who followed the link by hand lands on the switch.
+    """
+    return RedirectResponse(digest.digest_settings_url(), status_code=status.HTTP_303_SEE_OTHER)
 
 
 @router.get(

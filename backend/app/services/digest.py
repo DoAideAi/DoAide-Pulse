@@ -19,6 +19,8 @@ Two decisions shape the numbers:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -538,7 +540,7 @@ def render_text(digest: Digest) -> str:
 
 
 def digest_settings_url() -> str:
-    """Where the digest is switched off — the footer's link and List-Unsubscribe.
+    """Where the digest is switched off by hand — the footer's link.
 
     The digest is on by default for every account, and the email used to say
     nothing about stopping it: no footer line, no header, and no switch in
@@ -547,6 +549,36 @@ def digest_settings_url() -> str:
     reset link included.
     """
     return f"{settings.frontend_url.rstrip('/')}/settings#digest"
+
+
+def unsubscribe_token(user_id: int) -> str:
+    """The proof, in a digest's unsubscribe link, that the link was ours to send.
+
+    An HMAC of the account id under the server's secret, for this one purpose:
+    it can switch one account's digest off and nothing else, so it needs no
+    expiry and no row. Rotating ``JWT_SECRET`` retires every link at once.
+    """
+    message = f"digest-unsubscribe:{user_id}".encode()
+    return hmac.new(settings.jwt_secret.encode(), message, hashlib.sha256).hexdigest()[:32]
+
+
+def unsubscribe_url(user_id: int) -> str:
+    """The one-click unsubscribe URL (RFC 8058) for *user_id*'s digest.
+
+    On the API, not the app: a mail provider POSTs to it with no session, which
+    is the whole point — ``/settings#digest`` sits behind sign-in, and the
+    Unsubscribe button a client builds from ``List-Unsubscribe`` opened a login
+    form. See ``app.routers.analytics.digest_unsubscribe``.
+    """
+    return (
+        f"{settings.api_base_url}{settings.api_v1_prefix}/analytics/digest/unsubscribe/"
+        f"{user_id}/{unsubscribe_token(user_id)}"
+    )
+
+
+def is_unsubscribe_token(user_id: int, token: str) -> bool:
+    """Whether *token* is *user_id*'s unsubscribe token. Constant-time."""
+    return hmac.compare_digest(unsubscribe_token(user_id), token or "")
 
 
 def render_html(digest: Digest) -> str:
@@ -675,8 +707,13 @@ def send(
         subject=digest.subject,
         body=render_text(digest),
         html=render_html(digest),
-        # What mail clients turn into their own "Unsubscribe" button.
-        headers={"List-Unsubscribe": f"<{digest_settings_url()}>"},
+        # What mail clients turn into their own "Unsubscribe" button, and the
+        # one-click form of it (RFC 8058) Gmail and Yahoo require of recurring
+        # mail: the URL acts on a POST alone, no sign-in.
+        headers={
+            "List-Unsubscribe": f"<{unsubscribe_url(user.id)}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
     )
     if strict and not delivered:
         raise MailerRefused(f"the mailer refused user {user.id}'s digest")
