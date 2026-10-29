@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from app.config import settings
 from app.database import get_db, refresh_all
@@ -376,6 +377,14 @@ def reschedule(
     # unconditional write put a just-claimed row back to ``scheduled`` (or, for
     # a ``scheduled`` one, rewrote its time and attempt count under the worker),
     # and the next sweep posted it a second time.
+    # A move is a fresh start: a row that had burned two retries should not
+    # arrive at its new slot with one left.
+    values = {
+        "scheduled_for": when,
+        "status": PublicationStatus.SCHEDULED if when else PublicationStatus.PENDING,
+        "attempts": 0,
+        "error": None,
+    }
     for publication in targets:
         moved = db.execute(
             update(Publication)
@@ -383,16 +392,7 @@ def reschedule(
                 Publication.id == publication.id,
                 Publication.status.not_in(settled),
             )
-            .values(
-                scheduled_for=when,
-                status=(
-                    PublicationStatus.SCHEDULED if when else PublicationStatus.PENDING
-                ),
-                # A move is a fresh start: a row that had burned two retries
-                # should not arrive at its new slot with one left.
-                attempts=0,
-                error=None,
-            )
+            .values(**values)
             .execution_options(synchronize_session=False)
         ).rowcount
         if not moved:
@@ -403,9 +403,13 @@ def reschedule(
                 f"{publication.platform.value} was picked up just now. "
                 "Reload to see where it stands.",
             )
-    # The instances still hold what was loaded; the rows hold the move.
+    # The instances still hold what was loaded; the rows hold the move. Told
+    # what was written rather than re-read, so the status derivation below
+    # sees the move without a query per row (the response re-reads them all
+    # in one, after the commit).
     for publication in targets:
-        db.refresh(publication)
+        for key, value in values.items():
+            set_committed_value(publication, key, value)
 
     if payload.publication_id is None:
         content.scheduled_for = when
