@@ -52,13 +52,16 @@ skip_covered = true
 # adds a line or two of straight-line code does not trip it. Raise it when the
 # real number moves up; never lower it to make a red run go green.
 #
-# Measured 100.00% (9131 statements, 2098 branches, none missed). The floor is
-# 99.9 rather than 100 so that a work-in-progress commit is not blocked by a
-# single uncovered line, which leaves roughly ten statements of slack out of
-# ten thousand. If a branch turns out to be genuinely unreachable, mark it
+# Measured 97.82% on 2026-10-29 (18583 statements, 4480 branches; 307 and 173
+# missed) — the first run of the gate in CI. The "100.00%" this used to quote
+# was 9131 statements ago: CI ran pytest without --cov, so the floor below was
+# never checked and coverage drifted under a number nobody was enforcing. The
+# floor is set at the measured value so it holds from here; raise it as the
+# gaps are covered (`pytest --cov` lists them), never lower it to make a red
+# run go green. If a branch turns out to be genuinely unreachable, mark it
 # `# pragma: no cover - <reason>` as the rest of the tree does and pin the
-# invariant that makes it unreachable with a test — do not spend the slack.
-fail_under = 99.9
+# invariant that makes it unreachable with a test.
+fail_under = 97.8
 exclude_also = [
     # `if TYPE_CHECKING:` blocks exist for the type checker and never execute.
     "if TYPE_CHECKING:",

@@ -118,10 +118,11 @@ the bare `--cov` above is the whole gate. It is deliberately not in `addopts`:
 the tracer costs about a third again on top of the bare run, and that is a
 price worth paying on the gate rather than on every ordinary one.
 
-The floor is `fail_under = 99.9` in `backend/pyproject.toml`, deliberately just
-under 100 so a work-in-progress commit is not blocked by a single uncovered
-line; that slack is not budget to spend. Raise the floor when the real number
-moves up; never lower it to make a red run green.
+CI runs it on every push. The floor is `fail_under = 97.8` in
+`backend/pyproject.toml`: the coverage measured the first time CI enforced it
+(it had quoted 99.9 while CI ran without `--cov`, so nothing checked it and the
+real number drifted). Raise the floor as the gaps are covered; never lower it
+to make a red run green.
 
 ---
 

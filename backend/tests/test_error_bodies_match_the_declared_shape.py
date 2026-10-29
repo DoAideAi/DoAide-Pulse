@@ -112,9 +112,10 @@ def test_the_two_sweeps_are_the_size_they_should_be():
     the pin and left this failing on main. 140 with ``DELETE /auth/me``. 141
     with ``GET /auth/me/export``, which landed while ``/openapi.json`` was a 500
     and this whole module failed before reaching the pin. 142 with
-    ``POST /content/{id}/translations/{language}/accept``.
+    ``POST /content/{id}/translations/{language}/accept``. 143 with
+    ``POST /auth/logout``.
     """
-    assert len(AUTHENTICATED) == 142
+    assert len(AUTHENTICATED) == 143
     assert len(BY_ID) == 68
 
 
